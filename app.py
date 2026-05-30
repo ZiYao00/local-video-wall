@@ -60,6 +60,10 @@ DEFAULT_CONFIG = {
     "sort_mode": "mtime_desc",
     "immersive": False,
     "language": "en",
+    "slideshow_interval": 5,
+    "slideshow_effect": "drift",
+    "slideshow_fit": "contain",
+    "slideshow_loop": True,
 }
 
 runtime_lock = threading.Lock()
@@ -98,6 +102,12 @@ def load_config() -> dict:
     cfg["columns"] = clamp_int(cfg.get("columns"), 6, 4, 9)
     cfg["play_limit"] = clamp_int(cfg.get("play_limit"), 24, 12, 30)
     cfg["language"] = normalize_language(cfg.get("language", "en"))
+    cfg["slideshow_interval"] = clamp_int(cfg.get("slideshow_interval"), 5, 3, 12)
+    if cfg.get("slideshow_effect") not in {"fade", "slide", "drift", "random"}:
+        cfg["slideshow_effect"] = "drift"
+    if cfg.get("slideshow_fit") not in {"contain", "cover"}:
+        cfg["slideshow_fit"] = "contain"
+    cfg["slideshow_loop"] = bool(cfg.get("slideshow_loop", True))
     return cfg
 
 
@@ -110,6 +120,12 @@ def save_config(cfg: dict) -> dict:
     merged["columns"] = clamp_int(merged.get("columns"), 6, 4, 9)
     merged["play_limit"] = clamp_int(merged.get("play_limit"), 24, 12, 30)
     merged["language"] = normalize_language(merged.get("language", "en"))
+    merged["slideshow_interval"] = clamp_int(merged.get("slideshow_interval"), 5, 3, 12)
+    if merged.get("slideshow_effect") not in {"fade", "slide", "drift", "random"}:
+        merged["slideshow_effect"] = "drift"
+    if merged.get("slideshow_fit") not in {"contain", "cover"}:
+        merged["slideshow_fit"] = "contain"
+    merged["slideshow_loop"] = bool(merged.get("slideshow_loop", True))
     if not merged["remember_path"]:
         merged["last_video_dir"] = ""
     else:
@@ -556,6 +572,10 @@ class AppHandler(BaseHTTPRequestHandler):
                 "sort_mode": sort_mode,
                 "immersive": immersive,
                 "language": language,
+                "slideshow_interval": payload.get("slideshow_interval", DEFAULT_CONFIG["slideshow_interval"]),
+                "slideshow_effect": payload.get("slideshow_effect", DEFAULT_CONFIG["slideshow_effect"]),
+                "slideshow_fit": payload.get("slideshow_fit", DEFAULT_CONFIG["slideshow_fit"]),
+                "slideshow_loop": bool(payload.get("slideshow_loop", DEFAULT_CONFIG["slideshow_loop"])),
             })
             self.send_json({
                 "ok": True,
@@ -576,6 +596,10 @@ class AppHandler(BaseHTTPRequestHandler):
                 "sort_mode": payload.get("sort_mode", cfg.get("sort_mode", "mtime_desc")),
                 "immersive": bool(payload.get("immersive", cfg.get("immersive", False))),
                 "language": normalize_language(payload.get("language", cfg.get("language", "en"))),
+                "slideshow_interval": payload.get("slideshow_interval", cfg.get("slideshow_interval", 5)),
+                "slideshow_effect": payload.get("slideshow_effect", cfg.get("slideshow_effect", "drift")),
+                "slideshow_fit": payload.get("slideshow_fit", cfg.get("slideshow_fit", "contain")),
+                "slideshow_loop": bool(payload.get("slideshow_loop", cfg.get("slideshow_loop", True))),
             })
             current = str(get_current_video_dir() or "")
             if cfg.get("remember_path"):

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.0 - 2026-05-30
+
+- Added image-only fullscreen slideshow from the image modal.
+- Added slideshow controls for play / pause, previous / next, interval, effect, fit, and loop.
+- Added keyboard controls: Esc, Space, Left, and Right.
+- Added fade, slide, drift, and random slideshow effects.
+- Added persistent slideshow settings in `config.json`.
+
 ## 1.3.0 - 2026-05-30
 
 - Added `service.bat` for background start, stop, startup install, startup uninstall, browser open, and status checks.

@@ -50,12 +50,33 @@ Acceptance checks:
 - Move/delete actions can be audited from a local log.
 - Image and video cards remain visually consistent.
 
+## v1.4.0 - Image Slideshow - Done
+
+Goal: add a visual review mode specifically for images.
+
+- Image-only fullscreen slideshow from the image modal
+- Play / pause
+- Previous / next
+- Interval controls
+- Fade / slide / drift / random effects
+- Contain / cover fit modes
+- Loop toggle
+- Keyboard controls
+
+Acceptance checks:
+
+- Slideshow button only appears for images.
+- Slideshow starts from the current image.
+- Slideshow uses the current filtered image list.
+- Drift effect slowly pans and zooms the image.
+
 ## Later Ideas
 
 - Tag system
 - Star rating
 - Folder presets
 - Contact sheet export
-- Keyboard shortcuts
+- Slideshow drift strength presets
+- Slideshow thumbnail strip
 - Release ZIP packaging
 - Optional thumbnail cache

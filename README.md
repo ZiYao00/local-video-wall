@@ -12,6 +12,7 @@ It is designed for quickly scanning large folders of local short video assets, e
 
 - Scan a local video folder
 - Browse videos and images in one wall
+- Start a fullscreen image-only slideshow from an image modal
 - Enter a folder path manually
 - Use a Windows folder picker
 - Remember the last folder path
@@ -29,6 +30,8 @@ It is designed for quickly scanning large folders of local short video assets, e
 - Open a clicked video in a larger player
 - Show a video file in its folder
 - Move files safely to `_video_wall_review` or `_video_wall_trash`
+- Slideshow controls: play / pause, previous / next, interval, effect, fit, and loop
+- Slideshow effects: fade, slide, drift, and random
 - English interface by default, with a Chinese toggle in the top toolbar
 - Favorite clips, mark selected clips, and filter review results
 
@@ -144,6 +147,8 @@ config.json
 ```
 
 This file can contain local folder paths, so it should not be uploaded to GitHub. Use `config.example.json` as the shareable example instead.
+
+Slideshow settings such as interval, effect, fit mode, and loop mode are also saved locally in `config.json`.
 
 ## Project Structure
 

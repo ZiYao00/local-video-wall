@@ -6,5 +6,9 @@
   "play_limit": 24,
   "sort_mode": "mtime_desc",
   "immersive": false,
-  "language": "en"
+  "language": "en",
+  "slideshow_interval": 5,
+  "slideshow_effect": "drift",
+  "slideshow_fit": "contain",
+  "slideshow_loop": true
 }

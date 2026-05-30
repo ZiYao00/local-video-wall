@@ -93,10 +93,45 @@
     <div class="modal-content">
       <div class="modal-header">
         <div class="modal-title"><strong id="modalName"></strong><span id="modalMeta"></span></div>
-        <div class="modal-actions"><button id="modalMoveReview" class="btn">Move to Review</button><button id="modalMoveTrash" class="btn">Move to Trash</button><button id="modalOpenFolder" class="btn">Show in Folder</button><button id="modalClose" class="btn ghost">Close</button></div>
+        <div class="modal-actions"><button id="modalSlideshow" class="btn hidden">Slideshow</button><button id="modalMoveReview" class="btn">Move to Review</button><button id="modalMoveTrash" class="btn">Move to Trash</button><button id="modalOpenFolder" class="btn">Show in Folder</button><button id="modalClose" class="btn ghost">Close</button></div>
       </div>
       <video id="modalVideo" class="modal-video" controls loop autoplay playsinline></video>
       <img id="modalImage" class="modal-image hidden" alt="" />
+    </div>
+  </div>
+  <div id="slideshow" class="slideshow hidden" role="dialog" aria-modal="true">
+    <div class="slideshow-stage">
+      <img id="slideshowImageA" class="slideshow-image" alt="" />
+      <img id="slideshowImageB" class="slideshow-image hidden" alt="" />
+    </div>
+    <div class="slideshow-top">
+      <div>
+        <strong id="slideshowName"></strong>
+        <span id="slideshowCounter"></span>
+      </div>
+      <button id="slideshowClose" class="btn ghost">Close</button>
+    </div>
+    <div class="slideshow-controls">
+      <button id="slideshowPrev" class="btn">Prev</button>
+      <button id="slideshowPlay" class="btn primary">Pause</button>
+      <button id="slideshowNext" class="btn">Next</button>
+      <select id="slideshowInterval" class="select small">
+        <option value="3">3s</option>
+        <option value="5">5s</option>
+        <option value="8">8s</option>
+        <option value="12">12s</option>
+      </select>
+      <select id="slideshowEffect" class="select">
+        <option value="fade">Fade</option>
+        <option value="slide">Slide</option>
+        <option value="drift">Drift</option>
+        <option value="random">Random</option>
+      </select>
+      <select id="slideshowFit" class="select">
+        <option value="contain">Contain</option>
+        <option value="cover">Cover</option>
+      </select>
+      <label class="check"><input id="slideshowLoop" type="checkbox" checked /><span id="slideshowLoopLabel">Loop</span></label>
     </div>
   </div>
   <script src="/static/app.js"></script>
