@@ -29,6 +29,7 @@ const state = {
   videoMode: "loop",
   modalControlsHidden: false,
   modalWheelTime: 0,
+  mediaNavTimer: null,
   scannedPath: "",
   updateTimer: null,
 };
@@ -97,8 +98,8 @@ const i18n = {
     cover: "Cover",
     hideUi: "Hide UI",
     showUi: "Show UI",
-    loopOne: "Loop One",
-    sequential: "Sequential",
+    loopOne: "Loop",
+    sequential: "Seq",
     randomPlay: "Random",
     fullscreen: "Fullscreen",
     exitFullscreen: "Exit Fullscreen",
@@ -209,9 +210,9 @@ const i18n = {
     cover: "填满屏幕",
     hideUi: "隐藏控制",
     showUi: "显示控制",
-    loopOne: "单个循环",
-    sequential: "顺序播放",
-    randomPlay: "随机播放",
+    loopOne: "循环",
+    sequential: "顺序",
+    randomPlay: "随机",
     fullscreen: "全屏",
     exitFullscreen: "退出全屏",
     volumeLabel: "音量",
@@ -299,13 +300,14 @@ const modalOpenFolder = $("#modalOpenFolder");
 const modalMoveReview = $("#modalMoveReview");
 const modalMoveTrash = $("#modalMoveTrash");
 const modalSlideshow = $("#modalSlideshow");
+const modalImageUiToggle = $("#modalImageUiToggle");
 const modalPrev = $("#modalPrev");
 const modalNext = $("#modalNext");
 const modalVideoControls = $("#modalVideoControls");
 const modalVideoModeSeg = $("#modalVideoModeSeg");
 const modalFullscreen = $("#modalFullscreen");
 const modalVideoUiToggle = $("#modalVideoUiToggle");
-const modalVideoUiShow = $("#modalVideoUiShow");
+const modalUiShow = $("#modalUiShow");
 const slideshow = $("#slideshow");
 const slideshowImageA = $("#slideshowImageA");
 const slideshowImageB = $("#slideshowImageB");
@@ -416,12 +418,13 @@ function applyLanguage() {
   modalMoveTrash.textContent = tx.moveTrash;
   modalOpenFolder.textContent = tx.showInFolder;
   modalClose.textContent = tx.close;
+  modalImageUiToggle.textContent = labelText("hideUi", "Hide UI", "隐藏控制");
   modalVideoModeSeg.querySelector('[data-video-mode="loop"]').textContent = tx.loopOne;
   modalVideoModeSeg.querySelector('[data-video-mode="sequence"]').textContent = tx.sequential;
   modalVideoModeSeg.querySelector('[data-video-mode="random"]').textContent = tx.randomPlay;
   updateFullscreenLabels();
   modalVideoUiToggle.textContent = labelText("hideUi", "Hide UI", "隐藏控制");
-  modalVideoUiShow.textContent = labelText("showUi", "Show UI", "显示控制");
+  modalUiShow.textContent = labelText("showUi", "Show UI", "显示控制");
   slideshowClose.textContent = tx.close;
   slideshowPrev.textContent = tx.prev;
   slideshowNext.textContent = tx.next;
@@ -805,6 +808,7 @@ function renderModalItem(item) {
   modalVideo.classList.toggle("hidden", item.type === "image");
   modalImage.classList.toggle("hidden", item.type !== "image");
   modalSlideshow.classList.toggle("hidden", item.type !== "image");
+  modalImageUiToggle.classList.toggle("hidden", item.type !== "image");
   modalVideoControls.classList.toggle("hidden", item.type !== "video");
   modalContent.classList.toggle("is-video", item.type === "video");
   if (item.type === "image") {
@@ -828,14 +832,16 @@ function openModal(item) {
 
 function closeModal() {
   if (isModalFullscreen()) document.exitFullscreen?.();
+  clearTimeout(state.mediaNavTimer);
   modalVideo.pause();
   modalVideo.removeAttribute("src");
   modalVideo.load();
   modalImage.removeAttribute("src");
   modalSlideshow.classList.add("hidden");
+  modalImageUiToggle.classList.add("hidden");
   modalVideoControls.classList.add("hidden");
-  modalContent.classList.remove("is-video", "controls-hidden");
-  modalVideoUiShow.classList.add("hidden");
+  modalContent.classList.remove("is-video", "controls-hidden", "nav-active");
+  modalUiShow.classList.add("hidden");
   modalPrev.classList.add("hidden");
   modalNext.classList.add("hidden");
   modal.classList.add("hidden");
@@ -992,7 +998,9 @@ function closeSlideshow() {
   if (isSlideshowFullscreen()) document.exitFullscreen?.();
   clearTimeout(state.slideshowTimer);
   clearTimeout(state.slideshowCleanupTimer);
+  clearTimeout(state.mediaNavTimer);
   setSlideshowControlsHidden(false);
+  slideshow.classList.remove("nav-active");
   slideshow.classList.add("hidden");
   slideshowImageA.removeAttribute("src");
   slideshowImageB.removeAttribute("src");
@@ -1005,14 +1013,30 @@ function setSlideshowControlsHidden(hidden) {
   slideshowUiShow.classList.toggle("hidden", !hidden);
   slideshowUiToggle.textContent = labelText("hideUi", "Hide UI", "隐藏控制");
   slideshowUiShow.textContent = labelText("showUi", "Show UI", "显示控制");
+  if (hidden) {
+    slideshow.classList.remove("nav-active");
+  }
 }
 
 function setModalControlsHidden(hidden) {
   state.modalControlsHidden = hidden;
   modalContent.classList.toggle("controls-hidden", hidden);
-  modalVideoUiShow.classList.toggle("hidden", !hidden);
+  modalUiShow.classList.toggle("hidden", !hidden);
+  modalImageUiToggle.textContent = labelText("hideUi", "Hide UI", "隐藏控制");
   modalVideoUiToggle.textContent = labelText("hideUi", "Hide UI", "隐藏控制");
-  modalVideoUiShow.textContent = labelText("showUi", "Show UI", "显示控制");
+  modalUiShow.textContent = labelText("showUi", "Show UI", "显示控制");
+  if (hidden) {
+    modalContent.classList.remove("nav-active");
+  }
+}
+
+function pulseMediaNav(container) {
+  if (!container || container.classList.contains("controls-hidden")) return;
+  container.classList.add("nav-active");
+  clearTimeout(state.mediaNavTimer);
+  state.mediaNavTimer = setTimeout(() => {
+    container.classList.remove("nav-active");
+  }, 1000);
 }
 
 function toggleModalFullscreen() {
@@ -1317,6 +1341,9 @@ modalClose.addEventListener("click", closeModal);
 modal.addEventListener("click", e => {
   if (e.target?.dataset?.close) closeModal();
 });
+modal.addEventListener("mousemove", () => {
+  if (!modal.classList.contains("hidden")) pulseMediaNav(modalContent);
+});
 modal.addEventListener("wheel", e => {
   if (modal.classList.contains("hidden") || !state.currentModalItem) return;
   const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
@@ -1347,8 +1374,9 @@ modalVideoModeSeg.addEventListener("click", e => {
   updateVideoModeUI();
 });
 modalFullscreen.addEventListener("click", toggleModalFullscreen);
+modalImageUiToggle.addEventListener("click", () => setModalControlsHidden(true));
 modalVideoUiToggle.addEventListener("click", () => setModalControlsHidden(true));
-modalVideoUiShow.addEventListener("click", () => setModalControlsHidden(false));
+modalUiShow.addEventListener("click", () => setModalControlsHidden(false));
 modalVideo.addEventListener("ended", () => {
   if (state.currentModalItem?.type !== "video") return;
   if (state.videoMode === "sequence") showModalVideo(1);
@@ -1360,6 +1388,9 @@ modalOpenFolder.addEventListener("click", () => {
 modalMoveReview.addEventListener("click", () => runFileAction("move_review"));
 modalMoveTrash.addEventListener("click", () => runFileAction("move_trash"));
 modalSlideshow.addEventListener("click", openSlideshowFromCurrent);
+slideshow.addEventListener("mousemove", () => {
+  if (!slideshow.classList.contains("hidden")) pulseMediaNav(slideshow);
+});
 slideshowClose.addEventListener("click", closeSlideshow);
 slideshowPrev.addEventListener("click", () => showNextSlide(-1));
 slideshowNext.addEventListener("click", () => showNextSlide(1));

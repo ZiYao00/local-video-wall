@@ -95,22 +95,13 @@
     <div class="modal-content">
       <div class="modal-header">
         <div class="modal-title"><strong id="modalName"></strong><span id="modalMeta"></span></div>
-        <div class="modal-actions"><button id="modalSlideshow" class="btn hidden">Slideshow</button><button id="modalMoveReview" class="btn">Move to Review</button><button id="modalMoveTrash" class="btn">Move to Trash</button><button id="modalOpenFolder" class="btn">Show in Folder</button><button id="modalClose" class="btn ghost">Close</button></div>
+        <div class="modal-actions"><button id="modalSlideshow" class="btn hidden">Slideshow</button><button id="modalImageUiToggle" class="btn ghost hidden">Hide UI</button><button id="modalMoveReview" class="btn">Move to Review</button><button id="modalMoveTrash" class="btn">Move to Trash</button><button id="modalOpenFolder" class="btn">Show in Folder</button><div id="modalVideoControls" class="modal-video-controls hidden"><div id="modalVideoModeSeg" class="seg"><button data-video-mode="loop">Loop</button><button data-video-mode="sequence">Seq</button><button data-video-mode="random">Random</button></div><button id="modalFullscreen" class="btn">Fullscreen</button><button id="modalVideoUiToggle" class="btn ghost">Hide UI</button></div><button id="modalClose" class="btn ghost">Close</button></div>
       </div>
       <button id="modalPrev" class="modal-nav modal-nav-prev hidden" aria-label="Previous item">&#8249;</button>
       <button id="modalNext" class="modal-nav modal-nav-next hidden" aria-label="Next item">&#8250;</button>
       <video id="modalVideo" class="modal-video" controls loop autoplay playsinline></video>
       <img id="modalImage" class="modal-image hidden" alt="" />
-      <div id="modalVideoControls" class="modal-video-controls hidden">
-        <div id="modalVideoModeSeg" class="seg">
-          <button data-video-mode="loop">Loop One</button>
-          <button data-video-mode="sequence">Sequential</button>
-          <button data-video-mode="random">Random</button>
-        </div>
-        <button id="modalFullscreen" class="btn">Fullscreen</button>
-        <button id="modalVideoUiToggle" class="btn ghost">Hide UI</button>
-      </div>
-      <button id="modalVideoUiShow" class="btn modal-show-ui hidden">Show UI</button>
+      <button id="modalUiShow" class="btn modal-show-ui hidden">Show UI</button>
     </div>
   </div>
   <div id="slideshow" class="slideshow hidden" role="dialog" aria-modal="true">
@@ -125,6 +116,7 @@
         <strong id="slideshowName"></strong>
         <span id="slideshowCounter"></span>
       </div>
+      <button id="slideshowUiToggle" class="btn ghost">Hide UI</button>
       <button id="slideshowClose" class="btn ghost">Close</button>
     </div>
     <div class="slideshow-controls">
@@ -161,7 +153,6 @@
       </select>
       <label class="check"><input id="slideshowLoop" type="checkbox" checked /><span id="slideshowLoopLabel">Loop</span></label>
       <button id="slideshowFullscreen" class="btn">Fullscreen</button>
-      <button id="slideshowUiToggle" class="btn ghost">Hide UI</button>
     </div>
     <button id="slideshowUiShow" class="btn slideshow-show-ui hidden">Show UI</button>
   </div>

@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.6.5 - 2026-06-01
+
+- Increased media previous / next arrow size for image, slideshow, and video viewers.
+- Kept media arrows hidden by default until mouse movement.
+- Reduced media arrow idle time so arrows begin fading out after about one second.
+
+## 1.6.4 - 2026-06-01
+
+- Added hide / show controls to the image preview modal.
+- Moved slideshow hide UI control into the top-right slideshow toolbar.
+- Aligned image modal, slideshow, and video modal UI hiding behavior.
+
+## 1.6.3 - 2026-06-01
+
+- Merged video playback mode, fullscreen, and hide UI controls into the top video overlay toolbar.
+- Removed the separate bottom custom video control bar so the native video controls remain visually separate.
+- Shortened video mode labels for a more compact toolbar.
+
+## 1.6.2 - 2026-06-01
+
+- Updated media navigation arrows to fade in only during mouse activity.
+- Restyled previous / next arrows with a larger borderless shadowed design.
+- Moved video overlay controls higher so they do not overlap the browser's native video controls.
+
 ## 1.6.1 - 2026-06-01
 
 - Changed the video preview modal header and video controls to overlay the video instead of reducing the viewing area.
