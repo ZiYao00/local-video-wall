@@ -15,6 +15,8 @@ const state = {
   mediaType: "all",
   immersive: false,
   language: "en",
+  theme: "dark",
+  buttonStyle: "text",
   slideshowItems: [],
   slideshowIndex: 0,
   slideshowPlaying: true,
@@ -29,6 +31,7 @@ const state = {
   videoMode: "loop",
   modalControlsHidden: false,
   modalWheelTime: 0,
+  slideshowWheelTime: 0,
   mediaNavTimer: null,
   scannedPath: "",
   updateTimer: null,
@@ -37,6 +40,36 @@ const state = {
 const COLUMN_WIDTHS = { 4: 300, 5: 260, 6: 220, 7: 190, 8: 165, 9: 145, 12: 94, 16: 66 };
 const COLUMN_GAPS = { 4: 18, 5: 18, 6: 18, 7: 16, 8: 14, 9: 12, 12: 8, 16: 6 };
 const COLUMN_OPTIONS = Object.keys(COLUMN_WIDTHS).map(Number);
+
+const ICONS = {
+  back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/><path d="M9 12h11"/></svg>',
+  check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>',
+  close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>',
+  download: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>',
+  eye: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  eyeOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6A3 3 0 0 0 13.4 13.4"/><path d="M9.9 4.3A10.6 10.6 0 0 1 12 4c6 0 10 8 10 8a17.8 17.8 0 0 1-3.1 4.3"/><path d="M6.2 6.5C3.5 8.3 2 12 2 12s4 8 10 8a10 10 0 0 0 5-1.4"/></svg>',
+  folder: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h5l2 2"/></svg>',
+  fullscreen: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5"/><path d="M16 3h5v5"/><path d="M21 16v5h-5"/><path d="M8 21H3v-5"/></svg>',
+  fullscreenExit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v6H3"/><path d="M15 3v6h6"/><path d="M15 21v-6h6"/><path d="M9 21v-6H3"/></svg>',
+  globe: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18"/><path d="M12 3a15 15 0 0 0 0 18"/></svg>',
+  iconMode: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="3"/><circle cx="9" cy="12" r="1.6"/><path d="M13 10h4"/><path d="M13 14h4"/></svg>',
+  image: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8" cy="10" r="2"/><path d="M21 16l-5-5L5 19"/></svg>',
+  language: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h9"/><path d="M9 3v2"/><path d="M6 5c.8 3 2.8 5.4 6 7"/><path d="M12 5c-.8 3-2.8 5.4-6 7"/><path d="M14 21l4-9 4 9"/><path d="M15.4 18h5.2"/></svg>',
+  list: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h12"/><path d="M8 12h12"/><path d="M8 18h12"/><path d="M4 6h.01"/><path d="M4 12h.01"/><path d="M4 18h.01"/></svg>',
+  moon: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 15.5A8.5 8.5 0 0 1 8.5 4 7 7 0 1 0 20 15.5z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14"/><path d="M16 5v14"/></svg>',
+  play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>',
+  scan: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7V4h3"/><path d="M17 4h3v3"/><path d="M20 17v3h-3"/><path d="M7 20H4v-3"/><path d="M7 12h10"/></svg>',
+  shuffle: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 7h3c4 0 5 10 9 10h5"/><path d="M16 21h5v-5"/><path d="M4 17h3c1.7 0 2.9-1.8 4-4"/><path d="M14 7c.8-.7 1.8-1 3-1h4"/></svg>',
+  slideshow: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M10 8v5l4-2.5z"/></svg>',
+  star: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z"/></svg>',
+  sun: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.9 4.9l1.4 1.4"/><path d="M17.7 17.7l1.4 1.4"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.9 19.1l1.4-1.4"/><path d="M17.7 6.3l1.4-1.4"/></svg>',
+  repeat: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>',
+  textMode: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18h14"/><path d="M8 18l4-12 4 12"/><path d="M9.5 13h5"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 14h10l1-14"/><path d="M9 7V4h6v3"/></svg>',
+  left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>',
+  right: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>',
+};
 
 const i18n = {
   en: {
@@ -147,9 +180,10 @@ const i18n = {
       name_desc: "Filename Z-A",
       size_desc: "Size large-small",
       size_asc: "Size small-large",
+      random: "Random order",
     },
     colLabel: n => `${n} cols`,
-    playLabel: n => `Play ${n}`,
+    playLabel: n => `Play ${n} at once`,
   },
   zh: {
     htmlLang: "zh-CN",
@@ -259,9 +293,10 @@ const i18n = {
       name_desc: "文件名 Z-A",
       size_desc: "文件大-小",
       size_asc: "文件小-大",
+      random: "随机顺序",
     },
     colLabel: n => `${n}列`,
-    playLabel: n => `播放${n}`,
+    playLabel: n => `同时播放${n}`,
   },
 };
 
@@ -281,12 +316,13 @@ const mediaTypeSelect = $("#mediaTypeSelect");
 const sortSelect = $("#sortSelect");
 const playLimitSelect = $("#playLimitSelect");
 const columnsSeg = $("#columnsSeg");
-const shuffleBtn = $("#shuffleBtn");
 const exportCsvBtn = $("#exportCsvBtn");
 const pauseBtn = $("#pauseBtn");
 const immersiveBtn = $("#immersiveBtn");
 const expandBtn = $("#expandBtn");
 const langToggle = $("#langToggle");
+const themeToggle = $("#themeToggle");
+const buttonStyleToggle = $("#buttonStyleToggle");
 const emptyState = $("#emptyState");
 const toast = $("#toast");
 const modal = $("#modal");
@@ -307,7 +343,10 @@ const modalVideoControls = $("#modalVideoControls");
 const modalVideoModeSeg = $("#modalVideoModeSeg");
 const modalFullscreen = $("#modalFullscreen");
 const modalVideoUiToggle = $("#modalVideoUiToggle");
+const modalHiddenActions = $("#modalHiddenActions");
 const modalUiShow = $("#modalUiShow");
+const modalHiddenExitFullscreen = $("#modalHiddenExitFullscreen");
+const modalHiddenClose = $("#modalHiddenClose");
 const slideshow = $("#slideshow");
 const slideshowImageA = $("#slideshowImageA");
 const slideshowImageB = $("#slideshowImageB");
@@ -326,7 +365,10 @@ const slideshowLoop = $("#slideshowLoop");
 const slideshowLoopLabel = $("#slideshowLoopLabel");
 const slideshowFullscreen = $("#slideshowFullscreen");
 const slideshowUiToggle = $("#slideshowUiToggle");
+const slideshowHiddenActions = $("#slideshowHiddenActions");
 const slideshowUiShow = $("#slideshowUiShow");
+const slideshowExitFullscreen = $("#slideshowExitFullscreen");
+const slideshowBackToPreview = $("#slideshowBackToPreview");
 
 function t() {
   return i18n[state.language] || i18n.en;
@@ -334,6 +376,33 @@ function t() {
 
 function labelText(key, en, zh) {
   return t()[key] || (state.language === "zh" ? zh : en);
+}
+
+function compactText(key, en) {
+  const tx = t();
+  return state.language === "en" ? en : (tx[key] || en);
+}
+
+function iconSvg(name) {
+  return ICONS[name] || "";
+}
+
+function setButtonLabel(button, text, iconName, options = {}) {
+  if (!button) return;
+  const title = options.title || text;
+  const iconOnly = options.iconOnly ?? state.buttonStyle === "icons";
+  button.title = title;
+  button.setAttribute("aria-label", title);
+  button.classList.toggle("icon-only", iconOnly);
+  if (iconOnly && iconName) {
+    button.innerHTML = iconSvg(iconName);
+  } else {
+    button.textContent = text;
+  }
+}
+
+function applyTheme() {
+  document.body.classList.toggle("theme-light", state.theme === "light");
 }
 
 function isModalFullscreen() {
@@ -346,8 +415,52 @@ function isSlideshowFullscreen() {
 
 function updateFullscreenLabels() {
   const tx = t();
-  modalFullscreen.textContent = isModalFullscreen() ? tx.exitFullscreen : tx.fullscreen;
-  slideshowFullscreen.textContent = isSlideshowFullscreen() ? tx.exitFullscreen : tx.fullscreen;
+  const fullScreenText = labelText("fullScreen", "Full Screen", "完整屏幕");
+  const exitFullScreenText = labelText("exitFullScreen", "Exit Full Screen", "退出完整屏幕");
+  setButtonLabel(modalFullscreen, isModalFullscreen() ? tx.exitFullscreen : tx.fullscreen, isModalFullscreen() ? "fullscreenExit" : "fullscreen");
+  setButtonLabel(slideshowFullscreen, isSlideshowFullscreen() ? exitFullScreenText : fullScreenText, isSlideshowFullscreen() ? "fullscreenExit" : "fullscreen");
+  setButtonLabel(modalHiddenExitFullscreen, exitFullScreenText, "fullscreenExit");
+  modalHiddenExitFullscreen.classList.toggle("hidden", !(state.modalControlsHidden && isModalFullscreen()));
+  setButtonLabel(modalHiddenClose, tx.close, "close");
+  modalHiddenActions.classList.toggle("hidden", !state.modalControlsHidden);
+  setButtonLabel(slideshowExitFullscreen, exitFullScreenText, "fullscreenExit");
+  slideshowExitFullscreen.classList.toggle("hidden", !(state.slideshowControlsHidden && isSlideshowFullscreen()));
+  setButtonLabel(slideshowBackToPreview, labelText("backToPreview", "Back", "返回"), "back");
+  slideshowHiddenActions.classList.toggle("hidden", !state.slideshowControlsHidden);
+}
+
+function applyActionButtons() {
+  const tx = t();
+  const switchLanguageTitle = state.language === "en" ? "Switch to Chinese" : "切换到英文";
+  const themeText = state.theme === "dark" ? labelText("lightTheme", "Light Theme", "亮色主题") : labelText("darkTheme", "Dark Theme", "暗色主题");
+  const styleText = state.buttonStyle === "icons" ? labelText("textButtons", "Text Buttons", "文字按钮") : labelText("iconButtons", "Icon Buttons", "图标按钮");
+  document.body.classList.toggle("icon-buttons", state.buttonStyle === "icons");
+  setButtonLabel(langToggle, tx.langToggle, "language", { iconOnly: true, title: switchLanguageTitle });
+  setButtonLabel(themeToggle, themeText, state.theme === "dark" ? "sun" : "moon", { iconOnly: true });
+  setButtonLabel(buttonStyleToggle, styleText, state.buttonStyle === "icons" ? "textMode" : "iconMode", { iconOnly: true });
+  setButtonLabel(chooseFolderBtn, tx.chooseFolder, "folder");
+  setButtonLabel(scanBtn, tx.scan, "scan");
+  setButtonLabel(expandBtn, tx.expand, "fullscreen");
+  setButtonLabel(exportCsvBtn, tx.exportCsv, "download");
+  setButtonLabel(pauseBtn, state.playingEnabled ? tx.pauseAll : tx.resume, state.playingEnabled ? "pause" : "play");
+  setButtonLabel(immersiveBtn, state.immersive ? tx.exitImmersive : tx.immersive, state.immersive ? "close" : "fullscreen");
+  setButtonLabel(modalSlideshow, labelText("slideshowFullscreen", "Slideshow (Fullscreen)", "幻灯片（全屏）"), "slideshow");
+  setButtonLabel(modalMoveReview, tx.moveReview, "star");
+  setButtonLabel(modalMoveTrash, tx.moveTrash, "trash");
+  setButtonLabel(modalOpenFolder, tx.showInFolder, "folder");
+  setButtonLabel(modalImageUiToggle, labelText("hideUi", "Hide UI", "隐藏控制"), "eyeOff");
+  setButtonLabel(modalVideoUiToggle, labelText("hideUi", "Hide UI", "隐藏控制"), "eyeOff");
+  setButtonLabel(modalUiShow, labelText("showUi", "Show UI", "显示控制"), "eye");
+  setButtonLabel(modalClose, tx.close, "close");
+  updateVideoModeUI();
+  setButtonLabel(slideshowPrev, tx.prev, "left");
+  setButtonLabel(slideshowNext, tx.next, "right");
+  setButtonLabel(slideshowPlay, state.slideshowPlaying ? tx.pause : tx.play, state.slideshowPlaying ? "pause" : "play");
+  setButtonLabel(slideshowUiToggle, compactText("hideUi", "Hide"), "eyeOff");
+  setButtonLabel(slideshowUiShow, labelText("showUi", "Show UI", "显示控制"), "eye");
+  setButtonLabel(slideshowClose, tx.close, "close");
+  document.querySelectorAll(".tiny-btn").forEach(btn => setButtonLabel(btn, tx.location, "folder"));
+  updateFullscreenLabels();
 }
 
 function fmtBytes(mb) {
@@ -374,7 +487,7 @@ function showToast(message, ms = 2600) {
 function setBusy(isBusy) {
   scanBtn.disabled = isBusy;
   chooseFolderBtn.disabled = isBusy;
-  scanBtn.textContent = isBusy ? t().scanning : t().scan;
+  setButtonLabel(scanBtn, isBusy ? t().scanning : t().scan, "scan");
 }
 
 function applyLanguage() {
@@ -409,11 +522,10 @@ function applyLanguage() {
   sortSelect.title = tx.sortTitle;
   columnsSeg.title = tx.columnsTitle;
   playLimitSelect.title = tx.playLimitTitle;
-  shuffleBtn.textContent = tx.shuffle;
   exportCsvBtn.textContent = tx.exportCsv;
   pauseBtn.textContent = state.playingEnabled ? tx.pauseAll : tx.resume;
   immersiveBtn.textContent = state.immersive ? tx.exitImmersive : tx.immersive;
-  modalSlideshow.textContent = tx.slideshow;
+  modalSlideshow.textContent = labelText("slideshowFullscreen", "Slideshow (Fullscreen)", "幻灯片（全屏）");
   modalMoveReview.textContent = tx.moveReview;
   modalMoveTrash.textContent = tx.moveTrash;
   modalOpenFolder.textContent = tx.showInFolder;
@@ -422,7 +534,7 @@ function applyLanguage() {
   modalVideoModeSeg.querySelector('[data-video-mode="loop"]').textContent = tx.loopOne;
   modalVideoModeSeg.querySelector('[data-video-mode="sequence"]').textContent = tx.sequential;
   modalVideoModeSeg.querySelector('[data-video-mode="random"]').textContent = tx.randomPlay;
-  updateFullscreenLabels();
+  applyActionButtons();
   modalVideoUiToggle.textContent = labelText("hideUi", "Hide UI", "隐藏控制");
   modalUiShow.textContent = labelText("showUi", "Show UI", "显示控制");
   slideshowClose.textContent = tx.close;
@@ -431,7 +543,7 @@ function applyLanguage() {
   slideshowPlay.textContent = state.slideshowPlaying ? tx.pause : tx.play;
   slideshowLoopLabel.textContent = tx.loop;
   updateFullscreenLabels();
-  slideshowUiToggle.textContent = labelText("hideUi", "Hide UI", "隐藏控制");
+  slideshowUiToggle.textContent = compactText("hideUi", "Hide");
   slideshowUiShow.textContent = labelText("showUi", "Show UI", "显示控制");
   slideshowEffect.querySelector('[value="none"]').textContent = tx.none;
   slideshowEffect.querySelector('[value="fade"]').textContent = tx.fade;
@@ -453,6 +565,8 @@ function applyLanguage() {
   });
   updateReviewFilterUI();
   document.querySelectorAll(".tiny-btn").forEach(btn => btn.textContent = tx.location);
+  applyTheme();
+  applyActionButtons();
   updateReviewButtons();
   updateSubInfo();
 }
@@ -489,6 +603,7 @@ function updateSubInfo() {
 }
 
 function sortItems(items, mode) {
+  if (mode === "random") return shuffle(items);
   const arr = [...items];
   const locale = state.language === "zh" ? "zh-CN" : "en";
   if (mode === "mtime_desc") arr.sort((a, b) => b.mtime - a.mtime);
@@ -595,11 +710,11 @@ function updateReviewButtons() {
     const favoriteBtn = card.querySelector('[data-review-field="favorite"]');
     const selectedBtn = card.querySelector('[data-review-field="selected"]');
     if (favoriteBtn) {
-      favoriteBtn.textContent = item.favorite ? `★ ${tx.favorited}` : `☆ ${tx.favorite}`;
+      setButtonLabel(favoriteBtn, item.favorite ? tx.favorited : tx.favorite, "star");
       favoriteBtn.classList.toggle("active", !!item.favorite);
     }
     if (selectedBtn) {
-      selectedBtn.textContent = item.selected ? `✓ ${tx.selectedMarked}` : `＋ ${tx.markSelected}`;
+      setButtonLabel(selectedBtn, item.selected ? tx.selectedMarked : tx.markSelected, "check");
       selectedBtn.classList.toggle("active", !!item.selected);
     }
   });
@@ -784,7 +899,15 @@ function resumeVisibleInline() {
 }
 
 function updateVideoModeUI() {
+  const tx = t();
+  const modeLabels = {
+    loop: [tx.loopOne, "repeat"],
+    sequence: [tx.sequential, "list"],
+    random: [tx.randomPlay, "shuffle"],
+  };
   modalVideoModeSeg.querySelectorAll("button[data-video-mode]").forEach(btn => {
+    const [label, icon] = modeLabels[btn.dataset.videoMode] || [btn.textContent, "play"];
+    setButtonLabel(btn, label, icon);
     btn.classList.toggle("active", btn.dataset.videoMode === state.videoMode);
   });
   modalVideo.loop = state.videoMode === "loop";
@@ -841,7 +964,9 @@ function closeModal() {
   modalImageUiToggle.classList.add("hidden");
   modalVideoControls.classList.add("hidden");
   modalContent.classList.remove("is-video", "controls-hidden", "nav-active");
-  modalUiShow.classList.add("hidden");
+  state.modalControlsHidden = false;
+  modalHiddenActions.classList.add("hidden");
+  modalHiddenExitFullscreen.classList.add("hidden");
   modalPrev.classList.add("hidden");
   modalNext.classList.add("hidden");
   modal.classList.add("hidden");
@@ -930,9 +1055,18 @@ function renderSlideshow(direction = 1) {
   outgoing.style.objectFit = state.slideshowFit;
   incoming.style.zIndex = 2;
   outgoing.style.zIndex = 1;
-  const duration = effect === "drift" ? Math.max(1, state.slideshowInterval) * 1000 : effect === "fade" ? 650 : effect === "slide" ? 320 : 0;
-  incoming.style.animationDuration = `${duration}ms`;
-  outgoing.style.animationDuration = `${duration}ms`;
+  const duration = effect === "drift" ? Math.max(1, state.slideshowInterval) * 1000 : effect === "fade" ? 650 : effect === "slide" ? 560 : 0;
+  const outgoingDuration = effect === "drift" ? 760 : duration;
+  incoming.style.removeProperty("--drift-duration");
+  outgoing.style.removeProperty("--drift-duration");
+  if (effect === "drift") {
+    incoming.style.animationDuration = "";
+    incoming.style.setProperty("--drift-duration", `${duration}ms`);
+    outgoing.style.animationDuration = `${outgoingDuration}ms`;
+  } else {
+    incoming.style.animationDuration = `${duration}ms`;
+    outgoing.style.animationDuration = `${outgoingDuration}ms`;
+  }
   const vars = driftVars();
   for (const [key, value] of Object.entries(vars)) incoming.style.setProperty(key, value);
   if (effect === "none") {
@@ -941,8 +1075,12 @@ function renderSlideshow(direction = 1) {
     outgoing.classList.remove("hidden");
     incoming.classList.add(`effect-${effect}`);
     if (effect === "fade") outgoing.classList.add("effect-fade-out");
-    if (effect === "slide") incoming.classList.add(direction >= 0 ? "from-right" : "from-left");
-    state.slideshowCleanupTimer = setTimeout(() => outgoing.classList.add("hidden"), duration + 40);
+    if (effect === "drift") outgoing.classList.add("effect-drift-out");
+    if (effect === "slide") {
+      incoming.classList.add(direction >= 0 ? "from-right" : "from-left");
+      outgoing.classList.add("effect-slide-out", direction >= 0 ? "to-left" : "to-right");
+    }
+    state.slideshowCleanupTimer = setTimeout(() => outgoing.classList.add("hidden"), outgoingDuration + 40);
   }
   slideshowName.textContent = item.name;
   slideshowCounter.textContent = `${state.slideshowIndex + 1} / ${state.slideshowItems.length}`;
@@ -962,7 +1100,7 @@ function showNextSlide(direction = 1) {
   if (next >= state.slideshowItems.length) {
     if (!state.slideshowLoop) {
       state.slideshowPlaying = false;
-      slideshowPlay.textContent = t().play;
+      applyActionButtons();
       return;
     }
     next = 0;
@@ -992,42 +1130,54 @@ function openSlideshowFromCurrent() {
   pauseAllInline();
   applyLanguage();
   renderSlideshow(1);
+  applyActionButtons();
 }
 
-function closeSlideshow() {
+function closeSlideshow(options = {}) {
+  const shouldResumeInline = options.resumeInline !== false;
   if (isSlideshowFullscreen()) document.exitFullscreen?.();
   clearTimeout(state.slideshowTimer);
   clearTimeout(state.slideshowCleanupTimer);
   clearTimeout(state.mediaNavTimer);
   setSlideshowControlsHidden(false);
+  slideshowHiddenActions.classList.add("hidden");
+  slideshowExitFullscreen.classList.add("hidden");
   slideshow.classList.remove("nav-active");
   slideshow.classList.add("hidden");
   slideshowImageA.removeAttribute("src");
   slideshowImageB.removeAttribute("src");
-  if (state.playingEnabled) resumeVisibleInline();
+  if (shouldResumeInline && state.playingEnabled) resumeVisibleInline();
+}
+
+function returnSlideshowToModal() {
+  const item = state.slideshowItems[state.slideshowIndex];
+  closeSlideshow({ resumeInline: false });
+  if (item) openModal(item);
 }
 
 function setSlideshowControlsHidden(hidden) {
   state.slideshowControlsHidden = hidden;
   slideshow.classList.toggle("controls-hidden", hidden);
-  slideshowUiShow.classList.toggle("hidden", !hidden);
-  slideshowUiToggle.textContent = labelText("hideUi", "Hide UI", "隐藏控制");
+  slideshowHiddenActions.classList.toggle("hidden", !hidden);
+  slideshowUiToggle.textContent = compactText("hideUi", "Hide");
   slideshowUiShow.textContent = labelText("showUi", "Show UI", "显示控制");
   if (hidden) {
     slideshow.classList.remove("nav-active");
   }
+  applyActionButtons();
 }
 
 function setModalControlsHidden(hidden) {
   state.modalControlsHidden = hidden;
   modalContent.classList.toggle("controls-hidden", hidden);
-  modalUiShow.classList.toggle("hidden", !hidden);
+  modalHiddenActions.classList.toggle("hidden", !hidden);
   modalImageUiToggle.textContent = labelText("hideUi", "Hide UI", "隐藏控制");
   modalVideoUiToggle.textContent = labelText("hideUi", "Hide UI", "隐藏控制");
   modalUiShow.textContent = labelText("showUi", "Show UI", "显示控制");
   if (hidden) {
     modalContent.classList.remove("nav-active");
   }
+  applyActionButtons();
 }
 
 function pulseMediaNav(container) {
@@ -1057,7 +1207,7 @@ function toggleSlideshowFullscreen() {
 
 function toggleSlideshowPlay() {
   state.slideshowPlaying = !state.slideshowPlaying;
-  slideshowPlay.textContent = state.slideshowPlaying ? t().pause : t().play;
+  applyActionButtons();
   scheduleSlideshow();
 }
 
@@ -1098,7 +1248,7 @@ async function runFileAction(action) {
 async function chooseFolder() {
   showToast(t().chooseOpening, 3500);
   chooseFolderBtn.disabled = true;
-  chooseFolderBtn.textContent = t().choosing;
+  setButtonLabel(chooseFolderBtn, t().choosing, "folder");
   try {
     const res = await fetch("/api/choose-folder");
     const data = await res.json();
@@ -1112,7 +1262,7 @@ async function chooseFolder() {
     showToast(t().chooseFail);
   } finally {
     chooseFolderBtn.disabled = false;
-    chooseFolderBtn.textContent = t().chooseFolder;
+    setButtonLabel(chooseFolderBtn, t().chooseFolder, "folder");
   }
 }
 
@@ -1138,6 +1288,8 @@ async function scanNow() {
       sort_mode: sortSelect.value,
       immersive: state.immersive,
       language: state.language,
+      theme: state.theme,
+      button_style: state.buttonStyle,
     };
     const res = await fetch("/api/scan", {
       method: "POST",
@@ -1194,6 +1346,8 @@ async function saveSettingsSoft() {
         sort_mode: sortSelect.value,
         immersive: state.immersive,
         language: state.language,
+        theme: state.theme,
+        button_style: state.buttonStyle,
         slideshow_interval: state.slideshowInterval,
         slideshow_effect: state.slideshowEffect,
         slideshow_fit: state.slideshowFit,
@@ -1219,7 +1373,7 @@ function setPlayLimit(limit) {
 function setImmersive(enabled) {
   state.immersive = !!enabled;
   document.body.classList.toggle("immersive", state.immersive);
-  immersiveBtn.textContent = state.immersive ? t().exitImmersive : t().immersive;
+  applyActionButtons();
   updateSubInfo();
   saveSettingsSoft();
 }
@@ -1228,6 +1382,22 @@ function setLanguage(lang, save = true) {
   state.language = lang === "zh" ? "zh" : "en";
   applyLanguage();
   if (state.all.length) renderGrid();
+  if (save) saveSettingsSoft();
+}
+
+function setTheme(theme, save = true) {
+  state.theme = theme === "light" ? "light" : "dark";
+  try { localStorage.setItem("localVideoWallTheme", state.theme); } catch {}
+  applyTheme();
+  applyActionButtons();
+  if (save) saveSettingsSoft();
+}
+
+function setButtonStyle(style, save = true) {
+  state.buttonStyle = style === "icons" ? "icons" : "text";
+  try { localStorage.setItem("localVideoWallButtonStyle", state.buttonStyle); } catch {}
+  applyActionButtons();
+  updateReviewButtons();
   if (save) saveSettingsSoft();
 }
 
@@ -1244,6 +1414,14 @@ async function init() {
     state.sortMode = cfg.sort_mode || "mtime_desc";
     state.immersive = !!cfg.immersive;
     state.language = cfg.language === "zh" ? "zh" : "en";
+    let localTheme = "";
+    let localButtonStyle = "";
+    try {
+      localTheme = localStorage.getItem("localVideoWallTheme") || "";
+      localButtonStyle = localStorage.getItem("localVideoWallButtonStyle") || "";
+    } catch {}
+    state.theme = (localTheme || cfg.theme) === "light" ? "light" : "dark";
+    state.buttonStyle = (localButtonStyle || cfg.button_style) === "icons" ? "icons" : "text";
     state.slideshowInterval = Math.max(1, Math.min(15, Number(cfg.slideshow_interval || 5)));
     state.slideshowEffect = ["none", "fade", "slide", "drift", "random"].includes(cfg.slideshow_effect) ? cfg.slideshow_effect : "drift";
     state.slideshowFit = cfg.slideshow_fit === "cover" ? "cover" : "contain";
@@ -1292,23 +1470,6 @@ columnsSeg.addEventListener("click", e => {
   if (btn) setColumns(btn.dataset.columns);
 });
 playLimitSelect.addEventListener("change", () => setPlayLimit(playLimitSelect.value));
-shuffleBtn.addEventListener("click", () => {
-  const q = searchInput.value.trim().toLowerCase();
-  let items = state.all;
-  if (q) items = items.filter(v => v.name.toLowerCase().includes(q) || v.rel.toLowerCase().includes(q));
-  if (state.reviewFilter === "favorites") items = items.filter(v => v.favorite);
-  if (state.reviewFilter === "selected") items = items.filter(v => v.selected);
-  if (state.sizeFilter === "small") items = items.filter(v => Number(v.size_mb) < 10);
-  if (state.sizeFilter === "medium") items = items.filter(v => Number(v.size_mb) >= 10 && Number(v.size_mb) < 50);
-  if (state.sizeFilter === "large") items = items.filter(v => Number(v.size_mb) >= 50);
-  const now = Date.now() / 1000;
-  if (state.dateFilter === "day") items = items.filter(v => now - Number(v.mtime) <= 86400);
-  if (state.dateFilter === "week") items = items.filter(v => now - Number(v.mtime) <= 86400 * 7);
-  if (state.dateFilter === "month") items = items.filter(v => now - Number(v.mtime) <= 86400 * 30);
-  if (state.mediaType !== "all") items = items.filter(v => v.type === state.mediaType);
-  state.view = shuffle(items);
-  renderGrid();
-});
 sizeFilterSelect.addEventListener("change", () => {
   state.sizeFilter = sizeFilterSelect.value;
   applyFilters();
@@ -1325,18 +1486,19 @@ exportCsvBtn.addEventListener("click", exportCsv);
 pauseBtn.addEventListener("click", () => {
   state.playingEnabled = !state.playingEnabled;
   if (state.playingEnabled) {
-    pauseBtn.textContent = t().pauseAll;
     pauseBtn.classList.add("ghost");
     resumeVisibleInline();
   } else {
-    pauseBtn.textContent = t().resume;
     pauseBtn.classList.remove("ghost");
     pauseAllInline();
   }
+  applyActionButtons();
 });
 immersiveBtn.addEventListener("click", () => setImmersive(true));
 expandBtn.addEventListener("click", () => setImmersive(false));
 langToggle.addEventListener("click", () => setLanguage(state.language === "en" ? "zh" : "en"));
+themeToggle.addEventListener("click", () => setTheme(state.theme === "dark" ? "light" : "dark"));
+buttonStyleToggle.addEventListener("click", () => setButtonStyle(state.buttonStyle === "icons" ? "text" : "icons"));
 modalClose.addEventListener("click", closeModal);
 modal.addEventListener("click", e => {
   if (e.target?.dataset?.close) closeModal();
@@ -1377,6 +1539,8 @@ modalFullscreen.addEventListener("click", toggleModalFullscreen);
 modalImageUiToggle.addEventListener("click", () => setModalControlsHidden(true));
 modalVideoUiToggle.addEventListener("click", () => setModalControlsHidden(true));
 modalUiShow.addEventListener("click", () => setModalControlsHidden(false));
+modalHiddenExitFullscreen.addEventListener("click", toggleModalFullscreen);
+modalHiddenClose.addEventListener("click", closeModal);
 modalVideo.addEventListener("ended", () => {
   if (state.currentModalItem?.type !== "video") return;
   if (state.videoMode === "sequence") showModalVideo(1);
@@ -1400,6 +1564,19 @@ slideshowPlay.addEventListener("click", toggleSlideshowPlay);
 slideshowFullscreen.addEventListener("click", toggleSlideshowFullscreen);
 slideshowUiToggle.addEventListener("click", () => setSlideshowControlsHidden(true));
 slideshowUiShow.addEventListener("click", () => setSlideshowControlsHidden(false));
+slideshowExitFullscreen.addEventListener("click", toggleSlideshowFullscreen);
+slideshowBackToPreview.addEventListener("click", returnSlideshowToModal);
+slideshow.addEventListener("wheel", e => {
+  if (slideshow.classList.contains("hidden")) return;
+  if (e.target.closest(".slideshow-top, .slideshow-controls, button, select, input, label")) return;
+  const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+  if (!delta) return;
+  e.preventDefault();
+  const now = Date.now();
+  if (now - state.slideshowWheelTime < 320) return;
+  state.slideshowWheelTime = now;
+  showNextSlide(delta > 0 ? 1 : -1);
+}, { passive: false });
 slideshowInterval.addEventListener("change", () => {
   state.slideshowInterval = Math.max(1, Math.min(15, Number(slideshowInterval.value) || 5));
   saveSettingsSoft();

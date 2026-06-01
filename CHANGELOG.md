@@ -1,5 +1,49 @@
 # Changelog
 
+## 1.6.11 - 2026-06-01
+
+- Fixed hidden video overlay controls so Show UI, Exit Fullscreen, and Close stay aligned in the top-right action group.
+- Fixed video loop / sequence / random icons in icon-button mode for both dark and light themes.
+- Updated English and Chinese README usage notes for image previews, slideshow controls, video preview controls, themes, and icon buttons.
+- Updated the example config with theme and button-style defaults.
+
+## 1.6.10 - 2026-06-01
+
+- Fixed media overlay toolbar click areas so the full button surface is clickable.
+- Added icon-mode support for video loop / sequence / random controls.
+- Replaced duplicate fullscreen-exit and close icons with distinct SVG icons.
+- Improved slideshow, icon-mode toggle, and fullscreen icon choices.
+- Fixed dark-theme slideshow dropdown colors.
+
+## 1.6.9 - 2026-06-01
+
+- Added three direct top-right SVG controls for language, light / dark theme, and text / icon button style.
+- Added a light theme while keeping the dark theme as the default.
+- Added an icon button mode for common actions with tooltips and accessible labels.
+- Persisted theme and button style preferences locally and in app settings.
+- Aligned saved slideshow interval and effect settings with the existing UI options.
+
+## 1.6.8 - 2026-06-01
+
+- Restored the highlighted primary background for the slideshow play / pause button.
+- Improved Drift slideshow transitions so the outgoing image fades away cleanly.
+- Moved the image preview Hide UI button next to Close.
+
+## 1.6.7 - 2026-06-01
+
+- Restored the slideshow toolbar to a horizontal layout.
+- Smoothed slideshow slide transitions with a longer animation and outgoing image fade.
+- Added visible hidden-control actions for returning from slideshow and closing video previews.
+- Renamed image and slideshow fullscreen controls for clearer behavior.
+- Moved random ordering into the sort dropdown and clarified the simultaneous playback label.
+
+## 1.6.6 - 2026-06-01
+
+- Changed the image modal entry from Slideshow to Fullscreen while reusing the slideshow viewer.
+- Merged slideshow playback controls into the top toolbar.
+- Added mouse-wheel previous / next navigation in slideshow mode.
+- Kept an Exit Fullscreen button available when slideshow controls are hidden in native fullscreen.
+
 ## 1.6.5 - 2026-06-01
 
 - Increased media previous / next arrow size for image, slideshow, and video viewers.

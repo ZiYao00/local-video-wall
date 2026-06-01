@@ -60,6 +60,8 @@ DEFAULT_CONFIG = {
     "sort_mode": "mtime_desc",
     "immersive": False,
     "language": "en",
+    "theme": "dark",
+    "button_style": "text",
     "slideshow_interval": 5,
     "slideshow_effect": "drift",
     "slideshow_fit": "contain",
@@ -120,8 +122,10 @@ def save_config(cfg: dict) -> dict:
     merged["columns"] = clamp_int(merged.get("columns"), 6, 4, 9)
     merged["play_limit"] = clamp_int(merged.get("play_limit"), 24, 12, 30)
     merged["language"] = normalize_language(merged.get("language", "en"))
-    merged["slideshow_interval"] = clamp_int(merged.get("slideshow_interval"), 5, 3, 12)
-    if merged.get("slideshow_effect") not in {"fade", "slide", "drift", "random"}:
+    merged["theme"] = "light" if merged.get("theme") == "light" else "dark"
+    merged["button_style"] = "icons" if merged.get("button_style") == "icons" else "text"
+    merged["slideshow_interval"] = clamp_int(merged.get("slideshow_interval"), 5, 1, 15)
+    if merged.get("slideshow_effect") not in {"none", "fade", "slide", "drift", "random"}:
         merged["slideshow_effect"] = "drift"
     if merged.get("slideshow_fit") not in {"contain", "cover"}:
         merged["slideshow_fit"] = "contain"
@@ -718,6 +722,8 @@ class AppHandler(BaseHTTPRequestHandler):
                 "sort_mode": sort_mode,
                 "immersive": immersive,
                 "language": language,
+                "theme": payload.get("theme", DEFAULT_CONFIG["theme"]),
+                "button_style": payload.get("button_style", DEFAULT_CONFIG["button_style"]),
                 "slideshow_interval": payload.get("slideshow_interval", DEFAULT_CONFIG["slideshow_interval"]),
                 "slideshow_effect": payload.get("slideshow_effect", DEFAULT_CONFIG["slideshow_effect"]),
                 "slideshow_fit": payload.get("slideshow_fit", DEFAULT_CONFIG["slideshow_fit"]),
@@ -742,6 +748,8 @@ class AppHandler(BaseHTTPRequestHandler):
                 "sort_mode": payload.get("sort_mode", cfg.get("sort_mode", "mtime_desc")),
                 "immersive": bool(payload.get("immersive", cfg.get("immersive", False))),
                 "language": normalize_language(payload.get("language", cfg.get("language", "en"))),
+                "theme": payload.get("theme", cfg.get("theme", "dark")),
+                "button_style": payload.get("button_style", cfg.get("button_style", "text")),
                 "slideshow_interval": payload.get("slideshow_interval", cfg.get("slideshow_interval", 5)),
                 "slideshow_effect": payload.get("slideshow_effect", cfg.get("slideshow_effect", "drift")),
                 "slideshow_fit": payload.get("slideshow_fit", cfg.get("slideshow_fit", "contain")),

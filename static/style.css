@@ -19,3 +19,363 @@
 .modal-content.controls-hidden .modal-header{display:none}.modal-content.controls-hidden .modal-show-ui{top:16px;right:16px;bottom:auto}.slideshow-top{gap:8px}.slideshow.controls-hidden .slideshow-top{display:none}.slideshow-show-ui{top:22px;right:22px;bottom:auto}@media (max-width:760px){.modal-content.controls-hidden .modal-show-ui{top:10px;right:10px;bottom:auto}.slideshow-show-ui{top:10px;right:10px;bottom:auto}}
 
 .modal-nav,.slideshow-nav{width:112px;height:176px;font-size:118px;transition:opacity .28s ease,transform .18s ease,text-shadow .18s ease}.modal-content.nav-active .modal-nav,.slideshow.nav-active .slideshow-nav{opacity:.82}.modal-nav:hover,.slideshow-nav:hover{opacity:1}@media (max-width:760px){.modal-nav,.slideshow-nav{width:72px;height:112px;font-size:76px}}
+
+.slideshow-top{
+  top:22px;
+  left:22px;
+  right:22px;
+  width:auto;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+  padding:0;
+  border:0;
+  background:transparent;
+  backdrop-filter:none;
+  pointer-events:none;
+}
+
+.slideshow-top .slideshow-controls{
+  position:static;
+  left:auto;
+  bottom:auto;
+  z-index:auto;
+  display:flex;
+  flex-direction:row;
+  flex-wrap:nowrap;
+  align-items:center;
+  max-width:calc(100vw - 44px);
+  transform:none;
+  justify-content:flex-end;
+  gap:8px;
+  padding:0;
+  border:0;
+  background:transparent;
+  backdrop-filter:none;
+  overflow-x:auto;
+  pointer-events:auto;
+}
+
+.slideshow-top .slideshow-controls > *{
+  flex:0 0 auto;
+}
+
+.slideshow-top .slideshow-controls .btn,
+.slideshow-top .slideshow-controls .select,
+.slideshow-top .slideshow-controls .check{
+  background:rgba(0,0,0,.32);
+  border-color:rgba(255,255,255,.14);
+  box-shadow:0 8px 24px rgba(0,0,0,.28);
+}
+
+.slideshow-top .slideshow-controls .btn:hover,
+.slideshow-top .slideshow-controls .select:hover{
+  background:rgba(0,0,0,.46);
+}
+
+.slideshow-top .slideshow-controls .btn.primary{
+  background:var(--accent-2);
+  border-color:rgba(255,255,255,.22);
+  color:white;
+  box-shadow:0 10px 28px rgba(88,119,255,.34);
+}
+
+.slideshow-top .slideshow-controls .btn.primary:hover{
+  background:rgb(101,132,255);
+}
+
+.slideshow-exit-full{
+  position:absolute;
+  top:22px;
+  right:116px;
+  bottom:auto;
+  z-index:4;
+  background:rgba(0,0,0,.34);
+  border-color:rgba(255,255,255,.18);
+}
+
+@media (max-width:760px){
+  .slideshow-top{
+    top:10px;
+    left:10px;
+    right:10px;
+  }
+  .slideshow-top .slideshow-controls{
+    max-width:calc(100vw - 20px);
+    justify-content:flex-end;
+    overflow-x:auto;
+    flex-wrap:nowrap;
+  }
+  .slideshow-exit-full{
+    top:10px;
+    right:96px;
+  }
+}
+
+.slideshow-image.effect-drift{animation:slideDriftMove var(--drift-duration,5000ms) ease both,driftFadeIn 720ms ease both}.slideshow-image.effect-drift-out{animation:driftFadeOut ease both}.slideshow-image.effect-slide-out.to-left{animation:slideOutLeft ease both}.slideshow-image.effect-slide-out.to-right{animation:slideOutRight ease both}@keyframes slideDriftMove{from{transform:translate(var(--sx),var(--sy)) scale(1.02)}to{transform:translate(var(--ex),var(--ey)) scale(1.12)}}@keyframes driftFadeIn{from{opacity:0}to{opacity:1}}@keyframes driftFadeOut{from{opacity:1}to{opacity:0}}@keyframes slideOutLeft{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(-8%)}}@keyframes slideOutRight{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(8%)}}
+
+#playLimitSelect{width:138px}
+
+.modal-hidden-actions,.slideshow-hidden-actions{
+  position:absolute;
+  top:16px;
+  right:16px;
+  z-index:8;
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+  max-width:calc(100% - 32px);
+}
+
+.slideshow-hidden-actions{
+  top:22px;
+  right:22px;
+}
+
+.modal-hidden-actions .modal-show-ui,
+.slideshow-hidden-actions .slideshow-show-ui,
+.slideshow-hidden-actions .slideshow-exit-full{
+  position:static;
+  top:auto;
+  right:auto;
+  bottom:auto;
+}
+
+.modal-hidden-actions .btn,
+.slideshow-hidden-actions .btn{
+  background:rgba(0,0,0,.34);
+  border-color:rgba(255,255,255,.18);
+  box-shadow:0 8px 24px rgba(0,0,0,.28);
+}
+
+@media (max-width:760px){
+  .modal-hidden-actions,.slideshow-hidden-actions{
+    top:10px;
+    right:10px;
+    max-width:calc(100% - 20px);
+    overflow-x:auto;
+  }
+}
+
+.btn svg,.tiny-btn svg,.review-btn svg{
+  width:17px;
+  height:17px;
+  display:block;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  pointer-events:none;
+}
+
+.btn.icon-only{
+  width:34px;
+  min-width:34px;
+  padding:0;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.top-actions .icon-toggle{
+  width:34px;
+  min-width:34px;
+  padding:0;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.top-actions .icon-toggle svg{
+  width:18px;
+  height:18px;
+}
+
+.tiny-btn.icon-only,.review-btn.icon-only{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  padding:0;
+}
+
+.tiny-btn.icon-only{
+  width:28px;
+}
+
+.review-btn.icon-only svg{
+  width:16px;
+  height:16px;
+}
+
+body.theme-light{
+  --bg:rgb(246,247,250);
+  --panel:rgb(255,255,255);
+  --panel-2:rgb(236,240,247);
+  --text:rgb(28,31,38);
+  --muted:rgb(93,99,113);
+  --line:rgba(33,43,62,.13);
+  --accent:rgb(72,105,228);
+  --accent-2:rgb(64,98,220);
+}
+
+body.theme-light .topbar{
+  background:rgba(246,247,250,.9);
+}
+
+body.theme-light .empty,
+body.theme-light .modal-content{
+  background:rgb(255,255,255);
+  box-shadow:0 24px 80px rgba(31,42,68,.18);
+}
+
+body.theme-light .video-card{
+  background:rgb(255,255,255);
+  border-color:rgba(33,43,62,.12);
+  box-shadow:0 12px 30px rgba(31,42,68,.12);
+}
+
+body.theme-light .card-footer,
+body.theme-light .review-actions{
+  background:rgba(33,43,62,.025);
+}
+
+body.theme-light .tiny-btn,
+body.theme-light .review-btn{
+  background:rgba(33,43,62,.04);
+}
+
+body.theme-light .toast{
+  background:rgb(255,255,255);
+  color:var(--text);
+  box-shadow:0 18px 48px rgba(31,42,68,.2);
+}
+
+body.theme-light .modal-header{
+  background:rgba(255,255,255,.92);
+}
+
+body.theme-light .modal-content.is-video .modal-header{
+  background:linear-gradient(to bottom,rgba(0,0,0,.48),rgba(0,0,0,0));
+  color:white;
+}
+
+body.theme-light .slideshow-top .slideshow-controls .btn,
+body.theme-light .slideshow-top .slideshow-controls .select,
+body.theme-light .slideshow-top .slideshow-controls .check,
+body.theme-light .modal-hidden-actions .btn,
+body.theme-light .slideshow-hidden-actions .btn{
+  background:rgba(255,255,255,.72);
+  color:rgb(20,24,32);
+  border-color:rgba(33,43,62,.18);
+}
+
+body.theme-light .slideshow-top .slideshow-controls .btn.primary{
+  background:var(--accent-2);
+  color:white;
+}
+
+.modal-header,.modal-actions,.modal-video-controls,.slideshow-top,.slideshow-controls,.modal-hidden-actions,.slideshow-hidden-actions{
+  pointer-events:auto;
+}
+
+.modal-title{
+  pointer-events:none;
+}
+
+.modal-actions,.slideshow-controls,.modal-video-controls{
+  position:relative;
+  z-index:9;
+}
+
+.modal-actions .btn,.modal-video-controls button,.slideshow-controls .btn,.modal-hidden-actions .btn,.slideshow-hidden-actions .btn{
+  position:relative;
+  z-index:10;
+  pointer-events:auto;
+}
+
+.modal-actions{
+  overflow:visible;
+}
+
+.slideshow .select{
+  background:rgba(0,0,0,.6);
+  color:white;
+  border-color:rgba(255,255,255,.18);
+  color-scheme:dark;
+}
+
+.slideshow .select option{
+  background:rgb(22,23,27);
+  color:white;
+}
+
+body.theme-light .slideshow .select{
+  background:rgba(255,255,255,.82);
+  color:rgb(20,24,32);
+  border-color:rgba(33,43,62,.18);
+  color-scheme:light;
+}
+
+body.theme-light .slideshow .select option{
+  background:white;
+  color:rgb(20,24,32);
+}
+
+body.icon-buttons .modal-video-controls .seg button{
+  width:34px;
+  min-width:34px;
+  padding:0;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+}
+
+.modal-content .modal-hidden-actions .modal-show-ui,
+.modal-content.is-video .modal-hidden-actions .modal-show-ui,
+.modal-content.is-video:fullscreen .modal-hidden-actions .modal-show-ui,
+.modal-content.controls-hidden .modal-hidden-actions .modal-show-ui{
+  position:relative;
+  top:auto;
+  right:auto;
+  bottom:auto;
+  left:auto;
+  z-index:10;
+}
+
+.seg button svg,
+.modal-video-controls .seg button svg{
+  width:16px;
+  height:16px;
+  display:block;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+  pointer-events:none;
+}
+
+body.icon-buttons .modal-video-controls .seg button{
+  height:28px;
+  color:rgba(255,255,255,.72);
+}
+
+body.icon-buttons .modal-video-controls .seg button:hover{
+  color:white;
+}
+
+body.icon-buttons .modal-video-controls .seg button.active{
+  background:var(--accent-2);
+  color:white;
+}
+
+body.theme-light.icon-buttons .modal-video-controls .seg button{
+  color:rgba(255,255,255,.76);
+}
+
+body.theme-light.icon-buttons .modal-video-controls .seg button:hover,
+body.theme-light.icon-buttons .modal-video-controls .seg button.active{
+  color:white;
+}

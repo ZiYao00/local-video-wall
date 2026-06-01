@@ -27,9 +27,13 @@ It is designed for quickly scanning large folders of local short video assets, e
 - Shuffle browsing
 - Export the current review list to CSV
 - Immersive mode
+- Switch between dark and light themes
+- Switch between text buttons and icon buttons
+- Open a clicked image in a larger preview with previous / next, mouse-wheel navigation, fullscreen slideshow, and hide / show controls
 - Open a clicked video in a larger overlay player with previous / next, playback mode, volume wheel, fullscreen, and hide / show controls
 - Show a video file in its folder
 - Move files safely to `_video_wall_review` or `_video_wall_trash`
+- Video preview playback modes: loop one, sequential playback, and random playback
 - Slideshow controls: play / pause, previous / next, 1-15s interval, effect, fit, loop, fullscreen, and show / hide controls
 - Slideshow effects: none, fade, slide, drift, and random
 - English interface by default, with a Chinese toggle in the top toolbar
@@ -111,6 +115,26 @@ You can:
 
 Then click `Scan`.
 
+### 3. Review media
+
+- Click an image to open the image preview.
+- Use the side arrows, keyboard arrows, or mouse wheel to move to the previous / next image.
+- Click `Slideshow (Fullscreen)` to enter the fullscreen image slideshow.
+- In slideshow mode, use play / pause, interval, effect, fit, loop, and fullscreen controls from the top toolbar.
+- Click a video to open the video preview.
+- Use the side arrows to move to the previous / next video.
+- Use the mouse wheel inside the video preview to adjust volume.
+- Use the video mode control to switch between loop one, sequential playback, and random playback.
+- Use `Hide UI` when you want a cleaner image, slideshow, or video viewing surface.
+
+### 4. Interface options
+
+The top-right toolbar contains quick controls for:
+
+- Language: English / Chinese
+- Theme: dark / light
+- Button style: text buttons / icon buttons
+
 ## Recommended Settings
 
 General browsing:
@@ -150,7 +174,7 @@ config.json
 
 This file can contain local folder paths, so it should not be uploaded to GitHub. Use `config.example.json` as the shareable example instead.
 
-Slideshow settings such as interval, effect, fit mode, and loop mode are also saved locally in `config.json`.
+Settings such as language, theme, button style, slideshow interval, slideshow effect, fit mode, and loop mode are also saved locally in `config.json`.
 
 ## Project Structure
 
@@ -175,7 +199,7 @@ local-civitai-video-wall/
 
 ## Roadmap
 
-Roadmap items through v1.3.0 are now implemented. See [ROADMAP.md](ROADMAP.md) for later ideas.
+See [ROADMAP.md](ROADMAP.md) for completed milestones and future ideas.
 
 ## License
 
