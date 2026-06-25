@@ -17,6 +17,7 @@
   "language": "en",
   "theme": "dark",
   "font_size": "standard",
+  "content_align": "center",
   "button_style": "text",
   "path_history": [],
   "path_favorites": [],

@@ -87,7 +87,7 @@ Completed:
 
 ### v1.7.0 - Path And Large Media Safeguards
 
-Goal: keep routine browsing responsive while making occasional large files safer to encounter.
+Goal: keep routine browsing responsive while making occasional large files and larger folders safer to encounter.
 
 Completed:
 
@@ -95,9 +95,18 @@ Completed:
 - 500 MB large-video wall placeholder with an opt-in preview setting
 - On-demand modal playback for large videos
 - Viewport-aware image loading and distant image resource release
-- 120-item grid pagination for very large mixed-media folders
+- Adjustable page-size input for large mixed-media folders, capped at 240 cards per page
 - Configurable filename exclusion rules with editable keywords and image/all-media scope
 - No persistent thumbnail cache by default
+- 2-20 grid columns
+- Automatic wall playback derived from column count
+- Static wall previews for 10 or more columns
+- Toolbar filters for all / videos / images / favorites
+- Reset-filters action
+- Batch mode for visible media selection, favorite / unfavorite, Recycle Bin move, and CSV export
+- Improved image and video viewer controls with cleaner fullscreen behavior
+- Small / standard / large interface font-size settings
+- More reliable startup installation with Task Scheduler support, fallback Startup shortcut, and service logging
 
 ## Future Ideas
 
@@ -124,14 +133,14 @@ Recommended priorities:
 ### Lightweight Index
 
 - Add an optional SQLite index for repeated scans.
-- Store file path, modified time, size, media type, hash or fingerprint, scan status, favorite, selected, tags, and extracted metadata summary.
+- Store file path, modified time, size, media type, hash or fingerprint, scan status, favorite state, review state, tags, and extracted metadata summary.
 - Start with scan acceleration and read-only metadata lookup before moving review state fully into SQLite.
 - Keep a rebuild / repair index action so users can recover from stale local state.
 
 ### Tags And Batch Review
 
 - Add user tags for review workflows, such as reference, usable, reject, published, pending edit, character, style, or project.
-- Add batch selection, batch favorite / selected updates, batch tag editing, and batch move actions.
+- Add stronger batch selection, batch favorite updates, batch tag editing, and batch move actions.
 - Keep batch operations previewable and reversible where possible.
 - Consider a compact selection mode for large folders.
 

@@ -24,6 +24,8 @@ v2 changes:
 from __future__ import annotations
 
 import json
+import base64
+import html
 import mimetypes
 import os
 import ntpath
@@ -73,6 +75,7 @@ DEFAULT_CONFIG = {
     "language": "en",
     "theme": "dark",
     "font_size": "standard",
+    "content_align": "center",
     "button_style": "text",
     "path_history": [],
     "path_favorites": [],
@@ -215,6 +218,7 @@ def save_config(cfg: dict) -> dict:
     merged["filename_exclude_scope"] = "all" if merged.get("filename_exclude_scope") == "all" else "image"
     merged["theme"] = "light" if merged.get("theme") == "light" else "dark"
     merged["font_size"] = merged.get("font_size") if merged.get("font_size") in {"small", "standard", "large"} else "standard"
+    merged["content_align"] = merged.get("content_align") if merged.get("content_align") in {"left", "center", "right"} else "center"
     merged["button_style"] = "icons" if merged.get("button_style") == "icons" else "text"
     merged["slideshow_interval"] = clamp_int(merged.get("slideshow_interval"), 5, 1, 15)
     if merged.get("slideshow_effect") not in {"none", "fade", "slide", "drift", "random"}:
@@ -292,33 +296,59 @@ def move_to_windows_recycle_bin(file_path: Path) -> None:
     if os.name != "nt":
         raise RuntimeError("System recycle bin is only supported on Windows.")
     script = (
-        "$Path = [Console]::In.ReadToEnd().Trim(); "
+        "$ErrorActionPreference = 'Stop'; "
+        "$ProgressPreference = 'SilentlyContinue'; "
+        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
+        "$OutputEncoding = [System.Text.Encoding]::UTF8; "
+        "$Path = [Environment]::GetEnvironmentVariable('LOCAL_VIDEO_WALL_RECYCLE_PATH', 'Process'); "
+        "if ([string]::IsNullOrWhiteSpace($Path)) { throw 'Missing recycle path.' }; "
         "Add-Type -AssemblyName Microsoft.VisualBasic; "
         "[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile("
         "$Path, "
         "[Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs, "
         "[Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin)"
     )
-    result = subprocess.run(
-        [
-            "powershell.exe",
-            "-NoProfile",
-            "-NonInteractive",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            script,
-        ],
-        input=str(file_path),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=30,
-    )
-    if result.returncode != 0:
-        message = (result.stderr or result.stdout or "Unknown recycle bin error").strip()
-        raise RuntimeError(message)
+    encoded_script = base64.b64encode(script.encode("utf-16le")).decode("ascii")
+    env = os.environ.copy()
+    env["LOCAL_VIDEO_WALL_RECYCLE_PATH"] = str(file_path)
+    last_message = "Unknown recycle bin error"
+    for attempt in range(6):
+        result = subprocess.run(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-NonInteractive",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-EncodedCommand",
+                encoded_script,
+            ],
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=30,
+        )
+        if result.returncode == 0:
+            return
+        last_message = clean_powershell_error(result.stderr or result.stdout or last_message)
+        if "being used by another process" not in last_message and "另一个程序正在使用" not in last_message:
+            break
+        if attempt < 5:
+            time.sleep(0.45)
+    raise RuntimeError(last_message)
+
+
+def clean_powershell_error(message: str) -> str:
+    text = (message or "").strip()
+    if text.startswith("#< CLIXML"):
+        error_parts = re.findall(r'<S S="Error">(.*?)</S>', text, flags=re.S)
+        if error_parts:
+            text = "\n".join(html.unescape(part) for part in error_parts)
+    text = re.sub(r"_x([0-9A-Fa-f]{4})_", lambda m: chr(int(m.group(1), 16)), text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text or "Unknown recycle bin error"
 
 def log_file_action(action: str, source: Path, destination: Path) -> None:
     record = {
@@ -897,6 +927,31 @@ class AppHandler(BaseHTTPRequestHandler):
             subprocess.Popen(["xdg-open", str(file_path.parent)])
             self.send_json({"ok": True})
 
+    def api_open_file_default_app(self, rel: str, scan_id: str = ""):
+        root = get_scan_root(scan_id)
+        if root is None:
+            self.send_json({"ok": False, "error": "Please choose and scan a media folder first."}, 400)
+            return
+        try:
+            file_path = safe_rel_to_path(root, rel)
+        except ValueError:
+            self.send_json({"ok": False, "error": "Invalid path"}, 403)
+            return
+        if not file_path.exists() or not file_path.is_file():
+            self.send_json({"ok": False, "error": "File not found"}, 404)
+            return
+        try:
+            if os.name == "nt":
+                os.startfile(str(file_path))  # type: ignore[attr-defined]
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", str(file_path)])
+            else:
+                subprocess.Popen(["xdg-open", str(file_path)])
+        except Exception as exc:
+            self.send_json({"ok": False, "error": f"Could not open file: {exc}"}, 500)
+            return
+        self.send_json({"ok": True})
+
     def api_file_action(self, payload: dict):
         root = get_scan_root(str(payload.get("scan_id", "")))
         if root is None:
@@ -985,6 +1040,11 @@ class AppHandler(BaseHTTPRequestHandler):
             scan_id = qs.get("scan_id", [""])[0]
             self.api_open_in_explorer(rel, scan_id)
             return
+        if path == "/api/open-file":
+            rel = qs.get("path", [""])[0]
+            scan_id = qs.get("scan_id", [""])[0]
+            self.api_open_file_default_app(rel, scan_id)
+            return
         if path == "/api/review":
             self.send_json({"ok": True, "review": load_review_data()})
             return
@@ -1049,6 +1109,7 @@ class AppHandler(BaseHTTPRequestHandler):
                 "language": language,
                 "theme": payload.get("theme", DEFAULT_CONFIG["theme"]),
                 "font_size": payload.get("font_size", DEFAULT_CONFIG["font_size"]),
+                "content_align": payload.get("content_align", DEFAULT_CONFIG["content_align"]),
                 "button_style": payload.get("button_style", DEFAULT_CONFIG["button_style"]),
                 "slideshow_interval": payload.get("slideshow_interval", DEFAULT_CONFIG["slideshow_interval"]),
                 "slideshow_effect": payload.get("slideshow_effect", DEFAULT_CONFIG["slideshow_effect"]),
@@ -1089,6 +1150,7 @@ class AppHandler(BaseHTTPRequestHandler):
                 "language": normalize_language(payload.get("language", cfg.get("language", "en"))),
                 "theme": payload.get("theme", cfg.get("theme", "dark")),
                 "font_size": payload.get("font_size", cfg.get("font_size", "standard")),
+                "content_align": payload.get("content_align", cfg.get("content_align", "center")),
                 "button_style": payload.get("button_style", cfg.get("button_style", "text")),
                 "slideshow_interval": payload.get("slideshow_interval", cfg.get("slideshow_interval", 5)),
                 "slideshow_effect": payload.get("slideshow_effect", cfg.get("slideshow_effect", "drift")),

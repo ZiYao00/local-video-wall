@@ -21,6 +21,7 @@ const state = {
   reviewFilter: "all",
   batchMode: false,
   batchSelected: new Set(),
+  batchBusy: false,
   sizeFilter: "all",
   dateFilter: "all",
   mediaType: "all",
@@ -28,6 +29,7 @@ const state = {
   language: "en",
   theme: "dark",
   fontSize: "standard",
+  contentAlign: "center",
   buttonStyle: "text",
   slideshowItems: [],
   slideshowIndex: 0,
@@ -76,6 +78,7 @@ const ICONS = {
   doubleCheck: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12l3 3L21 5"/><path d="M3 12l3 3 5-5"/></svg>',
   close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>',
   download: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>',
+  externalOpen: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M20 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4"/></svg>',
   eye: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   eyeOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6A3 3 0 0 0 13.4 13.4"/><path d="M9.9 4.3A10.6 10.6 0 0 1 12 4c6 0 10 8 10 8a17.8 17.8 0 0 1-3.1 4.3"/><path d="M6.2 6.5C3.5 8.3 2 12 2 12s4 8 10 8a10 10 0 0 0 5-1.4"/></svg>',
   folder: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h5l2 2"/></svg>',
@@ -184,6 +187,10 @@ const i18n = {
     fontSizeSmall: "Small",
     fontSizeStandard: "Standard",
     fontSizeLarge: "Large",
+    contentAlign: "Layout position",
+    contentAlignCenter: "Center",
+    contentAlignLeft: "Left",
+    contentAlignRight: "Right",
     scanSettings: "Scan",
     playbackSettings: "Playback",
     filterSettings: "Filters",
@@ -217,6 +224,9 @@ const i18n = {
     batchSelectedItem: "Selected",
     batchNoSelection: "Select at least one item first.",
     batchDone: n => `Batch action finished: ${n} item(s).`,
+    batchWorking: "Batch action in progress...",
+    batchFailed: reason => `Batch action failed: ${reason}`,
+    batchPartial: (done, failed, reason) => `Batch action finished: ${done} succeeded, ${failed} failed. ${reason}`,
     batchTrashConfirm: n => `Move ${n} selected item(s) to the Windows Recycle Bin?`,
     shuffle: "Shuffle",
     exportCsv: "Export CSV",
@@ -227,6 +237,9 @@ const i18n = {
     immersive: "Immersive",
     exitImmersive: "Exit Immersive",
     showInFolder: "Show in Folder",
+    openDefaultApp: "Open in Default App",
+    openDefaultDone: "Opened in default app.",
+    openDefaultFail: "Could not open the file in the default app.",
     close: "Close",
     slideshow: "Slideshow",
     prev: "Prev",
@@ -295,6 +308,8 @@ const i18n = {
       mtime_asc: "Oldest modified",
       name_asc: "Filename A-Z",
       name_desc: "Filename Z-A",
+      path_asc: "Path A-Z",
+      path_desc: "Path Z-A",
       size_desc: "Size large-small",
       size_asc: "Size small-large",
       random: "Random order",
@@ -381,6 +396,10 @@ const i18n = {
     fontSizeSmall: "小",
     fontSizeStandard: "标准",
     fontSizeLarge: "大",
+    contentAlign: "布局位置",
+    contentAlignCenter: "居中",
+    contentAlignLeft: "左侧",
+    contentAlignRight: "右侧",
     scanSettings: "扫描",
     playbackSettings: "播放",
     filterSettings: "筛选",
@@ -414,6 +433,9 @@ const i18n = {
     batchSelectedItem: "已选择",
     batchNoSelection: "请先选择至少一个项目。",
     batchDone: n => `批量操作完成：${n} 个项目。`,
+    batchWorking: "正在执行批量操作...",
+    batchFailed: reason => `批量操作失败：${reason}`,
+    batchPartial: (done, failed, reason) => `批量操作完成：成功 ${done} 个，失败 ${failed} 个。${reason}`,
     batchTrashConfirm: n => `要把已选择的 ${n} 个项目移到 Windows 回收站吗？`,
     shuffle: "随机",
     exportCsv: "导出 CSV",
@@ -424,6 +446,9 @@ const i18n = {
     immersive: "沉浸",
     exitImmersive: "退出沉浸",
     showInFolder: "打开所在位置",
+    openDefaultApp: "默认应用打开",
+    openDefaultDone: "已用默认应用打开。",
+    openDefaultFail: "无法用默认应用打开这个文件。",
     close: "关闭",
     slideshow: "幻灯片",
     prev: "上一张",
@@ -492,6 +517,8 @@ const i18n = {
       mtime_asc: "最早修改",
       name_asc: "文件名 A-Z",
       name_desc: "文件名 Z-A",
+      path_asc: "路径 A-Z",
+      path_desc: "路径 Z-A",
       size_desc: "文件大-小",
       size_asc: "文件小-大",
       random: "随机顺序",
@@ -567,6 +594,7 @@ const settingsMenu = $("#settingsMenu");
 const langToggle = $("#langToggle");
 const themeToggle = $("#themeToggle");
 const fontSizeSeg = $("#fontSizeSeg");
+const contentAlignSeg = $("#contentAlignSeg");
 const emptyState = $("#emptyState");
 const toast = $("#toast");
 const trashConfirmDialog = $("#trashConfirmDialog");
@@ -585,6 +613,7 @@ const modalMetadata = $("#modalMetadata");
 const modalName = $("#modalName");
 const modalMeta = $("#modalMeta");
 const modalClose = $("#modalClose");
+const modalOpenDefault = $("#modalOpenDefault");
 const modalOpenFolder = $("#modalOpenFolder");
 const modalMoveReview = $("#modalMoveReview");
 const modalMoveTrash = $("#modalMoveTrash");
@@ -675,6 +704,15 @@ function applyFontSize() {
   });
 }
 
+function applyContentAlign() {
+  const align = ["left", "center", "right"].includes(state.contentAlign) ? state.contentAlign : "center";
+  document.body.classList.remove("content-align-left", "content-align-center", "content-align-right");
+  document.body.classList.add(`content-align-${align}`);
+  contentAlignSeg.querySelectorAll("button[data-content-align]").forEach(button => {
+    button.classList.toggle("active", button.dataset.contentAlign === align);
+  });
+}
+
 function isModalFullscreen() {
   return document.fullscreenElement === modalContent;
 }
@@ -728,6 +766,7 @@ function applyActionButtons() {
   setButtonLabel(modalSlideshow, labelText("slideshowFullscreen", "Slideshow (Fullscreen)", "幻灯片（全屏）"), "slideshow", { iconOnly: true });
   setButtonLabel(modalMoveReview, tx.moveReview, "star", { iconOnly: true });
   setButtonLabel(modalMoveTrash, tx.moveTrash, "trash", { iconOnly: true });
+  setButtonLabel(modalOpenDefault, tx.openDefaultApp, "externalOpen", { iconOnly: true });
   setButtonLabel(modalOpenFolder, tx.showInFolder, "folder", { iconOnly: true });
   modalImageUiToggle.classList.add("hidden");
   modalVideoUiToggle.classList.add("hidden");
@@ -835,6 +874,11 @@ function applyLanguage() {
   fontSizeSeg.querySelector('[data-font-size="small"]').textContent = tx.fontSizeSmall;
   fontSizeSeg.querySelector('[data-font-size="standard"]').textContent = tx.fontSizeStandard;
   fontSizeSeg.querySelector('[data-font-size="large"]').textContent = tx.fontSizeLarge;
+  $("#contentAlignLabel").textContent = tx.contentAlign;
+  contentAlignSeg.title = tx.contentAlign;
+  contentAlignSeg.querySelector('[data-content-align="center"]').textContent = tx.contentAlignCenter;
+  contentAlignSeg.querySelector('[data-content-align="left"]').textContent = tx.contentAlignLeft;
+  contentAlignSeg.querySelector('[data-content-align="right"]').textContent = tx.contentAlignRight;
   $("#settingsScanTitle").textContent = tx.scanSettings;
   $("#settingsPlaybackTitle").textContent = tx.playbackSettings;
   $("#settingsFiltersTitle").textContent = tx.filterSettings;
@@ -845,6 +889,7 @@ function applyLanguage() {
   modalSlideshow.textContent = labelText("slideshowFullscreen", "Slideshow (Fullscreen)", "幻灯片（全屏）");
   modalMoveReview.textContent = tx.moveReview;
   modalMoveTrash.textContent = tx.moveTrash;
+  modalOpenDefault.textContent = tx.openDefaultApp;
   modalOpenFolder.textContent = tx.showInFolder;
   modalClose.textContent = tx.close;
   modalImageUiToggle.textContent = labelText("hideUi", "Hide UI", "隐藏控制");
@@ -880,6 +925,7 @@ function applyLanguage() {
   updateMediaFilterUI();
   document.querySelectorAll(".tiny-btn").forEach(btn => btn.textContent = tx.location);
   applyTheme();
+  applyContentAlign();
   applyActionButtons();
   updateReviewButtons();
   updateSubInfo();
@@ -893,6 +939,7 @@ function applyLayout() {
   const cols = Number(state.columns) || 6;
   const gap = COLUMN_GAPS[cols] || 18;
   const contentWidth = getContentWidthRule();
+  applyContentAlign();
   document.documentElement.style.setProperty("--columns", cols);
   document.documentElement.style.setProperty("--gap", `${gap}px`);
   document.documentElement.style.setProperty("--content-width", contentWidth);
@@ -906,6 +953,7 @@ function applyLayout() {
 function getContentWidthRule() {
   if (document.body.classList.contains("sidebar-open")) return "calc(100% - 24px)";
   const width = window.innerWidth || 1600;
+  if (state.contentAlign !== "center" && width >= 1400) return "calc(50vw - 42px)";
   if (width >= 2400) return "75vw";
   if (width >= 1600) return "86vw";
   return "calc(100% - 24px)";
@@ -1056,6 +1104,8 @@ function sortItems(items, mode) {
   if (mode === "mtime_asc") arr.sort((a, b) => a.mtime - b.mtime);
   if (mode === "name_asc") arr.sort((a, b) => a.name.localeCompare(b.name, locale));
   if (mode === "name_desc") arr.sort((a, b) => b.name.localeCompare(a.name, locale));
+  if (mode === "path_asc") arr.sort((a, b) => String(a.rel || a.name).localeCompare(String(b.rel || b.name), locale));
+  if (mode === "path_desc") arr.sort((a, b) => String(b.rel || b.name).localeCompare(String(a.rel || a.name), locale));
   if (mode === "size_desc") arr.sort((a, b) => b.size_mb - a.size_mb);
   if (mode === "size_asc") arr.sort((a, b) => a.size_mb - b.size_mb);
   return arr;
@@ -1273,12 +1323,13 @@ function updateBatchUI() {
   batchBar.classList.toggle("hidden", !state.batchMode);
   batchInfo.textContent = t().batchInfo(count);
   batchToggleBtn.classList.toggle("active", state.batchMode);
-  batchSelectPageBtn.disabled = !state.batchMode || !state.view.length;
-  batchClearBtn.disabled = !count;
-  batchFavoriteBtn.disabled = !count;
-  batchUnfavoriteBtn.disabled = !count;
-  batchTrashBtn.disabled = !count;
-  batchExportBtn.disabled = !count;
+  batchSelectPageBtn.disabled = state.batchBusy || !state.batchMode || !state.view.length;
+  batchClearBtn.disabled = state.batchBusy || !count;
+  batchFavoriteBtn.disabled = state.batchBusy || !count;
+  batchUnfavoriteBtn.disabled = state.batchBusy || !count;
+  batchTrashBtn.disabled = state.batchBusy || !count;
+  batchExportBtn.disabled = state.batchBusy || !count;
+  batchExitBtn.disabled = state.batchBusy;
 }
 
 function toggleBatchItem(key) {
@@ -1289,45 +1340,60 @@ function toggleBatchItem(key) {
 }
 
 function selectCurrentPageForBatch() {
+  if (state.batchBusy) return;
   if (!state.batchMode) setBatchMode(true);
   currentPageItems().forEach(item => state.batchSelected.add(item.key));
   updateReviewButtons();
 }
 
 function clearBatchSelection() {
+  if (state.batchBusy) return;
   state.batchSelected.clear();
   updateReviewButtons();
 }
 
 async function setBatchFavorite(value) {
+  if (state.batchBusy) return;
   const items = selectedBatchItems();
   if (!items.length) {
     showToast(t().batchNoSelection);
     return;
   }
   let done = 0;
-  for (const item of items) {
-    try {
-      const res = await fetch("/api/review", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: item.key, favorite: value }),
-      });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || t().reviewFail);
-      item.favorite = !!data.review.favorite;
-      state.all = state.all.map(v => v.key === item.key ? { ...v, favorite: item.favorite } : v);
-      state.view = state.view.map(v => v.key === item.key ? { ...v, favorite: item.favorite } : v);
-      done += 1;
-    } catch (err) {
-      console.error(err);
+  const errors = [];
+  state.batchBusy = true;
+  updateBatchUI();
+  showToast(t().batchWorking, 1800);
+  try {
+    for (const item of items) {
+      try {
+        const res = await fetch("/api/review", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: item.key, favorite: value }),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || t().reviewFail);
+        item.favorite = !!data.review.favorite;
+        state.all = state.all.map(v => v.key === item.key ? { ...v, favorite: item.favorite } : v);
+        state.view = state.view.map(v => v.key === item.key ? { ...v, favorite: item.favorite } : v);
+        done += 1;
+      } catch (err) {
+        console.error(err);
+        errors.push(err.message || t().reviewFail);
+      }
     }
+  } finally {
+    state.batchBusy = false;
   }
   applyFilters(false);
-  showToast(t().batchDone(done));
+  if (errors.length && done) showToast(t().batchPartial(done, errors.length, errors[0]), 6200);
+  else if (errors.length) showToast(t().batchFailed(errors[0]), 6200);
+  else showToast(t().batchDone(done));
 }
 
 async function moveBatchToTrash() {
+  if (state.batchBusy) return;
   const items = selectedBatchItems();
   if (!items.length) {
     showToast(t().batchNoSelection);
@@ -1335,25 +1401,37 @@ async function moveBatchToTrash() {
   }
   if (state.confirmTrash && !window.confirm(t().batchTrashConfirm(items.length))) return;
   let done = 0;
-  for (const item of items) {
-    try {
-      const res = await fetch("/api/file-action", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "move_trash", rel: item.rel, scan_id: item.scan_id || state.scanId || "", confirm: true }),
-      });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || t().fileActionFail);
-      state.batchSelected.delete(item.key);
-      state.all = state.all.filter(v => v.key !== item.key);
-      state.view = state.view.filter(v => v.key !== item.key);
-      done += 1;
-    } catch (err) {
-      console.error(err);
+  const errors = [];
+  state.batchBusy = true;
+  updateBatchUI();
+  showToast(t().batchWorking, 1800);
+  try {
+    for (const item of items) {
+      try {
+        await releaseMediaBeforeFileAction(item, "batch");
+        const res = await fetch("/api/file-action", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ action: "move_trash", rel: item.rel, scan_id: item.scan_id || state.scanId || "", confirm: true }),
+        });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || t().fileActionFail);
+        state.batchSelected.delete(item.key);
+        state.all = state.all.filter(v => v.key !== item.key);
+        state.view = state.view.filter(v => v.key !== item.key);
+        done += 1;
+      } catch (err) {
+        console.error(err);
+        errors.push(err.message || t().fileActionFail);
+      }
     }
+  } finally {
+    state.batchBusy = false;
   }
   applyFilters(false);
-  showToast(t().batchDone(done));
+  if (errors.length && done) showToast(t().batchPartial(done, errors.length, errors[0]), 6200);
+  else if (errors.length) showToast(t().batchFailed(errors[0]), 6200);
+  else showToast(t().batchDone(done));
 }
 
 async function toggleReview(item, field) {
@@ -1414,6 +1492,7 @@ function exportCsv(items = state.view, prefix = "video-wall-export") {
 }
 
 function exportBatchCsv() {
+  if (state.batchBusy) return;
   const items = selectedBatchItems();
   if (!items.length) {
     showToast(t().batchNoSelection);
@@ -1474,7 +1553,7 @@ function setupObservers() {
       }
     }
     scheduleUpdatePlaying();
-  }, { root: null, rootMargin: "0px", threshold: .32 });
+  }, { root: null, rootMargin: "160px 0px 220px 0px", threshold: [0, .1, .25, .5] });
   for (const image of images) loadObserver.observe(image);
   for (const video of videos) {
     loadObserver.observe(video);
@@ -1523,9 +1602,23 @@ function isActuallyVisible(el) {
   return r.bottom > 0 && r.top < window.innerHeight && r.right > 0 && r.left < window.innerWidth;
 }
 
+function visibleAreaRatio(el) {
+  const r = el.getBoundingClientRect();
+  const width = Math.max(0, Math.min(r.right, window.innerWidth) - Math.max(r.left, 0));
+  const height = Math.max(0, Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0));
+  const area = Math.max(1, r.width * r.height);
+  return (width * height) / area;
+}
+
 function distanceToViewportCenter(el) {
   const r = el.getBoundingClientRect();
   return Math.hypot((r.left + r.width / 2) - window.innerWidth / 2, (r.top + r.height / 2) - window.innerHeight / 2);
+}
+
+function isNearPageBottom() {
+  const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
+  const docHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+  return scrollTop + window.innerHeight >= docHeight - 160;
 }
 
 function effectiveWallPlayLimit() {
@@ -1545,9 +1638,15 @@ function scheduleUpdatePlaying() {
 }
 
 function updatePlaying() {
-  const videos = [...state.visibleVideos].filter(v => v.isConnected && isActuallyVisible(v));
+  const videos = [...state.visibleVideos].filter(v => v.isConnected && isActuallyVisible(v) && visibleAreaRatio(v) >= .08);
   const playLimit = effectiveWallPlayLimit();
-  const selected = videos.sort((a, b) => distanceToViewportCenter(a) - distanceToViewportCenter(b)).slice(0, playLimit);
+  const nearBottom = isNearPageBottom();
+  const selected = videos.sort((a, b) => {
+    const ratioDelta = visibleAreaRatio(b) - visibleAreaRatio(a);
+    if (Math.abs(ratioDelta) > .12) return ratioDelta;
+    if (nearBottom) return b.getBoundingClientRect().top - a.getBoundingClientRect().top;
+    return distanceToViewportCenter(a) - distanceToViewportCenter(b);
+  }).slice(0, playLimit);
   const selectedSet = new Set(selected);
   for (const video of videos) {
     const card = video.closest(".video-card");
@@ -2046,6 +2145,25 @@ async function openInExplorer(item) {
   }
 }
 
+async function openInDefaultApp(item) {
+  const rel = item?.rel;
+  const scanId = item?.scan_id || state.scanId || "";
+  if (!rel) return;
+  try {
+    const params = new URLSearchParams({ path: rel });
+    if (scanId) params.set("scan_id", scanId);
+    const res = await fetch("/api/open-file?" + params.toString());
+    const data = await res.json();
+    if (!data.ok) {
+      showToast(data.error || t().openDefaultFail, 3600);
+      return;
+    }
+    showToast(t().openDefaultDone, 1800);
+  } catch {
+    showToast(t().openDefaultFail, 3600);
+  }
+}
+
 function closeTrashConfirmDialog(confirmed) {
   const dontAsk = trashConfirmDontAsk.checked;
   trashConfirmDialog.classList.add("hidden");
@@ -2083,6 +2201,40 @@ function releaseActionPreviewMedia(source) {
   releaseMediaElement(modalImage);
 }
 
+function waitForMediaRelease(ms = 450) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function releaseMediaBeforeFileAction(item, source) {
+  if (!item) return;
+  if (source === "slideshow") releaseActionPreviewMedia(source);
+  if (state.currentModalItem?.key === item.key) releaseActionPreviewMedia("modal");
+  document.querySelectorAll(".video-wrap video, .video-wrap img.media-image").forEach(media => {
+    if (media.dataset.rel === item.rel || media.dataset.src === item.url || media.getAttribute("src") === item.url) {
+      releaseMediaElement(media);
+    }
+  });
+  state.visibleVideos.forEach(video => {
+    if (video.dataset.rel === item.rel || video.dataset.src === item.url || video.getAttribute("src") === item.url) {
+      state.visibleVideos.delete(video);
+    }
+  });
+  syncLoadedMediaStatNow();
+  if (item.type === "video") await waitForMediaRelease();
+}
+
+function restoreActionPreviewMedia(item, source) {
+  if (!item) return;
+  if (source === "slideshow" && !slideshow.classList.contains("hidden")) {
+    renderSlideshow(1);
+    return;
+  }
+  if (state.currentModalItem?.key === item.key && !modal.classList.contains("hidden")) {
+    renderModalItem(item);
+    if (item.type === "video") playModalVideoSoon();
+  }
+}
+
 function continueAfterFileAction(item, source, oldIndex) {
   if (source === "slideshow") {
     state.slideshowItems = currentImageItems();
@@ -2114,6 +2266,7 @@ async function runFileAction(action, item = state.currentModalItem, source = "mo
   if (action === "move_review" && !window.confirm(t().confirmReview)) return;
   if (action === "move_trash" && !(await requestTrashConfirmation())) return;
   try {
+    await releaseMediaBeforeFileAction(item, source);
     const res = await fetch("/api/file-action", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -2127,6 +2280,7 @@ async function runFileAction(action, item = state.currentModalItem, source = "mo
     showToast(t().fileActionDone, 3600);
   } catch (err) {
     console.error(err);
+    restoreActionPreviewMedia(item, source);
     showToast(err.message || t().fileActionFail, 5200);
   }
 }
@@ -2582,6 +2736,7 @@ async function scanNow() {
       language: state.language,
       theme: state.theme,
       font_size: state.fontSize,
+      content_align: state.contentAlign,
       button_style: state.buttonStyle,
     };
     const res = await fetch("/api/scan", {
@@ -2655,6 +2810,7 @@ async function saveSettingsSoft() {
         language: state.language,
         theme: state.theme,
         font_size: state.fontSize,
+        content_align: state.contentAlign,
         button_style: state.buttonStyle,
         slideshow_interval: state.slideshowInterval,
         slideshow_effect: state.slideshowEffect,
@@ -2752,6 +2908,12 @@ function setFontSize(size, save = true) {
   if (save) saveSettingsSoft();
 }
 
+function setContentAlign(align, save = true) {
+  state.contentAlign = ["left", "center", "right"].includes(align) ? align : "center";
+  applyLayout();
+  if (save) saveSettingsSoft();
+}
+
 function setButtonStyle(style, save = true) {
   state.buttonStyle = style === "icons" ? "icons" : "text";
   try { localStorage.setItem("localVideoWallButtonStyle", state.buttonStyle); } catch {}
@@ -2793,6 +2955,7 @@ async function init() {
     } catch {}
     state.theme = (localTheme || cfg.theme) === "light" ? "light" : "dark";
     state.fontSize = ["small", "standard", "large"].includes(localFontSize || cfg.font_size) ? (localFontSize || cfg.font_size) : "small";
+    state.contentAlign = ["left", "center", "right"].includes(cfg.content_align) ? cfg.content_align : "center";
     state.buttonStyle = (localButtonStyle || cfg.button_style) === "icons" ? "icons" : "text";
     state.slideshowInterval = Math.max(1, Math.min(15, Number(cfg.slideshow_interval || 5)));
     state.slideshowEffect = ["none", "fade", "slide", "drift", "random"].includes(cfg.slideshow_effect) ? cfg.slideshow_effect : "drift";
@@ -2988,6 +3151,10 @@ fontSizeSeg.addEventListener("click", event => {
   const button = event.target.closest("button[data-font-size]");
   if (button) setFontSize(button.dataset.fontSize);
 });
+contentAlignSeg.addEventListener("click", event => {
+  const button = event.target.closest("button[data-content-align]");
+  if (button) setContentAlign(button.dataset.contentAlign);
+});
 modalClose.addEventListener("click", closeModal);
 modal.addEventListener("click", e => {
   if (e.target?.dataset?.close) closeModal();
@@ -3040,6 +3207,9 @@ modalVideo.addEventListener("ended", () => {
 });
 modalOpenFolder.addEventListener("click", () => {
   if (state.currentModalItem) openInExplorer(state.currentModalItem);
+});
+modalOpenDefault.addEventListener("click", () => {
+  if (state.currentModalItem) openInDefaultApp(state.currentModalItem);
 });
 modalMetadata.addEventListener("click", async e => {
   const btn = e.target.closest("[data-copy-meta]");

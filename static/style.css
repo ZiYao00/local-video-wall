@@ -1114,6 +1114,18 @@ body.sidebar-open .app-shell{
   margin-right:auto;
 }
 
+@media (min-width:1400px){
+  body:not(.sidebar-open).content-align-left :is(#subInfo,#batchBar,#grid,#gridPager,#emptyState){
+    margin-left:12px;
+    margin-right:auto;
+  }
+
+  body:not(.sidebar-open).content-align-right :is(#subInfo,#batchBar,#grid,#gridPager,#emptyState){
+    margin-left:auto;
+    margin-right:12px;
+  }
+}
+
 .folder-panel{
   position:sticky;
   top:58px;
@@ -1357,18 +1369,22 @@ body.theme-light .grid-pager{background:rgba(255,255,255,.94)}
   width:32px;
   height:32px;
   padding:0;
-  border:0;
-  border-radius:999px;
-  border:1px solid rgba(255,255,255,.48);
-  background:rgba(0,0,0,.28);
-  color:rgba(255,255,255,.82);
-  box-shadow:0 6px 18px rgba(0,0,0,.35);
-  backdrop-filter:blur(8px);
+  border:2px solid rgba(20,24,36,.72);
+  border-radius:8px;
+  background:rgba(255,255,255,.9);
+  color:transparent;
+  box-shadow:0 7px 18px rgba(0,0,0,.42),inset 0 0 0 1px rgba(255,255,255,.55);
   pointer-events:auto;
   cursor:pointer;
   opacity:0;
   transform:scale(.92);
-  transition:opacity .14s ease,transform .14s ease,background .14s ease;
+  transition:opacity .14s ease,transform .14s ease,background .14s ease,border-color .14s ease,color .14s ease;
+}
+
+.batch-select-btn svg{
+  width:20px;
+  height:20px;
+  stroke-width:3;
 }
 
 body.batch-mode .batch-select-btn{
@@ -1378,18 +1394,19 @@ body.batch-mode .batch-select-btn{
 }
 
 .batch-select-btn:hover{
-  background:rgba(0,0,0,.58);
-  color:white;
+  border-color:rgba(88,119,255,.92);
+  background:white;
 }
 
 .batch-select-btn.active{
-  border-color:rgba(255,255,255,.76);
+  border-color:rgba(255,255,255,.92);
   color:white;
-  background:rgba(88,119,255,.86);
+  background:rgb(65,105,255);
+  box-shadow:0 8px 22px rgba(20,47,168,.48),0 0 0 2px rgba(255,255,255,.74);
 }
 
 .video-card.is-batch-selected{
-  box-shadow:0 0 0 2px rgba(88,119,255,.72),0 18px 42px rgba(0,0,0,.38);
+  box-shadow:0 0 0 2px rgba(65,105,255,.95),0 0 0 5px rgba(65,105,255,.22),0 18px 42px rgba(0,0,0,.38);
 }
 
 .batch-bar{
@@ -1548,6 +1565,32 @@ body.batch-mode .batch-select-btn{
 #modalUiShow,
 #slideshowUiShow{
   display:none!important;
+}
+
+@media (min-width:1400px){
+  body:not(.sidebar-open).content-align-left .modal-content.is-video:not(:fullscreen),
+  body:not(.sidebar-open).content-align-right .modal-content.is-video:not(:fullscreen){
+    top:30px;
+    bottom:30px;
+    width:calc(50vw - 42px);
+    height:auto;
+    border-radius:18px;
+  }
+
+  body:not(.sidebar-open).content-align-left .modal-content.is-video:not(:fullscreen){
+    left:24px;
+    right:auto;
+  }
+
+  body:not(.sidebar-open).content-align-right .modal-content.is-video:not(:fullscreen){
+    left:auto;
+    right:24px;
+  }
+
+  body:not(.sidebar-open).content-align-left .modal-content.is-video:not(:fullscreen) .modal-title strong,
+  body:not(.sidebar-open).content-align-right .modal-content.is-video:not(:fullscreen) .modal-title strong{
+    max-width:min(360px,28vw);
+  }
 }
 
 @media (max-width:1180px){
