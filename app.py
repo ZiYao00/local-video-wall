@@ -42,6 +42,18 @@ from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, quote
 
+from core.json_store import read_json_file, write_json_file
+from metadata.embedded_reader import read_embedded_metadata
+from metadata.ffprobe_reader import read_ffprobe_metadata
+from metadata.normalizer import merge_metadata, metadata_to_dict
+from metadata.sidecar_reader import read_sidecar_metadata
+from review.store import (
+    item_has_review_state,
+    normalize_review_data,
+    normalize_review_item,
+    review_for_key as normalized_review_for_key,
+)
+
 HOST = "127.0.0.1"
 PORT = 8787
 
@@ -157,11 +169,8 @@ def add_recent_path(paths: list[str], path: str, max_items: int = 20) -> list[st
 
 
 def load_config() -> dict:
-    if not CONFIG_FILE.exists():
-        return dict(DEFAULT_CONFIG)
-    try:
-        data = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-    except Exception:
+    data = read_json_file(CONFIG_FILE, {})
+    if not isinstance(data, dict):
         return dict(DEFAULT_CONFIG)
     if "filename_exclude_enabled" not in data and "exclude_cover_images" in data:
         data["filename_exclude_enabled"] = bool(data.get("exclude_cover_images"))
@@ -193,13 +202,9 @@ def load_config() -> dict:
 
 def save_config(cfg: dict) -> dict:
     merged = dict(DEFAULT_CONFIG)
-    if CONFIG_FILE.exists():
-        try:
-            existing = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-            if isinstance(existing, dict):
-                merged.update({k: existing.get(k, v) for k, v in DEFAULT_CONFIG.items()})
-        except Exception:
-            pass
+    existing = read_json_file(CONFIG_FILE, {})
+    if isinstance(existing, dict):
+        merged.update({k: existing.get(k, v) for k, v in DEFAULT_CONFIG.items()})
     merged.update({k: cfg.get(k, v) for k, v in DEFAULT_CONFIG.items()})
     merged["remember_path"] = bool(merged.get("remember_path"))
     merged["recursive"] = bool(merged.get("recursive"))
@@ -230,33 +235,22 @@ def save_config(cfg: dict) -> dict:
         merged["last_video_dir"] = ""
     else:
         merged["last_video_dir"] = normalize_path(merged.get("last_video_dir", ""))
-    CONFIG_FILE.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding="utf-8")
+    write_json_file(CONFIG_FILE, merged)
     return merged
 
 
 def load_review_data() -> dict:
-    if not REVIEW_FILE.exists():
-        return {"items": {}}
-    try:
-        data = json.loads(REVIEW_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        return {"items": {}}
-    items = data.get("items")
-    return {"items": items if isinstance(items, dict) else {}}
+    return normalize_review_data(read_json_file(REVIEW_FILE, {}))
 
 
 def save_review_data(data: dict) -> dict:
-    clean = {"items": data.get("items", {}) if isinstance(data.get("items"), dict) else {}}
-    REVIEW_FILE.write_text(json.dumps(clean, ensure_ascii=False, indent=2), encoding="utf-8")
+    clean = normalize_review_data(data)
+    write_json_file(REVIEW_FILE, clean)
     return clean
 
 
 def review_for_key(data: dict, key: str) -> dict:
-    item = data.get("items", {}).get(key, {})
-    return {
-        "favorite": bool(item.get("favorite", False)),
-        "selected": bool(item.get("selected", False)),
-    }
+    return normalized_review_for_key(data, key)
 
 
 def update_review_item(key: str, changes: dict) -> dict:
@@ -266,12 +260,12 @@ def update_review_item(key: str, changes: dict) -> dict:
     with review_lock:
         data = load_review_data()
         items = data.setdefault("items", {})
-        current = review_for_key(data, key)
+        current = normalize_review_item(items.get(key, {}))
         if "favorite" in changes:
             current["favorite"] = bool(changes.get("favorite"))
         if "selected" in changes:
             current["selected"] = bool(changes.get("selected"))
-        if current["favorite"] or current["selected"]:
+        if item_has_review_state(current):
             current["updated_at"] = int(time.time())
             items[key] = current
         else:
@@ -952,6 +946,36 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         self.send_json({"ok": True})
 
+    def api_metadata(self, rel: str, scan_id: str = ""):
+        root = get_scan_root(scan_id)
+        if root is None:
+            self.send_json({"ok": False, "error": "Please choose and scan a media folder first."}, 400)
+            return
+        try:
+            file_path = safe_rel_to_path(root, rel)
+        except ValueError:
+            self.send_json({"ok": False, "error": "Invalid path"}, 403)
+            return
+        if not file_path.exists() or not file_path.is_file():
+            self.send_json({"ok": False, "error": "File not found"}, 404)
+            return
+        suffix = file_path.suffix.lower()
+        if suffix not in MEDIA_EXTENSIONS:
+            self.send_json({"ok": False, "error": "Unsupported media type"}, 415)
+            return
+        media_type = "video" if suffix in VIDEO_EXTENSIONS else "image"
+        try:
+            metadata_parts = [
+                read_embedded_metadata(file_path, media_type),
+                read_sidecar_metadata(file_path),
+            ]
+            if media_type == "video":
+                metadata_parts.append(read_ffprobe_metadata(file_path, media_type))
+            metadata = merge_metadata(*metadata_parts)
+            self.send_json({"ok": True, "metadata": metadata_to_dict(metadata)})
+        except Exception as exc:
+            self.send_json({"ok": False, "error": f"Metadata read failed: {exc}"}, 500)
+
     def api_file_action(self, payload: dict):
         root = get_scan_root(str(payload.get("scan_id", "")))
         if root is None:
@@ -1044,6 +1068,11 @@ class AppHandler(BaseHTTPRequestHandler):
             rel = qs.get("path", [""])[0]
             scan_id = qs.get("scan_id", [""])[0]
             self.api_open_file_default_app(rel, scan_id)
+            return
+        if path == "/api/metadata":
+            rel = qs.get("path", [""])[0]
+            scan_id = qs.get("scan_id", [""])[0]
+            self.api_metadata(rel, scan_id)
             return
         if path == "/api/review":
             self.send_json({"ok": True, "review": load_review_data()})

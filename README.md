@@ -39,9 +39,11 @@ The next development direction is AI asset management: reading sidecar metadata,
 - Immersive mode
 - Switch between dark and light themes
 - Choose small, standard, or large interface text
+- Align the main grid and preview layout to the center, left, or right on wide screens
 - Keep the folder sidebar and media grid separated when the browser window is resized
-- Open a clicked image in a larger preview with previous / next, mouse-wheel navigation, fullscreen slideshow, and auto-hidden viewer controls
-- Open a clicked video in a larger overlay player with previous / next, playback mode, volume wheel, fullscreen, and auto-hidden viewer controls
+- Open a clicked image in a larger preview with previous / next, mouse-wheel navigation, fullscreen slideshow, default-app opening, and auto-hidden viewer controls
+- Open a clicked video in a larger overlay player with previous / next, playback mode, volume wheel, fullscreen, default-app opening, and auto-hidden viewer controls
+- Use half-width left/right preview modals when the wide-screen layout is aligned left or right
 - Show a video file in its folder
 - Move files safely to `_video_wall_review` or the Windows Recycle Bin, with optional confirmation
 - Video preview playback modes: loop one, sequential playback, and random playback
@@ -164,6 +166,7 @@ The top toolbar and Settings menu contain quick controls for:
 
 - Language: English / Chinese
 - Theme: dark / light
+- Layout position: center / left / right
 - Path history: clear recent paths while keeping favorites
 - Remove individual history entries or favorite paths directly from their lists
 - Filename exclusion rules: add or remove up to 30 case-insensitive filename keywords; defaults to `fanart` and `thumb` for images
@@ -216,14 +219,20 @@ Settings such as language, theme, font size, columns, page size, path history, f
 
 ## Future Direction
 
-The current release is the stable local media wall baseline. Planned future work focuses on AI media management:
+The current release is the stable local media wall baseline. Planned future work focuses on AI media asset management, while keeping the app local, lightweight, and Windows-friendly.
 
-- Read same-name `.json` sidecar metadata from generated images and videos
-- Show prompts, negative prompts, model names, LoRA information, source URLs, and basic generation details in the media modal
-- Add tags and batch tag editing for local review workflows
-- Add an optional SQLite index for faster repeated scans and metadata search
-- Consider optional thumbnail / video cover caches after the indexing and metadata workflow is stable
-- Keep file operations local, visible, and reversible
+Recommended order:
+
+1. Stabilize the current `v1.7.x` line with synchronized docs, changelog updates, and smoke tests.
+2. Add `v1.7.5 - Architecture Guardrails`: introduce small backend module boundaries for safe JSON handling, review-state compatibility, and future metadata normalization without changing current runtime behavior.
+3. Build `v1.8.0 - AI Metadata Preview`: read embedded ComfyUI / Stable Diffusion WebUI metadata, same-name sidecar JSON, and basic video technical metadata; show prompt, negative prompt, model, LoRA, source, and raw metadata in the media preview.
+4. Build `v1.9.0 - Tags & Review Workflow`: add local tags, ratings, notes, and batch tag editing.
+5. Build `v2.0.0 - Local Index`: add a lightweight SQLite index for repeated scans and metadata lookup.
+6. Build `v2.1.0 - Metadata Search`: search and filter by prompt, model, LoRA, tags, source URL, and review state.
+7. Consider `v2.2.0 - Optional Preview Cache`: optional image thumbnails and video covers only after metadata and indexing are stable.
+8. Improve `v2.3.0 - Packaging`: release ZIPs, startup checks, optional portable tools, and clearer troubleshooting.
+
+See [ROADMAP.md](ROADMAP.md) for the full plan, including third-party tool reuse rules.
 
 ## Project Structure
 

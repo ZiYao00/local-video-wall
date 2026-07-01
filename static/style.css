@@ -1453,6 +1453,16 @@ body.batch-mode .batch-select-btn{
   padding-right:calc(min(380px,28vw) + 92px);
 }
 
+.modal-content.modal-slideshow-playing .modal-image.modal-drift-active{
+  animation:modalImageDrift var(--modal-drift-duration,5000ms) ease both;
+  will-change:transform;
+}
+
+@keyframes modalImageDrift{
+  from{transform:translate(var(--sx),var(--sy)) scale(1.02)}
+  to{transform:translate(var(--ex),var(--ey)) scale(1.1)}
+}
+
 .modal-content.is-video .modal-metadata,
 .modal-content:fullscreen .modal-metadata{
   display:none;
@@ -1568,6 +1578,8 @@ body.batch-mode .batch-select-btn{
 }
 
 @media (min-width:1400px){
+  body:not(.sidebar-open).content-align-left .modal-content:not(.is-video):not(:fullscreen),
+  body:not(.sidebar-open).content-align-right .modal-content:not(.is-video):not(:fullscreen),
   body:not(.sidebar-open).content-align-left .modal-content.is-video:not(:fullscreen),
   body:not(.sidebar-open).content-align-right .modal-content.is-video:not(:fullscreen){
     top:30px;
@@ -1577,16 +1589,30 @@ body.batch-mode .batch-select-btn{
     border-radius:18px;
   }
 
+  body:not(.sidebar-open).content-align-left .modal-content:not(.is-video):not(:fullscreen),
   body:not(.sidebar-open).content-align-left .modal-content.is-video:not(:fullscreen){
     left:24px;
     right:auto;
   }
 
+  body:not(.sidebar-open).content-align-right .modal-content:not(.is-video):not(:fullscreen),
   body:not(.sidebar-open).content-align-right .modal-content.is-video:not(:fullscreen){
     left:auto;
     right:24px;
   }
 
+  body:not(.sidebar-open).content-align-left .modal-content:not(.is-video):not(:fullscreen) .modal-metadata,
+  body:not(.sidebar-open).content-align-right .modal-content:not(.is-video):not(:fullscreen) .modal-metadata{
+    display:none;
+  }
+
+  body:not(.sidebar-open).content-align-left .modal-content:not(.is-video):not(:fullscreen) .modal-image,
+  body:not(.sidebar-open).content-align-right .modal-content:not(.is-video):not(:fullscreen) .modal-image{
+    padding-right:74px;
+  }
+
+  body:not(.sidebar-open).content-align-left .modal-content:not(.is-video):not(:fullscreen) .modal-title strong,
+  body:not(.sidebar-open).content-align-right .modal-content:not(.is-video):not(:fullscreen) .modal-title strong,
   body:not(.sidebar-open).content-align-left .modal-content.is-video:not(:fullscreen) .modal-title strong,
   body:not(.sidebar-open).content-align-right .modal-content.is-video:not(:fullscreen) .modal-title strong{
     max-width:min(360px,28vw);

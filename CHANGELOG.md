@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.7.1 - Unreleased
+
+- Updated the roadmap into a staged AI media asset management plan covering metadata preview, tags, SQLite indexing, metadata search, optional preview cache, and packaging.
+- Inserted `v1.7.5 - Architecture Guardrails` before AI metadata work, documenting the small backend module boundaries needed before deeper feature development.
+- Clarified the project direction as a local AI image/video asset browser for fast review, screening, marking, and retrieval, rather than a general album or cloud media system.
+- Updated English and Chinese README future-direction sections to match the staged roadmap.
+- Documented the wide-screen center / left / right layout option and default-app opening behavior in both README files.
+- Added half-width left/right image preview behavior to match the existing wide-screen video preview layout, while keeping slideshow behavior unchanged.
+- Split the image preview actions into an in-modal Slideshow toggle and a separate Fullscreen slideshow button, so left/right image preview size stays unchanged during quick slideshow playback.
+- Added a lightweight Drift animation to the in-modal image slideshow, using the saved slideshow interval while keeping the existing fullscreen slideshow effects separate.
+- Added a safe UTF-8 JSON store helper and routed config/review JSON persistence through it using same-directory temporary files before replacing the target file.
+- Added a review-data compatibility layer with schema-version normalization while preserving the current favorite/selected UI behavior.
+- Added metadata schema and normalizer boundaries for future AI metadata preview work, plus safe embedded, sidecar, and ffprobe reader entry points without making external tools mandatory.
+- Started `v1.8.0 - AI Metadata Preview` with dependency-free PNG embedded metadata parsing, sidecar JSON metadata reading, metadata merging, and a scan-root-validated `/api/metadata` endpoint.
+
 ## 1.6.12 - 2026-06-12
 
 - Changed Move to Trash to use the Windows Recycle Bin instead of creating `_video_wall_trash` folders in each scanned directory.

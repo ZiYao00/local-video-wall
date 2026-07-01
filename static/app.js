@@ -31,6 +31,8 @@ const state = {
   fontSize: "standard",
   contentAlign: "center",
   buttonStyle: "text",
+  modalSlideshowPlaying: false,
+  modalSlideshowTimer: null,
   slideshowItems: [],
   slideshowIndex: 0,
   slideshowPlaying: true,
@@ -618,6 +620,7 @@ const modalOpenFolder = $("#modalOpenFolder");
 const modalMoveReview = $("#modalMoveReview");
 const modalMoveTrash = $("#modalMoveTrash");
 const modalSlideshow = $("#modalSlideshow");
+const modalSlideshowFullscreen = $("#modalSlideshowFullscreen");
 const modalImageUiToggle = $("#modalImageUiToggle");
 const modalPrev = $("#modalPrev");
 const modalNext = $("#modalNext");
@@ -763,7 +766,9 @@ function applyActionButtons() {
   setButtonLabel(batchExportBtn, tx.batchExport, "download", { iconOnly: true });
   setButtonLabel(batchExitBtn, tx.batchExit, "close", { iconOnly: true });
   setButtonLabel(immersiveBtn, state.immersive ? tx.exitImmersive : tx.immersive, state.immersive ? "close" : "fullscreen", { iconOnly: true });
-  setButtonLabel(modalSlideshow, labelText("slideshowFullscreen", "Slideshow (Fullscreen)", "幻灯片（全屏）"), "slideshow", { iconOnly: true });
+  setButtonLabel(modalSlideshow, state.modalSlideshowPlaying ? tx.pause : tx.slideshow, state.modalSlideshowPlaying ? "pause" : "slideshow", { iconOnly: true });
+  modalSlideshow.classList.toggle("primary", state.modalSlideshowPlaying);
+  setButtonLabel(modalSlideshowFullscreen, tx.fullscreen, "fullscreen", { iconOnly: true });
   setButtonLabel(modalMoveReview, tx.moveReview, "star", { iconOnly: true });
   setButtonLabel(modalMoveTrash, tx.moveTrash, "trash", { iconOnly: true });
   setButtonLabel(modalOpenDefault, tx.openDefaultApp, "externalOpen", { iconOnly: true });
@@ -886,7 +891,9 @@ function applyLanguage() {
   exportCsvBtn.textContent = tx.exportCsv;
   pauseBtn.textContent = state.playingEnabled ? tx.pauseAll : tx.resume;
   immersiveBtn.textContent = state.immersive ? tx.exitImmersive : tx.immersive;
-  modalSlideshow.textContent = labelText("slideshowFullscreen", "Slideshow (Fullscreen)", "幻灯片（全屏）");
+  modalSlideshow.textContent = state.modalSlideshowPlaying ? tx.pause : tx.slideshow;
+  modalSlideshow.classList.toggle("primary", state.modalSlideshowPlaying);
+  modalSlideshowFullscreen.textContent = tx.fullscreen;
   modalMoveReview.textContent = tx.moveReview;
   modalMoveTrash.textContent = tx.moveTrash;
   modalOpenDefault.textContent = tx.openDefaultApp;
@@ -1772,6 +1779,7 @@ function renderModalMetadata(item) {
 }
 
 function renderModalItem(item) {
+  if (item.type !== "image" && state.modalSlideshowPlaying) setModalSlideshowPlaying(false);
   state.currentModalItem = item;
   modalName.textContent = item.name;
   modalMeta.textContent = `${item.type || "video"} · ${fmtBytes(item.size_mb)} · ${item.mtime_text} · ${item.rel}`;
@@ -1781,6 +1789,7 @@ function renderModalItem(item) {
   modalVideo.classList.toggle("hidden", item.type === "image");
   modalImage.classList.toggle("hidden", item.type !== "image");
   modalSlideshow.classList.toggle("hidden", item.type !== "image");
+  modalSlideshowFullscreen.classList.toggle("hidden", item.type !== "image");
   modalImageUiToggle.classList.add("hidden");
   modalVideoUiToggle.classList.add("hidden");
   modalVideoControls.classList.toggle("hidden", item.type !== "video");
@@ -1809,12 +1818,14 @@ function openModal(item) {
 
 function closeModal() {
   if (isModalFullscreen()) document.exitFullscreen?.();
+  setModalSlideshowPlaying(false);
   clearTimeout(state.mediaNavTimer);
   clearTimeout(state.modalToolbarTimer);
   state.modalToolbarTimer = null;
   releaseMediaElement(modalVideo);
   releaseMediaElement(modalImage);
   modalSlideshow.classList.add("hidden");
+  modalSlideshowFullscreen.classList.add("hidden");
   modalImageUiToggle.classList.add("hidden");
   modalMetadata.classList.add("hidden");
   modalVideoControls.classList.add("hidden");
@@ -1837,15 +1848,31 @@ function currentVideoItems() {
   return state.view.filter(item => item.type === "video");
 }
 
-function showModalImage(direction = 1) {
+function showModalImage(direction = 1, options = {}) {
   const current = state.currentModalItem;
   if (!current || current.type !== "image") return;
   const images = currentImageItems();
   if (images.length < 2) return;
   let index = images.findIndex(item => item.key === current.key);
   if (index < 0) index = 0;
-  const next = (index + direction + images.length) % images.length;
+  let next = index + direction;
+  if (next >= images.length) {
+    if (!state.slideshowLoop) {
+      setModalSlideshowPlaying(false);
+      return;
+    }
+    next = 0;
+  }
+  if (next < 0) {
+    if (!state.slideshowLoop) {
+      setModalSlideshowPlaying(false);
+      return;
+    }
+    next = images.length - 1;
+  }
   renderModalItem(images[next]);
+  if (state.modalSlideshowPlaying) applyModalDriftAnimation();
+  if (state.modalSlideshowPlaying && !options.fromTimer) scheduleModalSlideshow();
 }
 
 function playModalVideoSoon() {
@@ -1977,7 +2004,7 @@ function showNextSlide(direction = 1) {
   renderSlideshow(direction);
 }
 
-function openSlideshowFromCurrent() {
+function openSlideshowFromCurrent(options = {}) {
   const current = state.currentModalItem;
   const images = currentImageItems();
   if (!current || current.type !== "image" || !images.length) {
@@ -1999,6 +2026,64 @@ function openSlideshowFromCurrent() {
   renderSlideshow(1);
   applyActionButtons();
   scheduleAutoHideControls("slideshow", 1000, true);
+  if (options.requestFullscreen) {
+    slideshow.requestFullscreen?.().catch(() => {});
+  }
+}
+
+function openFullscreenSlideshowFromCurrent() {
+  openSlideshowFromCurrent({ requestFullscreen: true });
+}
+
+function scheduleModalSlideshow() {
+  clearTimeout(state.modalSlideshowTimer);
+  if (!state.modalSlideshowPlaying || modal.classList.contains("hidden") || state.currentModalItem?.type !== "image") return;
+  state.modalSlideshowTimer = setTimeout(() => {
+    showModalImage(1, { fromTimer: true });
+    scheduleModalSlideshow();
+  }, state.slideshowInterval * 1000);
+}
+
+function applyModalDriftAnimation() {
+  modalImage.classList.remove("modal-drift-active");
+  const vars = driftVars();
+  for (const [key, value] of Object.entries(vars)) modalImage.style.setProperty(key, value);
+  modalImage.style.setProperty("--modal-drift-duration", `${Math.max(1, state.slideshowInterval) * 1000}ms`);
+  void modalImage.offsetWidth;
+  modalImage.classList.add("modal-drift-active");
+}
+
+function clearModalDriftAnimation() {
+  modalImage.classList.remove("modal-drift-active");
+  modalImage.style.removeProperty("--modal-drift-duration");
+  modalImage.style.removeProperty("--sx");
+  modalImage.style.removeProperty("--sy");
+  modalImage.style.removeProperty("--ex");
+  modalImage.style.removeProperty("--ey");
+}
+
+function setModalSlideshowPlaying(playing) {
+  clearTimeout(state.modalSlideshowTimer);
+  state.modalSlideshowTimer = null;
+  const images = currentImageItems();
+  state.modalSlideshowPlaying = !!playing && !modal.classList.contains("hidden") && state.currentModalItem?.type === "image" && images.length > 1;
+  modalContent.classList.toggle("modal-slideshow-playing", state.modalSlideshowPlaying);
+  if (state.modalSlideshowPlaying) {
+    applyModalDriftAnimation();
+  } else {
+    clearModalDriftAnimation();
+  }
+  applyActionButtons();
+  if (state.modalSlideshowPlaying) scheduleModalSlideshow();
+}
+
+function toggleModalSlideshow() {
+  const images = currentImageItems();
+  if (state.currentModalItem?.type !== "image" || images.length < 2) {
+    showToast(t().noImages);
+    return;
+  }
+  setModalSlideshowPlaying(!state.modalSlideshowPlaying);
 }
 
 function closeSlideshow(options = {}) {
@@ -2255,6 +2340,7 @@ function continueAfterFileAction(item, source, oldIndex) {
       return;
     }
     renderModalItem(items[Math.max(0, Math.min(oldIndex, items.length - 1))]);
+    if (state.currentModalItem?.type === "image" && state.modalSlideshowPlaying) scheduleModalSlideshow();
     if (state.currentModalItem?.type === "video") playModalVideoSoon();
   }
 }
@@ -3223,7 +3309,8 @@ modalMetadata.addEventListener("click", async e => {
 });
 modalMoveReview.addEventListener("click", () => runFileAction("move_review"));
 modalMoveTrash.addEventListener("click", () => runFileAction("move_trash"));
-modalSlideshow.addEventListener("click", openSlideshowFromCurrent);
+modalSlideshow.addEventListener("click", toggleModalSlideshow);
+modalSlideshowFullscreen.addEventListener("click", openFullscreenSlideshowFromCurrent);
 slideshow.addEventListener("mousemove", e => {
   if (slideshow.classList.contains("hidden")) return;
   pulseMediaNav(slideshow);
@@ -3319,6 +3406,11 @@ window.addEventListener("keydown", e => {
       return;
     }
     if (e.key === "Escape") {
+      if (state.modalSlideshowPlaying) {
+        e.preventDefault();
+        setModalSlideshowPlaying(false);
+        return;
+      }
       closeModal();
       return;
     }
