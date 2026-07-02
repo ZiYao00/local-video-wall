@@ -259,7 +259,9 @@ Acceptance checklist:
 
 ## Phase 2 - AI Metadata Preview
 
-Recommended version: `v1.8.0 - AI Metadata Preview`
+Recommended version: `v1.8.x - AI Metadata Preview / Metadata Stabilization`
+
+Status: core image metadata preview is implemented; remaining work is stabilization and optional video/container metadata support.
 
 Goal: show AI generation information inside image and video previews without turning the grid into a crowded database UI.
 
@@ -272,7 +274,7 @@ Recommended metadata priority:
 
 Reason: ComfyUI and Stable Diffusion WebUI images often already contain prompt, workflow, or parameter metadata in the image file itself. Sidecar JSON remains important, but should not be the only first-class source.
 
-Suggested module layout:
+Implemented module layout:
 
 ```text
 metadata/
@@ -281,9 +283,15 @@ metadata/
   embedded_reader.py
   sidecar_reader.py
   ffprobe_reader.py
+  normalizer.py
+```
+
+Planned optional modules:
+
+```text
+metadata/
   exiftool_reader.py
   mediainfo_reader.py
-  normalizer.py
 ```
 
 Unified metadata fields:
@@ -315,31 +323,48 @@ metadata_sources
 metadata_status
 ```
 
-Supported sources in the first implementation:
+Implemented sources:
 
 - Stable Diffusion WebUI / A1111 PNG `parameters`
 - ComfyUI `prompt` and `workflow`
-- common PNG / WebP / JPEG embedded text or EXIF fields where practical
 - same-name sidecar JSON:
   - `name.json`
   - `name.ext.json`
   - `name.info.json`
   - `name.civitai.json`
-- video technical information through `ffprobe` when available
+- basic filesystem information
 
-Preview UI:
+Implemented ComfyUI behavior:
 
-- Basic
-- AI Prompt
+- KSampler positive / negative conditioning chain is preferred when extracting prompts.
+- Disconnected, FaceDetailer, and unused text nodes are less likely to pollute the main Prompt field.
+- LoRA detection supports standard LoRA loader fields and Power Lora Loader / rgthree-style workflow values.
+- LoRA strength is displayed when model / clip / strength values are available.
+
+Implemented preview UI:
+
+- File Info as labeled fields:
+  - path
+  - type
+  - size
+  - modified date
+  - pixel dimensions
+  - approximate creative aspect ratio
+- Prompt
 - Negative Prompt
 - Model
-- LoRA
-- Source
-- Raw JSON
-- Copy Prompt
-- Copy Negative Prompt
-- Copy Model
-- Copy Source URL or file path
+- LoRA as a scrollable list
+- Raw metadata actions
+- Copy Raw metadata
+- Copy ComfyUI workflow JSON
+- Open local ComfyUI page
+
+Still pending in `v1.8.x`:
+
+- More real-world ComfyUI node format samples.
+- WebP / JPEG embedded metadata where practical.
+- Video embedded/container metadata through optional `ffprobe` or MediaInfo.
+- Better handling for workflows that only store runtime-generated prompt output outside the PNG metadata.
 
 Not planned for this phase:
 
@@ -612,20 +637,22 @@ External code can be copied or adapted only when:
 The next feature step should be:
 
 ```text
-v1.8.0 - AI Metadata Preview
+v1.8.x - Metadata Stabilization
 ```
 
-Recommended first implementation batch:
+Recommended stabilization batch:
 
-1. Implement embedded image metadata reading for PNG/WebP/JPEG where practical, starting with Stable Diffusion WebUI / A1111 `parameters` and ComfyUI `prompt` / `workflow`.
-2. Implement sidecar JSON reading using existing candidate rules:
-   - `name.json`
-   - `name.ext.json`
-   - `name.info.json`
-   - `name.civitai.json`
-3. Add a local metadata preview API for one media item, with scan-root validation so it cannot read arbitrary files.
-4. Keep unsupported or broken metadata non-fatal by returning a normalized empty or partial metadata object.
-5. After the API is stable, add the preview UI panel and copy actions.
+1. Test more real ComfyUI PNG samples, especially custom prompt, string, wildcard, and LoRA loader nodes.
+2. Keep the metadata panel readable with many LoRA entries and long prompts.
+3. Decide whether optional `ffprobe` video-container metadata belongs in `v1.8.x` or later.
+4. Keep unsupported or broken metadata non-fatal by returning normalized empty or partial metadata objects.
+5. Keep README, Chinese README, ROADMAP, and CHANGELOG synchronized before each GitHub release.
+
+After that, the next major feature step should be:
+
+```text
+v1.9.0 - Tags & Review Workflow
+```
 
 Still deferred:
 

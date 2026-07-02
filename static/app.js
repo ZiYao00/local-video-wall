@@ -7,6 +7,9 @@ const state = {
   pauseWhenInactive: false,
   confirmTrash: true,
   currentModalItem: null,
+  currentModalMetadata: null,
+  currentModalMetadataLoading: false,
+  currentModalMetadataError: "",
   visibleVideos: new Set(),
   columns: 6,
   pageSize: 120,
@@ -33,6 +36,7 @@ const state = {
   buttonStyle: "text",
   modalSlideshowPlaying: false,
   modalSlideshowTimer: null,
+  metadataRequestId: 0,
   slideshowItems: [],
   slideshowIndex: 0,
   slideshowPlaying: true,
@@ -73,6 +77,7 @@ const COLUMN_WIDTHS = { 2: 420, 3: 350, 4: 300, 5: 260, 6: 220, 7: 190, 8: 165, 
 const COLUMN_GAPS = { 2: 18, 3: 18, 4: 18, 5: 18, 6: 18, 7: 16, 8: 14, 9: 12, 10: 10, 11: 9, 12: 8, 13: 7, 14: 7, 15: 6, 16: 6, 17: 5, 18: 5, 19: 5, 20: 5 };
 const COLUMN_OPTIONS = Object.keys(COLUMN_WIDTHS).map(Number);
 const LARGE_VIDEO_MB = 500;
+const COMFYUI_URL = "http://127.0.0.1:8188/";
 
 const ICONS = {
   back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/><path d="M9 12h11"/></svg>',
@@ -87,6 +92,7 @@ const ICONS = {
   fullscreen: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5"/><path d="M16 3h5v5"/><path d="M21 16v5h-5"/><path d="M8 21H3v-5"/></svg>',
   fullscreenExit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v6H3"/><path d="M15 3v6h6"/><path d="M15 21v-6h6"/><path d="M9 21v-6H3"/></svg>',
   globe: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18"/><path d="M12 3a15 15 0 0 0 0 18"/></svg>',
+  alignCenter: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M12 4v16"/></svg>',
   iconMode: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="3"/><circle cx="9" cy="12" r="1.6"/><path d="M13 10h4"/><path d="M13 14h4"/></svg>',
   image: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8" cy="10" r="2"/><path d="M21 16l-5-5L5 19"/></svg>',
   language: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h9"/><path d="M9 3v2"/><path d="M6 5c.8 3 2.8 5.4 6 7"/><path d="M12 5c-.8 3-2.8 5.4-6 7"/><path d="M14 21l4-9 4 9"/><path d="M15.4 18h5.2"/></svg>',
@@ -159,7 +165,25 @@ const i18n = {
     metadataNegative: "Negative prompt",
     metadataSource: "Source / path",
     metadataBasic: "File info",
+    metadataPath: "Path",
+    metadataSize: "Size",
+    metadataDate: "Date",
+    metadataDimensions: "Dimensions",
+    metadataRatio: "Ratio",
+    metadataDuration: "Duration",
+    metadataFormat: "Format",
+    metadataCodec: "Codec",
     metadataPending: "No generation metadata detected yet.",
+    metadataLoading: "Reading metadata...",
+    metadataDetected: "Generation metadata loaded",
+    metadataPartial: "Basic media metadata loaded; no AI prompt fields detected.",
+    metadataEmpty: "No AI generation parameters detected.",
+    metadataRaw: "Raw metadata",
+    metadataActions: "Metadata actions",
+    metadataCopyRaw: "Copy raw",
+    metadataCopyWorkflow: "Copy workflow",
+    metadataOpenComfy: "Open ComfyUI",
+    metadataError: "Metadata read failed.",
     copy: "Copy",
     copied: "Copied.",
     sortTitle: "Sort",
@@ -368,7 +392,25 @@ const i18n = {
     metadataNegative: "负面提示词",
     metadataSource: "来源 / 路径",
     metadataBasic: "文件信息",
+    metadataPath: "路径",
+    metadataSize: "大小",
+    metadataDate: "日期",
+    metadataDimensions: "尺寸",
+    metadataRatio: "比例",
+    metadataDuration: "时长",
+    metadataFormat: "格式",
+    metadataCodec: "编码",
     metadataPending: "暂未读取到生成元数据。",
+    metadataLoading: "正在读取元数据...",
+    metadataDetected: "已读取生成元数据",
+    metadataPartial: "已读取基础媒体信息，未检测到 AI 提示词字段。",
+    metadataEmpty: "未检测到 AI 生成参数。",
+    metadataRaw: "原始元数据",
+    metadataActions: "元数据操作",
+    metadataCopyRaw: "复制原始数据",
+    metadataCopyWorkflow: "复制工作流",
+    metadataOpenComfy: "打开 ComfyUI",
+    metadataError: "元数据读取失败。",
     copy: "复制",
     copied: "已复制。",
     sortTitle: "排序",
@@ -597,6 +639,7 @@ const langToggle = $("#langToggle");
 const themeToggle = $("#themeToggle");
 const fontSizeSeg = $("#fontSizeSeg");
 const contentAlignSeg = $("#contentAlignSeg");
+const modalContentAlignSeg = $("#modalContentAlignSeg");
 const emptyState = $("#emptyState");
 const toast = $("#toast");
 const trashConfirmDialog = $("#trashConfirmDialog");
@@ -707,11 +750,29 @@ function applyFontSize() {
   });
 }
 
+function updateContentAlignLabels() {
+  const tx = t();
+  const labels = {
+    left: [tx.contentAlignLeft, "left"],
+    center: [tx.contentAlignCenter, "alignCenter"],
+    right: [tx.contentAlignRight, "right"],
+  };
+  [contentAlignSeg, modalContentAlignSeg].forEach(seg => {
+    seg?.querySelectorAll("button[data-content-align]").forEach(button => {
+      const [label, icon] = labels[button.dataset.contentAlign] || [button.textContent, "alignCenter"];
+      setButtonLabel(button, label, icon, { iconOnly: seg === modalContentAlignSeg });
+    });
+  });
+}
+
 function applyContentAlign() {
   const align = ["left", "center", "right"].includes(state.contentAlign) ? state.contentAlign : "center";
   document.body.classList.remove("content-align-left", "content-align-center", "content-align-right");
   document.body.classList.add(`content-align-${align}`);
   contentAlignSeg.querySelectorAll("button[data-content-align]").forEach(button => {
+    button.classList.toggle("active", button.dataset.contentAlign === align);
+  });
+  modalContentAlignSeg?.querySelectorAll("button[data-content-align]").forEach(button => {
     button.classList.toggle("active", button.dataset.contentAlign === align);
   });
 }
@@ -766,6 +827,7 @@ function applyActionButtons() {
   setButtonLabel(batchExportBtn, tx.batchExport, "download", { iconOnly: true });
   setButtonLabel(batchExitBtn, tx.batchExit, "close", { iconOnly: true });
   setButtonLabel(immersiveBtn, state.immersive ? tx.exitImmersive : tx.immersive, state.immersive ? "close" : "fullscreen", { iconOnly: true });
+  updateContentAlignLabels();
   setButtonLabel(modalSlideshow, state.modalSlideshowPlaying ? tx.pause : tx.slideshow, state.modalSlideshowPlaying ? "pause" : "slideshow", { iconOnly: true });
   modalSlideshow.classList.toggle("primary", state.modalSlideshowPlaying);
   setButtonLabel(modalSlideshowFullscreen, tx.fullscreen, "fullscreen", { iconOnly: true });
@@ -881,6 +943,7 @@ function applyLanguage() {
   fontSizeSeg.querySelector('[data-font-size="large"]').textContent = tx.fontSizeLarge;
   $("#contentAlignLabel").textContent = tx.contentAlign;
   contentAlignSeg.title = tx.contentAlign;
+  modalContentAlignSeg.title = tx.contentAlign;
   contentAlignSeg.querySelector('[data-content-align="center"]').textContent = tx.contentAlignCenter;
   contentAlignSeg.querySelector('[data-content-align="left"]').textContent = tx.contentAlignLeft;
   contentAlignSeg.querySelector('[data-content-align="right"]').textContent = tx.contentAlignRight;
@@ -1752,9 +1815,17 @@ function renderMetadataBlock(title, value, options = {}) {
   const safeValue = String(value || "").trim();
   if (!safeValue && options.hideEmpty) return "";
   const body = safeValue || t().metadataPending;
+  const collapsed = !!options.collapsed;
   const copy = safeValue
     ? `<button class="metadata-copy" type="button" data-copy-meta="${escapeHtml(safeValue)}">${escapeHtml(t().copy)}</button>`
     : "";
+  if (collapsed) {
+    return `
+      <details class="metadata-block metadata-fold">
+        <summary><span>${escapeHtml(title)}</span>${copy}</summary>
+        <p>${escapeHtml(body)}</p>
+      </details>`;
+  }
   return `
     <section class="metadata-block">
       <div class="metadata-block-head"><strong>${escapeHtml(title)}</strong>${copy}</div>
@@ -1762,20 +1833,218 @@ function renderMetadataBlock(title, value, options = {}) {
     </section>`;
 }
 
-function renderModalMetadata(item) {
+function renderMetadataLoraBlock(value, options = {}) {
+  const items = Array.isArray(value)
+    ? value.map(item => String(item || "").trim()).filter(Boolean)
+    : String(value || "").split(",").map(item => item.trim()).filter(Boolean);
+  if (!items.length) return "";
+  const copyText = items.join("\n");
+  const content = `
+    <ul class="metadata-lora-list">
+      ${items.map(item => `<li>${escapeHtml(item)}</li>`).join("")}
+    </ul>`;
+  if (options.collapsed) {
+    return `
+      <details class="metadata-block metadata-fold metadata-lora-block">
+        <summary><span>${escapeHtml(t().metadataLora)}</span><button class="metadata-copy" type="button" data-copy-meta="${escapeHtml(copyText)}">${escapeHtml(t().copy)}</button></summary>
+        ${content}
+      </details>`;
+  }
+  return `
+    <section class="metadata-block metadata-lora-block">
+      <div class="metadata-block-head">
+        <strong>${escapeHtml(t().metadataLora)}</strong>
+        <button class="metadata-copy" type="button" data-copy-meta="${escapeHtml(copyText)}">${escapeHtml(t().copy)}</button>
+      </div>
+      ${content}
+    </section>`;
+}
+
+function metadataSourceLabel(source) {
+  const labels = {
+    embedded: "Embedded",
+    sidecar: "Sidecar JSON",
+    ffprobe: "ffprobe",
+    mediainfo: "MediaInfo",
+    filesystem: "File",
+  };
+  return labels[source] || String(source || "").trim();
+}
+
+function metadataNoteText(metadata, options = {}) {
   const tx = t();
-  const basic = `${item.type || "media"} · ${fmtBytes(item.size_mb)} · ${item.mtime_text}`;
+  if (options.error) return options.error;
+  if (options.loading) return tx.metadataLoading;
+  const sources = Array.isArray(metadata?.metadata_sources)
+    ? metadata.metadata_sources.map(metadataSourceLabel).filter(Boolean).join(" / ")
+    : "";
+  const status = metadata?.metadata_status || "empty";
+  if (status === "ok") {
+    return sources ? `${tx.metadataDetected}: ${sources}` : tx.metadataDetected;
+  }
+  if (status === "partial") {
+    return sources ? `${tx.metadataPartial} (${sources})` : tx.metadataPartial;
+  }
+  return tx.metadataEmpty || tx.metadataPending;
+}
+
+function metadataJson(value) {
+  if (!value) return "";
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return "";
+  }
+}
+
+function aspectRatioText(width, height) {
+  const w = Number(width || 0);
+  const h = Number(height || 0);
+  if (!w || !h) return "";
+  const actual = w / h;
+  const common = [
+    [1, 1], [2, 3], [3, 2], [3, 4], [4, 3], [4, 5], [5, 4],
+    [9, 16], [16, 9], [9, 21], [21, 9], [5, 7], [7, 5],
+  ];
+  let best = common[0];
+  let bestDiff = Infinity;
+  for (const pair of common) {
+    const diff = Math.abs(actual - pair[0] / pair[1]);
+    if (diff < bestDiff) {
+      best = pair;
+      bestDiff = diff;
+    }
+  }
+  const tolerance = 0.045;
+  const decimal = actual.toFixed(2).replace(/\.00$/, "");
+  if (bestDiff <= tolerance) return `${best[0]}:${best[1]} approx (${decimal}:1)`;
+  const gcd = (a, b) => (b ? gcd(b, a % b) : a);
+  const divisor = gcd(Math.round(w), Math.round(h)) || 1;
+  return `${Math.round(w / divisor)}:${Math.round(h / divisor)} (${decimal}:1)`;
+}
+
+function mediaPixelDimensions(item, metadata = null) {
+  let width = Number(metadata?.width || 0);
+  let height = Number(metadata?.height || 0);
+  if (item?.type === "image" && modalImage.complete && modalImage.naturalWidth && state.currentModalItem?.key === item.key) {
+    width = modalImage.naturalWidth;
+    height = modalImage.naturalHeight;
+  }
+  if (item?.type === "video" && modalVideo.videoWidth && state.currentModalItem?.key === item.key) {
+    width = modalVideo.videoWidth;
+    height = modalVideo.videoHeight;
+  }
+  return { width, height };
+}
+
+function renderMetadataActions(metadata, raw, workflow) {
+  if (!raw && !workflow) return "";
+  const tx = t();
+  const rawButton = raw
+    ? `<button class="metadata-action-btn" type="button" data-copy-meta="${escapeHtml(raw)}">${escapeHtml(tx.metadataCopyRaw)}</button>`
+    : "";
+  const workflowButton = workflow
+    ? `<button class="metadata-action-btn" type="button" data-copy-meta="${escapeHtml(workflow)}">${escapeHtml(tx.metadataCopyWorkflow)}</button>`
+    : "";
+  const comfyButton = workflow
+    ? `<button class="metadata-action-btn" type="button" data-open-comfy="1">${escapeHtml(tx.metadataOpenComfy)}</button>`
+    : "";
+  return `
+    <section class="metadata-actions">
+      <div class="metadata-actions-title">${escapeHtml(tx.metadataActions)}</div>
+      <div class="metadata-actions-row">${workflowButton}${rawButton}${comfyButton}</div>
+    </section>`;
+}
+
+function renderMetadataInfo(items) {
+  const rows = items.filter(row => row.value);
+  if (!rows.length) return "";
+  return `
+    <section class="metadata-block metadata-info-block">
+      <div class="metadata-block-head"><strong>${escapeHtml(t().metadataBasic)}</strong></div>
+      <dl class="metadata-info-list">
+        ${rows.map(row => `<div><dt>${escapeHtml(row.label)}</dt><dd>${escapeHtml(row.value)}</dd></div>`).join("")}
+      </dl>
+    </section>`;
+}
+
+function renderModalMetadata(item, metadata = null, options = {}) {
+  const tx = t();
+  const loading = options.loading;
+  const error = options.error;
+  const source = metadata?.source_url
+    || metadata?.civitai_version_url
+    || metadata?.civitai_model_url
+    || item.full_path
+    || item.rel
+    || item.url;
+  const pixels = mediaPixelDimensions(item, metadata);
+  const dimensions = pixels.width && pixels.height ? `${pixels.width} x ${pixels.height}px` : "";
+  const ratio = aspectRatioText(pixels.width, pixels.height);
+  const duration = metadata?.duration ? `${Math.round(Number(metadata.duration) * 10) / 10}s` : "";
+  const infoRows = [
+    { label: tx.metadataPath, value: source },
+    { label: tx.mediaTypeTitle, value: item.type || "media" },
+    { label: tx.metadataSize, value: fmtBytes(item.size_mb) },
+    { label: tx.metadataDate, value: item.mtime_text },
+    { label: tx.metadataDimensions, value: dimensions },
+    { label: tx.metadataRatio, value: ratio },
+    { label: tx.metadataDuration, value: duration },
+    { label: tx.metadataFormat, value: metadata?.format || "" },
+    { label: tx.metadataCodec, value: metadata?.codec || "" },
+  ];
+  const raw = metadata?.raw_metadata && Object.keys(metadata.raw_metadata || {}).length ? metadataJson(metadata.raw_metadata) : "";
+  const workflow = metadata?.workflow ? metadataJson(metadata.workflow) : "";
   modalMetadata.innerHTML = `
-    <div class="metadata-title">${escapeHtml(tx.metadataTitle)}</div>
-    <p class="metadata-note">${escapeHtml(tx.metadataPending)}</p>
-    ${renderMetadataBlock(tx.metadataModel, "", { hideEmpty: true })}
-    ${renderMetadataBlock(tx.metadataLora, "", { hideEmpty: true })}
-    ${renderMetadataBlock(tx.metadataPrompt, "", { hideEmpty: true })}
-    ${renderMetadataBlock(tx.metadataNegative, "", { hideEmpty: true })}
-    ${renderMetadataBlock(tx.metadataSource, item.full_path || item.rel || item.url)}
-    ${renderMetadataBlock(tx.metadataBasic, basic)}
+    ${renderMetadataInfo(infoRows)}
+    ${error || loading ? `<p class="metadata-note">${escapeHtml(metadataNoteText(metadata, { loading, error }))}</p>` : ""}
+    ${renderMetadataActions(metadata, raw, workflow)}
+    ${renderMetadataBlock(tx.metadataModel, metadata?.model || "", { hideEmpty: true })}
+    ${renderMetadataLoraBlock(metadata?.loras, { collapsed: true })}
+    ${renderMetadataBlock(tx.metadataPrompt, metadata?.prompt || "", { hideEmpty: true, collapsed: true })}
+    ${renderMetadataBlock(tx.metadataNegative, metadata?.negative_prompt || "", { hideEmpty: true, collapsed: true })}
   `;
-  modalMetadata.classList.toggle("hidden", item.type !== "image");
+  modalMetadata.classList.toggle("hidden", !item || !["image", "video"].includes(item.type));
+}
+
+async function loadModalMetadata(item) {
+  const requestId = ++state.metadataRequestId;
+  state.currentModalMetadata = null;
+  state.currentModalMetadataLoading = true;
+  state.currentModalMetadataError = "";
+  renderModalMetadata(item, null, { loading: true });
+  try {
+    const params = new URLSearchParams({ path: item.rel || "", scan_id: item.scan_id || state.scanId || "" });
+    const res = await fetch(`/api/metadata?${params.toString()}`);
+    const data = await res.json();
+    if (requestId !== state.metadataRequestId || state.currentModalItem?.key !== item.key) return;
+    if (!res.ok || !data.ok) {
+      state.currentModalMetadata = null;
+      state.currentModalMetadataLoading = false;
+      state.currentModalMetadataError = data.error || t().metadataError;
+      renderModalMetadata(item, null, { error: data.error || t().metadataError });
+      return;
+    }
+    state.currentModalMetadata = data.metadata || {};
+    state.currentModalMetadataLoading = false;
+    state.currentModalMetadataError = "";
+    renderModalMetadata(item, state.currentModalMetadata);
+  } catch {
+    if (requestId === state.metadataRequestId && state.currentModalItem?.key === item.key) {
+      state.currentModalMetadata = null;
+      state.currentModalMetadataLoading = false;
+      state.currentModalMetadataError = t().metadataError;
+      renderModalMetadata(item, null, { error: t().metadataError });
+    }
+  }
+}
+
+function refreshModalMetadataPanel() {
+  if (modal.classList.contains("hidden") || !state.currentModalItem) return;
+  renderModalMetadata(state.currentModalItem, state.currentModalMetadata, {
+    loading: state.currentModalMetadataLoading,
+    error: state.currentModalMetadataError,
+  });
 }
 
 function renderModalItem(item) {
@@ -1792,6 +2061,9 @@ function renderModalItem(item) {
   modalSlideshowFullscreen.classList.toggle("hidden", item.type !== "image");
   modalImageUiToggle.classList.add("hidden");
   modalVideoUiToggle.classList.add("hidden");
+  state.currentModalMetadata = null;
+  state.currentModalMetadataLoading = true;
+  state.currentModalMetadataError = "";
   modalVideoControls.classList.toggle("hidden", item.type !== "video");
   modalContent.classList.toggle("is-video", item.type === "video");
   if (item.type === "image") {
@@ -1802,7 +2074,8 @@ function renderModalItem(item) {
     modalVideo.muted = false;
     updateVideoModeUI();
   }
-  renderModalMetadata(item);
+  renderModalMetadata(item, null, { loading: true });
+  loadModalMetadata(item);
   updateModalNav();
 }
 
@@ -2143,6 +2416,18 @@ function isInTopRightHotspot(event, root) {
   return event.clientX >= rect.right - width && event.clientY <= rect.top + height;
 }
 
+function isInModalControlHotspot(event, root) {
+  const rect = root.getBoundingClientRect();
+  const topHeight = Math.min(150, Math.max(96, rect.height * 0.18));
+  const sideWidth = Math.min(190, Math.max(96, rect.width * 0.12));
+  return (
+    event.clientY <= rect.top + topHeight
+    || event.clientX <= rect.left + sideWidth
+    || event.clientX >= rect.right - sideWidth
+    || !!event.target.closest(".modal-metadata")
+  );
+}
+
 function scheduleAutoHideControls(kind, delay = 1200, reset = false) {
   const timerKey = kind === "slideshow" ? "slideshowToolbarTimer" : "modalToolbarTimer";
   if (reset) {
@@ -2163,7 +2448,8 @@ function handleAutoControls(kind, event) {
     ? ".slideshow-top, .slideshow-controls, .slideshow-hidden-actions"
     : ".modal-header, .modal-actions, .modal-hidden-actions";
   const timerKey = kind === "slideshow" ? "slideshowToolbarTimer" : "modalToolbarTimer";
-  if (isInTopRightHotspot(event, root) || event.target.closest(toolbarSelector)) {
+  const inHotspot = kind === "modal" ? isInModalControlHotspot(event, root) : isInTopRightHotspot(event, root);
+  if (inHotspot || event.target.closest(toolbarSelector)) {
     clearTimeout(state[timerKey]);
     state[timerKey] = null;
     if (kind === "slideshow") {
@@ -2176,13 +2462,13 @@ function handleAutoControls(kind, event) {
   scheduleAutoHideControls(kind);
 }
 
-function pulseMediaNav(container) {
+function pulseMediaNav(container, delay = 1000) {
   if (!container || container.classList.contains("controls-hidden")) return;
   container.classList.add("nav-active");
   clearTimeout(state.mediaNavTimer);
   state.mediaNavTimer = setTimeout(() => {
     container.classList.remove("nav-active");
-  }, 1000);
+  }, delay);
 }
 
 function toggleModalFullscreen() {
@@ -3241,6 +3527,10 @@ contentAlignSeg.addEventListener("click", event => {
   const button = event.target.closest("button[data-content-align]");
   if (button) setContentAlign(button.dataset.contentAlign);
 });
+modalContentAlignSeg.addEventListener("click", event => {
+  const button = event.target.closest("button[data-content-align]");
+  if (button) setContentAlign(button.dataset.contentAlign);
+});
 modalClose.addEventListener("click", closeModal);
 modal.addEventListener("click", e => {
   if (e.target?.dataset?.close) closeModal();
@@ -3255,6 +3545,7 @@ modal.addEventListener("mouseleave", () => {
 });
 modal.addEventListener("wheel", e => {
   if (modal.classList.contains("hidden") || !state.currentModalItem) return;
+  if (e.target.closest(".modal-metadata")) return;
   const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
   if (!delta) return;
   e.preventDefault();
@@ -3266,13 +3557,18 @@ modal.addEventListener("wheel", e => {
   const jump = getWheelJump("modal");
   showModalImage(delta > 0 ? jump : -jump);
 }, { passive: false });
+modalMetadata.addEventListener("wheel", e => {
+  e.stopPropagation();
+}, { passive: true });
 modalPrev.addEventListener("click", () => {
   if (state.currentModalItem?.type === "image") showModalImage(-1);
   if (state.currentModalItem?.type === "video") showModalVideo(-1);
+  pulseMediaNav(modalContent, 1400);
 });
 modalNext.addEventListener("click", () => {
   if (state.currentModalItem?.type === "image") showModalImage(1);
   if (state.currentModalItem?.type === "video") showModalVideo(1);
+  pulseMediaNav(modalContent, 1400);
 });
 modalVideoModeSeg.addEventListener("click", e => {
   const btn = e.target.closest("button[data-video-mode]");
@@ -3286,6 +3582,8 @@ modalVideoUiToggle.addEventListener("click", () => setModalControlsHidden(true))
 modalUiShow.addEventListener("click", () => setModalControlsHidden(false));
 modalHiddenExitFullscreen.addEventListener("click", toggleModalFullscreen);
 modalHiddenClose.addEventListener("click", closeModal);
+modalImage.addEventListener("load", refreshModalMetadataPanel);
+modalVideo.addEventListener("loadedmetadata", refreshModalMetadataPanel);
 modalVideo.addEventListener("ended", () => {
   if (state.currentModalItem?.type !== "video") return;
   if (state.videoMode === "sequence") showModalVideo(1);
@@ -3298,8 +3596,18 @@ modalOpenDefault.addEventListener("click", () => {
   if (state.currentModalItem) openInDefaultApp(state.currentModalItem);
 });
 modalMetadata.addEventListener("click", async e => {
+  const comfyBtn = e.target.closest("[data-open-comfy]");
+  if (comfyBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const opened = window.open(COMFYUI_URL, "_blank", "noopener,noreferrer");
+    if (!opened) showToast(COMFYUI_URL, 1800);
+    return;
+  }
   const btn = e.target.closest("[data-copy-meta]");
   if (!btn) return;
+  e.preventDefault();
+  e.stopPropagation();
   try {
     await navigator.clipboard.writeText(btn.dataset.copyMeta || "");
     showToast(t().copied, 900);

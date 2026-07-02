@@ -6,9 +6,9 @@ A local media wall for browsing, screening, and organizing AI-generated videos a
 
 ![Preview](assets/preview01.gif)
 
-It is designed for local AI media folders from Civitai, ComfyUI, Wan, Kling, Runway, and similar tools. The app helps you scan large folders, preview visible videos without loading everything at once, review images in a fullscreen slideshow, and keep common review actions local and reversible.
+It is designed for local AI media folders from Civitai, ComfyUI, Stable Diffusion WebUI / A1111, Wan, Kling, Runway, and similar tools. The app helps you scan large folders, preview visible videos without loading everything at once, review images in a fullscreen slideshow, inspect generation metadata, and keep common review actions local and reversible.
 
-The next development direction is AI asset management: reading sidecar metadata, showing prompts and model information, adding tags, and building a lightweight local index.
+The current development direction is AI asset management: embedded generation metadata preview is now available for common PNG workflows, and the next stages focus on tags, notes, ratings, local indexing, and metadata search.
 
 ## Features
 
@@ -52,6 +52,15 @@ The next development direction is AI asset management: reading sidecar metadata,
 - English interface by default, with a Chinese toggle in the top toolbar
 - Filter directly from the toolbar: all, videos, images, or favorites
 - Batch-select visible media for favorite / unfavorite, Recycle Bin move, and CSV export
+- Preview AI generation metadata in the image/video viewer
+- Read Stable Diffusion WebUI / A1111 PNG `parameters`
+- Read ComfyUI PNG `prompt` and `workflow` metadata
+- Prefer the ComfyUI KSampler positive / negative conditioning chain when extracting prompts
+- Detect LoRA models, including Power Lora Loader / rgthree-style nodes, and show strength values when available
+- Read same-name sidecar JSON files such as `name.json`, `name.ext.json`, `name.info.json`, and `name.civitai.json`
+- Copy raw metadata or ComfyUI workflow JSON from the metadata panel
+- Open the local ComfyUI page from the metadata panel
+- Show file information as fields, including path, size, modified date, pixel dimensions, and approximate creative aspect ratio
 
 ## Use Cases
 
@@ -60,6 +69,7 @@ The next development direction is AI asset management: reading sidecar metadata,
 - Browse outputs from ComfyUI / Stable Diffusion / Wan / Kling / Runway and similar tools
 - Quickly screen large local media folders without importing them into a cloud service
 - Use a local folder as a dynamic visual reference wall
+- Inspect prompts, models, LoRA usage, and workflow metadata from generated images
 - Prepare local assets for future tagging, metadata search, and prompt/model review
 
 ## Requirements
@@ -159,6 +169,9 @@ Choosing a path from the folder panel or Windows folder picker fills the path fi
 - Use the video mode control to switch between loop one, sequential playback, and random playback.
 - Viewer controls auto-hide for cleaner image, slideshow, and video viewing. Move the mouse near the top-right control area to show them again.
 - Click the batch button to select multiple visible items, then favorite / unfavorite, move to Recycle Bin, or export CSV.
+- In the preview metadata panel, inspect file information, prompt, negative prompt, model, LoRA list with strength values when available, source/path, and raw metadata actions.
+- For ComfyUI images, prompt extraction prefers the KSampler conditioning chain, reducing noise from FaceDetailer, disconnected, or unused text nodes.
+- For ComfyUI workflows, use the metadata actions to copy workflow JSON or open your local ComfyUI page.
 
 ### 5. Interface options
 
@@ -205,6 +218,8 @@ Browsers usually require videos to be muted before autoplay is allowed, so video
 
 Click a video to open it in a larger player. You can enable audio manually in that player.
 
+Video embedded generation metadata is not fully implemented yet. The app can show sidecar JSON metadata for videos when present, but reading metadata directly from MP4/WebM containers is planned for a later optional `ffprobe` integration.
+
 ## Configuration
 
 The app stores local settings in:
@@ -219,18 +234,16 @@ Settings such as language, theme, font size, columns, page size, path history, f
 
 ## Future Direction
 
-The current release is the stable local media wall baseline. Planned future work focuses on AI media asset management, while keeping the app local, lightweight, and Windows-friendly.
+The app has moved beyond the baseline media wall into `v1.8.x` AI metadata preview work. Core embedded PNG metadata preview is implemented; the remaining `v1.8.x` work is stabilization and optional video/container metadata support.
 
 Recommended order:
 
-1. Stabilize the current `v1.7.x` line with synchronized docs, changelog updates, and smoke tests.
-2. Add `v1.7.5 - Architecture Guardrails`: introduce small backend module boundaries for safe JSON handling, review-state compatibility, and future metadata normalization without changing current runtime behavior.
-3. Build `v1.8.0 - AI Metadata Preview`: read embedded ComfyUI / Stable Diffusion WebUI metadata, same-name sidecar JSON, and basic video technical metadata; show prompt, negative prompt, model, LoRA, source, and raw metadata in the media preview.
-4. Build `v1.9.0 - Tags & Review Workflow`: add local tags, ratings, notes, and batch tag editing.
-5. Build `v2.0.0 - Local Index`: add a lightweight SQLite index for repeated scans and metadata lookup.
-6. Build `v2.1.0 - Metadata Search`: search and filter by prompt, model, LoRA, tags, source URL, and review state.
-7. Consider `v2.2.0 - Optional Preview Cache`: optional image thumbnails and video covers only after metadata and indexing are stable.
-8. Improve `v2.3.0 - Packaging`: release ZIPs, startup checks, optional portable tools, and clearer troubleshooting.
+1. Finish `v1.8.x - Metadata Stabilization`: test more ComfyUI node formats, keep metadata UI readable, and add optional video metadata support later.
+2. Build `v1.9.0 - Tags & Review Workflow`: add local tags, ratings, notes, and batch tag editing.
+3. Build `v2.0.0 - Local Index`: add a lightweight SQLite index for repeated scans and metadata lookup.
+4. Build `v2.1.0 - Metadata Search`: search and filter by prompt, model, LoRA, tags, source URL, and review state.
+5. Consider `v2.2.0 - Optional Preview Cache`: optional image thumbnails and video covers only after metadata and indexing are stable.
+6. Improve `v2.3.0 - Packaging`: release ZIPs, startup checks, optional portable tools, and clearer troubleshooting.
 
 See [ROADMAP.md](ROADMAP.md) for the full plan, including third-party tool reuse rules.
 

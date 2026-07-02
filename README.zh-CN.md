@@ -6,9 +6,9 @@
 
 ![预览](assets/preview01.gif)
 
-它适合用来管理来自 Civitai、ComfyUI、Wan、Kling、Runway 等工具的本地 AI 媒体文件夹。工具会自动预览当前屏幕内可见的视频，滚出屏幕后暂停或释放资源；图片可以进入大图预览和全屏幻灯片；常用整理操作尽量保持本地、可见、可撤回。
+它适合用来管理来自 Civitai、ComfyUI、Stable Diffusion WebUI / A1111、Wan、Kling、Runway 等工具的本地 AI 媒体文件夹。工具会自动预览当前屏幕内可见的视频，滚出屏幕后暂停或释放资源；图片可以进入大图预览和全屏幻灯片；还能查看常见图片生成元数据；常用整理操作尽量保持本地、可见、可撤回。
 
-下一阶段的开发方向是 AI 素材管理：读取 sidecar 元数据、显示提示词和模型信息、增加标签，并建立轻量本地索引。
+当前开发方向是 AI 素材管理：图片生成元数据预览已经进入可用阶段，后续会继续完善标签、备注、评分、本地索引和元数据搜索。
 
 ## 功能特点
 
@@ -52,6 +52,15 @@
 - 默认英文界面，顶部工具栏可切换中文
 - 顶部工具栏可直接筛选：全部、视频、图片、收藏
 - 支持批量选择可见媒体，并进行收藏、取消收藏、移到回收站和导出 CSV
+- 支持在图片/视频预览里查看 AI 生成元数据
+- 支持读取 Stable Diffusion WebUI / A1111 PNG `parameters`
+- 支持读取 ComfyUI PNG `prompt` 和 `workflow` 元数据
+- 提取 ComfyUI 提示词时优先追踪 KSampler 的正面 / 负面 conditioning 链路
+- 支持识别 LoRA，包括 Power Lora Loader / rgthree 风格节点，并在可读取时显示强度
+- 支持读取同名 sidecar JSON，例如 `name.json`、`name.ext.json`、`name.info.json`、`name.civitai.json`
+- 支持复制原始元数据或 ComfyUI workflow JSON
+- 支持从元数据面板打开本地 ComfyUI 页面
+- 文件信息以字段显示，包括路径、大小、日期、像素尺寸和近似常用生成比例
 
 ## 使用场景
 
@@ -62,6 +71,7 @@
 - 浏览 ComfyUI / Stable Diffusion / Wan / Kling / Runway 等工具生成的本地输出
 - 快速筛选大量本地媒体文件，不需要导入云端服务
 - 像看动态素材墙一样浏览本地文件夹
+- 查看生成图片的提示词、模型、LoRA 和 workflow 信息
 - 为后续标签、元数据搜索、提示词和模型信息整理做准备
 
 ## 运行环境
@@ -161,6 +171,9 @@ http://127.0.0.1:8787
 - 视频播放模式支持单视频循环、顺序播放和随机播放。
 - 图片、幻灯片和视频的观看控制栏会自动隐藏；需要操作时，把鼠标移到右上角控制区域即可重新显示。
 - 点击批量按钮后，可以选择多个可见媒体，并执行收藏、取消收藏、移到回收站或导出 CSV。
+- 在预览右侧的元数据面板里，可以查看文件信息、正面提示词、负面提示词、大模型、LoRA 列表及强度、来源/路径，以及原始元数据操作。
+- 对 ComfyUI 图片，工具会优先从 KSampler 的 conditioning 链路提取主提示词，尽量避免 FaceDetailer、未连接或未使用文本节点污染正面提示词。
+- 对 ComfyUI workflow，可以从元数据操作里复制 workflow JSON，或打开本地 ComfyUI 页面。
 
 ### 5. 界面选项
 
@@ -207,6 +220,8 @@ http://127.0.0.1:8787
 
 点击视频后，会打开大窗口播放器，你可以在播放器里手动开启声音。
 
+视频文件的内嵌生成元数据还没有完整实现。当前如果视频旁边有同名 sidecar JSON，可以显示其中的提示词、模型等信息；直接读取 MP4/WebM 容器里的生成信息会放到后续可选 `ffprobe` 集成里处理。
+
 ## 配置文件
 
 工具会在本地使用：
@@ -223,18 +238,16 @@ config.json
 
 ## 未来方向
 
-当前版本可以作为稳定的本地媒体墙基础。后续计划会逐步转向 AI 素材管理，同时继续保持本地、轻量、Windows 优先。
+项目已经从基础媒体墙推进到 `v1.8.x` AI 元数据预览阶段。当前核心 PNG 生成元数据预览已经可用，剩余 `v1.8.x` 重点是稳定更多 ComfyUI 节点格式，以及后续可选的视频容器元数据读取。
 
 建议顺序：
 
-1. 稳定当前 `v1.7.x`：同步中英文文档、更新更新日志、补充基础测试清单。
-2. 增加 `v1.7.5 - Architecture Guardrails`：先建立小范围后端模块边界，用于安全 JSON 读写、审核状态兼容和未来元数据标准化，但不改变当前运行行为。
-3. 开发 `v1.8.0 - AI Metadata Preview`：读取 ComfyUI / Stable Diffusion WebUI 图片内嵌元数据、同名 sidecar JSON 和视频基础技术信息，并在媒体预览里显示提示词、负面提示词、模型、LoRA、来源和 Raw JSON。
-4. 开发 `v1.9.0 - Tags & Review Workflow`：增加本地标签、评分、备注和批量打标签。
-5. 开发 `v2.0.0 - Local Index`：增加轻量 SQLite 索引，用于加速重复扫描和元数据查询。
-6. 开发 `v2.1.0 - Metadata Search`：按 Prompt、模型、LoRA、标签、来源 URL 和审核状态搜索筛选。
-7. 视情况开发 `v2.2.0 - Optional Preview Cache`：在元数据和索引稳定后，再考虑可选图片缩略图和视频封面缓存。
-8. 改进 `v2.3.0 - Packaging`：Release ZIP、启动检查、可选 portable tools 和更清晰的故障排查。
+1. 完成 `v1.8.x - Metadata Stabilization`：测试更多 ComfyUI 节点格式、优化元数据面板可读性，并在后续加入可选视频元数据支持。
+2. 开发 `v1.9.0 - Tags & Review Workflow`：增加本地标签、评分、备注和批量打标签。
+3. 开发 `v2.0.0 - Local Index`：增加轻量 SQLite 索引，用于加速重复扫描和元数据查询。
+4. 开发 `v2.1.0 - Metadata Search`：按 Prompt、模型、LoRA、标签、来源 URL 和审核状态搜索筛选。
+5. 视情况开发 `v2.2.0 - Optional Preview Cache`：在元数据和索引稳定后，再考虑可选图片缩略图和视频封面缓存。
+6. 改进 `v2.3.0 - Packaging`：Release ZIP、启动检查、可选 portable tools 和更清晰的故障排查。
 
 完整计划和第三方工具复用规则见 [ROADMAP.md](ROADMAP.md)。
 

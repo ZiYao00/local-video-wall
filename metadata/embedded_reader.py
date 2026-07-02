@@ -144,39 +144,454 @@ def _iter_comfy_nodes(prompt: Any) -> Iterable[dict[str, Any]]:
     return [node for node in nodes if isinstance(node, dict)]
 
 
+def _comfy_node_map(prompt: Any) -> dict[str, dict[str, Any]]:
+    if not isinstance(prompt, dict):
+        return {}
+    return {str(key): node for key, node in prompt.items() if isinstance(node, dict)}
+
+
+def _iter_workflow_nodes(workflow: Any) -> Iterable[dict[str, Any]]:
+    if not isinstance(workflow, dict):
+        return []
+    nodes = workflow.get("nodes")
+    if not isinstance(nodes, list):
+        return []
+    return [node for node in nodes if isinstance(node, dict)]
+
+
 def _extract_loras(values: Iterable[Any]) -> list[str]:
     found: list[str] = []
     seen: set[str] = set()
+
+    def add_lora(name: Any, weight: Any = None) -> None:
+        text = str(name or "").strip()
+        if not text:
+            return
+        if isinstance(weight, (int, float, str)) and str(weight).strip() not in {"", "0", "0.0"}:
+            text = _format_lora_display(text, str(weight).strip())
+        key = text.casefold()
+        if key not in seen:
+            seen.add(key)
+            found.append(text)
+
     for value in values:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                key_text = str(key or "").casefold()
+                if "lora" in key_text and item not in (None, "", False):
+                    add_lora(item)
+            continue
         text = str(value or "")
         for match in re.finditer(r"<lora:([^:>]+)(?::[^>]+)?>", text, flags=re.IGNORECASE):
-            name = match.group(1).strip()
-            key = name.casefold()
-            if name and key not in seen:
-                seen.add(key)
-                found.append(name)
+            weight_match = re.match(r"<lora:[^:>]+:([^>]+)>", match.group(0), flags=re.IGNORECASE)
+            add_lora(match.group(1).strip(), weight_match.group(1).strip() if weight_match else None)
+    return found
+
+
+def _add_unique_text(target: list[str], value: Any) -> None:
+    text = str(value or "").strip()
+    if text and text.casefold() not in {item.casefold() for item in target}:
+        target.append(text)
+
+
+def _clean_strength(value: Any) -> str:
+    if value in (None, "", False):
+        return ""
+    if isinstance(value, bool):
+        return ""
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        text = str(value or "").strip()
+        return text if text and text.casefold() not in {"true", "false", "on", "off"} else ""
+    return f"{number:g}"
+
+
+def _format_lora_display(name: Any, *strength_values: tuple[str, Any] | Any) -> str:
+    text = str(name or "").strip()
+    if not text:
+        return ""
+    parts: list[str] = []
+    for value in strength_values:
+        label = ""
+        raw = value
+        if isinstance(value, tuple):
+            label, raw = value
+        strength = _clean_strength(raw)
+        if not strength:
+            continue
+        parts.append(f"{label} {strength}".strip())
+    return f"{text} - {' / '.join(parts)}" if parts else text
+
+
+def _looks_like_prompt_text(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    text = value.strip()
+    if len(text) < 3:
+        return False
+    lowered = text.casefold()
+    if lowered.startswith(("http://", "https://")):
+        return False
+    if lowered.endswith((".safetensors", ".ckpt", ".pt", ".pth", ".onnx", ".json", ".png", ".jpg", ".jpeg", ".webp")):
+        return False
+    if re.fullmatch(r"[\d\s.,:;_+\-\\/]+", text):
+        return False
+    return True
+
+
+def _text_kind_from_key(key: Any, class_type: str = "") -> str:
+    text = f"{key or ''} {class_type}".casefold()
+    if any(token in text for token in ("negative", "neg_prompt", "negative_prompt", "uncond")):
+        return "negative"
+    if any(token in text for token in ("positive", "pos_prompt", "positive_prompt")):
+        return "positive"
+    if any(token in text for token in ("prompt", "wildcard", "text", "caption", "string")):
+        return "positive"
+    return ""
+
+
+def _extract_prompt_texts_from_inputs(class_type: str, inputs: dict[str, Any]) -> tuple[list[str], list[str], list[str]]:
+    positives: list[str] = []
+    negatives: list[str] = []
+    clip_texts: list[str] = []
+    class_key = class_type.casefold()
+    prompt_like_class = any(token in class_key for token in ("prompt", "wildcard", "textencode", "cliptextencode", "conditioning"))
+    for key, value in inputs.items():
+        if not _looks_like_prompt_text(value):
+            continue
+        kind = _text_kind_from_key(key, class_type)
+        if key == "text" and "cliptextencode" in class_key:
+            _add_unique_text(clip_texts, value)
+            continue
+        if kind == "negative":
+            _add_unique_text(negatives, value)
+        elif kind == "positive":
+            _add_unique_text(positives, value)
+        elif prompt_like_class:
+            _add_unique_text(positives, value)
+    return positives, negatives, clip_texts
+
+
+def _extract_prompt_texts_from_workflow(workflow: Any) -> tuple[list[str], list[str]]:
+    positives: list[str] = []
+    negatives: list[str] = []
+    for node in _iter_workflow_nodes(workflow):
+        class_type = str(node.get("type") or node.get("class_type") or node.get("title") or "")
+        kind = _text_kind_from_key("", class_type)
+        prompt_like = bool(kind) or any(token in class_type.casefold() for token in ("wildcard", "text", "prompt", "conditioning"))
+        widgets = node.get("widgets_values")
+        if not isinstance(widgets, list) or not prompt_like:
+            continue
+        for value in widgets:
+            if not _looks_like_prompt_text(value):
+                continue
+            if kind == "negative":
+                _add_unique_text(negatives, value)
+            else:
+                _add_unique_text(positives, value)
+    return positives, negatives
+
+
+def _linked_node_id(value: Any) -> str:
+    if isinstance(value, (list, tuple)) and value:
+        first = value[0]
+        if isinstance(first, (int, str)):
+            return str(first)
+    return ""
+
+
+def _is_sampler_node(class_type: str) -> bool:
+    class_key = class_type.casefold()
+    return "ksampler" in class_key or class_key in {"samplercustom", "samplercustomadvanced"}
+
+
+def _prompt_input_values(inputs: dict[str, Any], class_type: str) -> Iterable[Any]:
+    class_key = class_type.casefold()
+    prompt_like_class = any(token in class_key for token in ("prompt", "wildcard", "string", "text", "cliptextencode"))
+    for key, value in inputs.items():
+        key_fold = str(key or "").casefold()
+        if _linked_node_id(value):
+            yield value
+            continue
+        if key_fold in {"seed", "steps", "cfg", "cfg_scale", "sampler_name", "scheduler"}:
+            continue
+        if any(token in key_fold for token in ("function", "expression", "script", "code", "mode", "operation")):
+            continue
+        if any(token in key_fold for token in ("prompt", "text", "string", "wildcard", "caption")) or prompt_like_class:
+            yield value
+
+
+def _resolve_prompt_chain(node_id: str, nodes: dict[str, dict[str, Any]], visited: set[str] | None = None) -> list[str]:
+    if not node_id or node_id not in nodes:
+        return []
+    if visited is None:
+        visited = set()
+    if node_id in visited or len(visited) > 80:
+        return []
+    visited.add(node_id)
+    node = nodes[node_id]
+    class_type = str(node.get("class_type") or "")
+    inputs = node.get("inputs") if isinstance(node.get("inputs"), dict) else {}
+    result: list[str] = []
+    for value in _prompt_input_values(inputs, class_type):
+        linked_id = _linked_node_id(value)
+        if linked_id:
+            for text in _resolve_prompt_chain(linked_id, nodes, visited):
+                _add_unique_text(result, text)
+            continue
+        if _looks_like_prompt_text(value):
+            _add_unique_text(result, value)
+    return result
+
+
+def _extract_sampler_prompts(prompt: Any) -> tuple[list[str], list[str]]:
+    nodes = _comfy_node_map(prompt)
+    positives: list[str] = []
+    negatives: list[str] = []
+    for node in nodes.values():
+        class_type = str(node.get("class_type") or "")
+        if not _is_sampler_node(class_type):
+            continue
+        inputs = node.get("inputs") if isinstance(node.get("inputs"), dict) else {}
+        positive_link = _linked_node_id(inputs.get("positive") or inputs.get("positive_conditioning"))
+        negative_link = _linked_node_id(inputs.get("negative") or inputs.get("negative_conditioning"))
+        for text in _resolve_prompt_chain(positive_link, nodes):
+            _add_unique_text(positives, text)
+        for text in _resolve_prompt_chain(negative_link, nodes):
+            _add_unique_text(negatives, text)
+    return positives, negatives
+
+
+def _extract_loras_from_comfy_inputs(class_type: str, inputs: dict[str, Any]) -> list[str]:
+    class_key = class_type.casefold()
+    found: list[str] = []
+    lora_like_class = "lora" in class_key or "loraloader" in class_key
+
+    def strength_for(key: str) -> list[tuple[str, Any]]:
+        key_fold = key.casefold()
+        suffix = ""
+        match = re.search(r"(?:lora|name|model_name|lora_name)[_\- ]*(\d+)$", key_fold)
+        if match:
+            suffix = match.group(1)
+        candidates: list[tuple[str, str]] = []
+        if suffix:
+            candidates.extend([
+                ("model", f"model_strength_{suffix}"),
+                ("clip", f"clip_strength_{suffix}"),
+                ("strength", f"strength_{suffix}"),
+                ("weight", f"weight_{suffix}"),
+            ])
+        candidates.extend([
+            ("model", "strength_model"),
+            ("clip", "strength_clip"),
+            ("model", "model_strength"),
+            ("clip", "clip_strength"),
+            ("strength", "strength"),
+            ("weight", "weight"),
+        ])
+        result: list[tuple[str, Any]] = []
+        for label, candidate in candidates:
+            if candidate in inputs:
+                result.append((label, inputs.get(candidate)))
+        return result
+
+    def add_lora(value: Any) -> None:
+        if isinstance(value, dict):
+            nested = (
+                value.get("name")
+                or value.get("modelName")
+                or value.get("lora_name")
+                or value.get("model_name")
+                or value.get("lora")
+            )
+            _add_unique_text(
+                found,
+                _format_lora_display(
+                    nested,
+                    ("model", value.get("strength_model") or value.get("model_strength")),
+                    ("clip", value.get("strength_clip") or value.get("clip_strength")),
+                    ("strength", value.get("strength")),
+                    ("weight", value.get("weight")),
+                ),
+            )
+            return
+        if isinstance(value, str):
+            text = value.strip()
+            if not text:
+                return
+            parsed = _json_loads(text) if text[:1] in {"{", "["} else None
+            if isinstance(parsed, (dict, list)):
+                for item in _extract_loras_from_value(parsed):
+                    _add_unique_text(found, item)
+                return
+        _add_unique_text(found, value)
+
+    for key, value in inputs.items():
+        key_text = str(key or "")
+        key_fold = key_text.casefold()
+        if value in (None, "", False):
+            continue
+        if any(token in key_fold for token in ("strength", "weight", "enabled", "enable", "switch", "bypass")):
+            continue
+        if "lora" not in key_fold and not (lora_like_class and key_fold in {"model_name", "name"}):
+            continue
+        if isinstance(value, (list, tuple)):
+            for item in value:
+                add_lora(item)
+            continue
+        if isinstance(value, str) and not value.strip()[:1] in {"{", "["}:
+            _add_unique_text(found, _format_lora_display(value, *strength_for(key_text)))
+        else:
+            add_lora(value)
+    return found
+
+
+def _extract_loras_from_value(value: Any) -> list[str]:
+    result: list[str] = []
+    if isinstance(value, dict):
+        if value.get("enabled") is False or value.get("on") is False or value.get("bypass") is True:
+            return result
+        is_lora_record = (
+            "lora" in str(value.get("type") or "").casefold()
+            or any("lora" in str(key or "").casefold() for key in value.keys())
+            or any(key in value for key in ("modelName", "model_name"))
+        )
+        name = (
+            (value.get("name") if is_lora_record else "")
+            or value.get("modelName")
+            or value.get("lora_name")
+            or value.get("model_name")
+            or value.get("lora")
+        )
+        _add_unique_text(
+            result,
+            _format_lora_display(
+                name,
+                ("model", value.get("strength_model") or value.get("model_strength")),
+                ("clip", value.get("strength_clip") or value.get("clip_strength")),
+                ("strength", value.get("strength")),
+                ("weight", value.get("weight")),
+            ),
+        )
+        for key, item in value.items():
+            key_fold = str(key or "").casefold()
+            if any(token in key_fold for token in ("strength", "weight", "enabled", "enable", "switch", "bypass", "on")):
+                continue
+            if key_fold in {"name", "modelname", "model_name", "lora_name", "lora"} and name:
+                continue
+            if "lora" in key_fold or key_fold in {"modelname", "model_name"}:
+                for nested in _extract_loras_from_value(item):
+                    _add_unique_text(result, nested)
+        return result
+    if isinstance(value, list):
+        for item in value:
+            for nested in _extract_loras_from_value(item):
+                _add_unique_text(result, nested)
+        return result
+    if isinstance(value, str):
+        text = value.strip()
+        if not text or text.casefold() in {"true", "false", "on", "off", "enabled", "disabled"}:
+            return result
+        if re.fullmatch(r"[\d\s.,:;_+\-\\/]+", text):
+            return result
+        if text[:1] in {"{", "["}:
+            parsed = _json_loads(text)
+            if isinstance(parsed, (dict, list)):
+                for nested in _extract_loras_from_value(parsed):
+                    _add_unique_text(result, nested)
+                return result
+        if text.lower().endswith((".safetensors", ".ckpt", ".pt", ".pth")) or "lora" in text.casefold():
+            _add_unique_text(result, text)
+    return result
+
+
+def _extract_loras_from_rgthree_widgets(widgets: list[Any]) -> list[str]:
+    found: list[str] = []
+    skip_next = False
+    for index, value in enumerate(widgets):
+        if skip_next:
+            skip_next = False
+            continue
+        if value in (False, None, ""):
+            continue
+        if isinstance(value, bool):
+            continue
+        items = _extract_loras_from_value(value)
+        if items and isinstance(value, str):
+            next_one = widgets[index + 1] if index + 1 < len(widgets) else None
+            next_two = widgets[index + 2] if index + 2 < len(widgets) else None
+            if _clean_strength(next_one) and _clean_strength(next_two):
+                items = [_format_lora_display(item, ("model", next_one), ("clip", next_two)) for item in items]
+            elif _clean_strength(next_one):
+                items = [_format_lora_display(item, ("strength", next_one)) for item in items]
+        for item in items:
+            _add_unique_text(found, item)
+        if isinstance(value, str) and value.strip().casefold() in {"off", "disabled", "bypassed"}:
+            skip_next = True
+    return found
+
+
+def _extract_loras_from_workflow(workflow: Any) -> list[str]:
+    found: list[str] = []
+    for node in _iter_workflow_nodes(workflow):
+        class_type = str(node.get("type") or node.get("class_type") or node.get("title") or "")
+        if "lora" not in class_type.casefold():
+            continue
+        widgets = node.get("widgets_values")
+        if isinstance(widgets, list):
+            for lora in _extract_loras_from_rgthree_widgets(widgets):
+                _add_unique_text(found, lora)
+        for key in ("properties", "widgets", "inputs"):
+            value = node.get(key)
+            for lora in _extract_loras_from_value(value):
+                _add_unique_text(found, lora)
     return found
 
 
 def _extract_comfy_metadata(prompt: Any, workflow: Any) -> dict[str, Any]:
-    text_prompts: list[str] = []
+    sampler_positives, sampler_negatives = _extract_sampler_prompts(prompt)
+    fallback_positives: list[str] = []
+    fallback_negatives: list[str] = []
+    clip_texts: list[str] = []
     models: list[str] = []
     loras: list[str] = []
     for node in _iter_comfy_nodes(prompt):
         class_type = str(node.get("class_type") or "")
         inputs = node.get("inputs") if isinstance(node.get("inputs"), dict) else {}
-        if "CLIPTextEncode" in class_type and inputs.get("text"):
-            text_prompts.append(str(inputs.get("text") or "").strip())
-        if class_type in {"CheckpointLoaderSimple", "CheckpointLoader"} and inputs.get("ckpt_name"):
-            models.append(str(inputs.get("ckpt_name") or "").strip())
-        if "LoraLoader" in class_type and inputs.get("lora_name"):
-            loras.append(str(inputs.get("lora_name") or "").strip())
+        node_positives, node_negatives, node_clip_texts = _extract_prompt_texts_from_inputs(class_type, inputs)
+        for text in node_positives:
+            _add_unique_text(fallback_positives, text)
+        for text in node_negatives:
+            _add_unique_text(fallback_negatives, text)
+        for text in node_clip_texts:
+            _add_unique_text(clip_texts, text)
+        if ("CheckpointLoader" in class_type or "Checkpoint" in class_type) and inputs.get("ckpt_name"):
+            _add_unique_text(models, inputs.get("ckpt_name"))
+        for model_key in ("checkpoint", "checkpoint_name", "model_name"):
+            if "checkpoint" in class_type.casefold() and inputs.get(model_key):
+                _add_unique_text(models, inputs.get(model_key))
+        for lora in _extract_loras_from_comfy_inputs(class_type, inputs):
+            _add_unique_text(loras, lora)
+    workflow_positives, workflow_negatives = _extract_prompt_texts_from_workflow(workflow)
+    for text in workflow_positives:
+        _add_unique_text(fallback_positives, text)
+    for text in workflow_negatives:
+        _add_unique_text(fallback_negatives, text)
+    for lora in _extract_loras_from_workflow(workflow):
+        _add_unique_text(loras, lora)
+    if not fallback_positives and clip_texts:
+        _add_unique_text(fallback_positives, clip_texts[0])
+    if not fallback_negatives and len(clip_texts) > 1:
+        _add_unique_text(fallback_negatives, clip_texts[1])
+    positive_prompts = sampler_positives or fallback_positives
+    negative_prompts = sampler_negatives or fallback_negatives
     return {
         "source_app": "ComfyUI",
-        "prompt": text_prompts[0] if text_prompts else "",
-        "negative_prompt": text_prompts[1] if len(text_prompts) > 1 else "",
+        "prompt": "\n\n".join(positive_prompts),
+        "negative_prompt": "\n\n".join(negative_prompts),
         "model": models[0] if models else "",
-        "loras": loras or _extract_loras(text_prompts),
+        "loras": loras or _extract_loras([*positive_prompts, *negative_prompts, *clip_texts]),
         "workflow": workflow,
     }
 

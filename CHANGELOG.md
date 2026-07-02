@@ -14,6 +14,17 @@
 - Added a review-data compatibility layer with schema-version normalization while preserving the current favorite/selected UI behavior.
 - Added metadata schema and normalizer boundaries for future AI metadata preview work, plus safe embedded, sidecar, and ffprobe reader entry points without making external tools mandatory.
 - Started `v1.8.0 - AI Metadata Preview` with dependency-free PNG embedded metadata parsing, sidecar JSON metadata reading, metadata merging, and a scan-root-validated `/api/metadata` endpoint.
+- Connected the image/video preview metadata panel to `/api/metadata`, including loading/error states, Prompt, Negative Prompt, Model, LoRA, Source, file info, Raw metadata, and copy actions.
+- Improved the metadata panel UX with collapsible Negative Prompt, Source, File Info, and Raw metadata sections; isolated metadata-panel wheel scrolling from image navigation; expanded modal control hover zones; and removed the hidden-toolbar dark gradient residue.
+- Improved AI metadata status text and LoRA detection for ComfyUI/custom-node workflows and sidecar JSON variants, while keeping dynamic wildcard prompt reconstruction as a later parser task.
+- Expanded ComfyUI prompt extraction to read common custom prompt, wildcard, text, and workflow widget fields, with a conservative CLIPTextEncode fallback for positive/negative prompt pairs.
+- Replaced the always-visible Raw metadata text block with compact metadata action buttons for copying Raw metadata, copying ComfyUI workflow JSON, and opening the local ComfyUI page.
+- Added preview-window layout controls for Left / Center / Right, aligned the Settings order to Left / Center / Right, hid video metadata in side-preview layouts, and kept navigation arrows visible briefly after Prev / Next clicks.
+- Changed ComfyUI prompt extraction to prefer the KSampler positive / negative conditioning chain, so FaceDetailer, disconnected, and fallback text nodes are less likely to pollute the main Prompt field.
+- Expanded ComfyUI LoRA extraction for Power Lora Loader / rgthree-style nodes by reading LoRA inputs and workflow widget values while avoiding node-title false positives.
+- Added LoRA strength display when model / clip / strength values are available, and changed the metadata panel LoRA section from a comma-separated line into a scrollable per-LoRA list.
+- Reworked the metadata panel header so File Info appears first with pixel dimensions and aspect ratio, and made the LoRA and Prompt sections collapsible.
+- Changed metadata File Info to a labeled field list, merged Source / Path into it, suppressed successful metadata-source status text, and switched aspect-ratio display to common creative-ratio approximations such as 3:4.
 
 ## 1.6.12 - 2026-06-12
 

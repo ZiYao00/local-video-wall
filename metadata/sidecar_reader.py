@@ -42,11 +42,22 @@ def _first_text(data: dict[str, Any], keys: tuple[str, ...]) -> str:
 
 
 def _extract_loras(value: Any) -> list[str]:
+    if isinstance(value, dict):
+        result = []
+        for key, item in value.items():
+            if isinstance(item, dict):
+                name = item.get("name") or item.get("modelName") or item.get("lora_name") or item.get("model_name") or key
+            else:
+                name = item or key
+            text = str(name or "").strip()
+            if text:
+                result.append(text)
+        return result
     if isinstance(value, list):
         result = []
         for item in value:
             if isinstance(item, dict):
-                name = item.get("name") or item.get("modelName") or item.get("lora_name")
+                name = item.get("name") or item.get("modelName") or item.get("lora_name") or item.get("model_name")
             else:
                 name = item
             text = str(name or "").strip()
@@ -58,12 +69,37 @@ def _extract_loras(value: Any) -> list[str]:
     return []
 
 
+def _collect_lora_fields(data: dict[str, Any]) -> list[str]:
+    result: list[str] = []
+    for key in (
+        "loras",
+        "lora",
+        "Lora",
+        "lora_names",
+        "loraNames",
+        "additional_networks",
+        "additionalNetworks",
+        "additional_networks_info",
+        "additionalNetworksInfo",
+    ):
+        result.extend(_extract_loras(data.get(key)))
+    seen: set[str] = set()
+    unique: list[str] = []
+    for item in result:
+        text = str(item or "").strip()
+        key = text.casefold()
+        if text and key not in seen:
+            seen.add(key)
+            unique.append(text)
+    return unique
+
+
 def _normalize_sidecar_mapping(data: dict[str, Any], sidecar_path: Path, media_path: Path) -> MediaMetadata:
     resources = data.get("resources") if isinstance(data.get("resources"), list) else []
     resource_loras = [
         item.get("name") or item.get("modelName")
         for item in resources
-        if isinstance(item, dict) and str(item.get("type") or "").casefold() == "lora"
+        if isinstance(item, dict) and "lora" in str(item.get("type") or "").casefold()
     ]
     model_from_resources = next(
         (
@@ -79,7 +115,7 @@ def _normalize_sidecar_mapping(data: dict[str, Any], sidecar_path: Path, media_p
         "prompt": _first_text(data, ("prompt", "positive_prompt", "positive", "Prompt")),
         "negative_prompt": _first_text(data, ("negative_prompt", "negativePrompt", "negative", "Negative prompt")),
         "model": _first_text(data, ("model", "model_name", "modelName", "checkpoint", "ckpt_name")) or model_from_resources,
-        "loras": _extract_loras(data.get("loras") or data.get("lora") or data.get("Lora")) + [str(v) for v in resource_loras if v],
+        "loras": _collect_lora_fields(data) + [str(v) for v in resource_loras if v],
         "seed": _first_text(data, ("seed", "Seed")),
         "sampler": _first_text(data, ("sampler", "Sampler")),
         "steps": data.get("steps") or data.get("Steps"),
