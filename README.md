@@ -61,6 +61,7 @@ The current development direction is AI asset management: embedded generation me
 - Copy raw metadata or ComfyUI workflow JSON from the metadata panel
 - Open the local ComfyUI page from the metadata panel
 - Show file information as fields, including path, size, modified date, pixel dimensions, and approximate creative aspect ratio
+- Optionally read video container metadata through `ffprobe` when it is available on PATH
 
 ## Use Cases
 
@@ -218,7 +219,7 @@ Browsers usually require videos to be muted before autoplay is allowed, so video
 
 Click a video to open it in a larger player. You can enable audio manually in that player.
 
-Video embedded generation metadata is not fully implemented yet. The app can show sidecar JSON metadata for videos when present, but reading metadata directly from MP4/WebM containers is planned for a later optional `ffprobe` integration.
+Video embedded generation metadata depends on how the video was created. If `ffprobe` is available on PATH, the app can read MP4/WebM/MOV container tags such as prompt, workflow, comment, description, duration, codec, and resolution. If `ffprobe` is not installed, video metadata reading safely falls back to sidecar JSON and basic file information.
 
 ## Configuration
 
@@ -234,11 +235,11 @@ Settings such as language, theme, font size, columns, page size, path history, f
 
 ## Future Direction
 
-The app has moved beyond the baseline media wall into `v1.8.x` AI metadata preview work. Core embedded PNG metadata preview is implemented; the remaining `v1.8.x` work is stabilization and optional video/container metadata support.
+The app has moved beyond the baseline media wall into `v1.8.x` AI metadata preview work. Core embedded PNG metadata preview is implemented, and optional `ffprobe` video/container metadata reading is available when `ffprobe` is installed.
 
 Recommended order:
 
-1. Finish `v1.8.x - Metadata Stabilization`: test more ComfyUI node formats, keep metadata UI readable, and add optional video metadata support later.
+1. Finish `v1.8.x - Metadata Stabilization`: test more ComfyUI node formats, keep metadata UI readable, and validate more real-world video metadata samples.
 2. Build `v1.9.0 - Tags & Review Workflow`: add local tags, ratings, notes, and batch tag editing.
 3. Build `v2.0.0 - Local Index`: add a lightweight SQLite index for repeated scans and metadata lookup.
 4. Build `v2.1.0 - Metadata Search`: search and filter by prompt, model, LoRA, tags, source URL, and review state.

@@ -63,6 +63,10 @@
         </select>
         <span id="pageSizeLabel" class="toolbar-label">Per page</span>
         <input id="pageSizeInput" class="page-size-input" type="number" min="1" max="240" step="1" value="120" title="Items per page" />
+        <div id="topPager" class="top-pager hidden" aria-label="Media page controls">
+          <button id="topPagePrev" class="btn ghost" type="button" title="Previous page" aria-label="Previous page">Previous</button>
+          <button id="topPageNext" class="btn ghost" type="button" title="Next page" aria-label="Next page">Next</button>
+        </div>
         <button id="pauseBtn" class="btn ghost">Pause All</button>
         <button id="immersiveBtn" class="btn">Immersive</button>
         <button id="settingsToggle" class="btn icon-toggle" title="Settings" aria-label="Settings"></button>
@@ -71,6 +75,7 @@
           <div id="settingsInterfaceTitle" class="settings-title">Interface</div>
           <button id="langToggle" class="btn settings-btn" title="Switch language" aria-label="Switch language"></button>
           <button id="themeToggle" class="btn settings-btn" title="Toggle theme" aria-label="Toggle theme"></button>
+          <label class="check settings-check"><input id="floatingPagerEnabled" type="checkbox"><span id="floatingPagerLabel">Floating pager</span></label>
           <div class="settings-field">
             <span id="fontSizeLabel" class="settings-field-label">Text size</span>
             <div id="fontSizeSeg" class="seg settings-seg" title="Text size">
@@ -97,6 +102,17 @@
         <div class="settings-section">
           <div id="settingsPlaybackTitle" class="settings-title">Playback</div>
           <label class="check settings-check"><input id="wallAutoplay" type="checkbox" checked><span id="wallAutoplayLabel">Auto play wall</span></label>
+          <div class="settings-field">
+            <span id="playLimitLabel" class="settings-field-label">Wall play limit</span>
+            <select id="playLimitSelect" class="select settings-select" title="Wall play limit">
+              <option value="12">12</option>
+              <option value="18">18</option>
+              <option value="24">24</option>
+              <option value="36">36</option>
+              <option value="48">48</option>
+              <option value="72">72</option>
+            </select>
+          </div>
           <label class="check settings-check"><input id="previewLargeVideos" type="checkbox"><span id="previewLargeVideosLabel">Preview large videos</span></label>
           <label class="check settings-check"><input id="pauseWhenInactive" type="checkbox"><span id="pauseWhenInactiveLabel">Pause inactive</span></label>
         </div>
@@ -157,11 +173,8 @@
       </div>
       <div id="subInfo" class="status-bar hidden"></div>
       <section id="grid" class="video-grid" aria-live="polite"></section>
-      <nav id="gridPager" class="grid-pager hidden" aria-label="Media pages">
-        <button id="gridPagePrev" class="btn" type="button">Previous</button>
-        <span id="gridPageInfo"></span>
-        <button id="gridPageNext" class="btn" type="button">Next</button>
-      </nav>
+      <nav id="gridPager" class="grid-pager hidden" aria-label="Media pages"></nav>
+      <nav id="floatingPager" class="floating-pager hidden" aria-label="Floating media pages"></nav>
       <div id="emptyState" class="empty hidden"></div>
     </main>
   </div>

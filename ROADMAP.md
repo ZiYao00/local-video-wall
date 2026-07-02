@@ -261,7 +261,7 @@ Acceptance checklist:
 
 Recommended version: `v1.8.x - AI Metadata Preview / Metadata Stabilization`
 
-Status: core image metadata preview is implemented; remaining work is stabilization and optional video/container metadata support.
+Status: core image metadata preview is implemented; optional `ffprobe` video/container metadata reading is implemented when `ffprobe` is available; remaining work is stabilization against more real-world samples.
 
 Goal: show AI generation information inside image and video previews without turning the grid into a crowded database UI.
 
@@ -333,6 +333,7 @@ Implemented sources:
   - `name.info.json`
   - `name.civitai.json`
 - basic filesystem information
+- optional video container tags and technical information through `ffprobe` when available on PATH
 
 Implemented ComfyUI behavior:
 
@@ -363,7 +364,8 @@ Still pending in `v1.8.x`:
 
 - More real-world ComfyUI node format samples.
 - WebP / JPEG embedded metadata where practical.
-- Video embedded/container metadata through optional `ffprobe` or MediaInfo.
+- More real-world MP4/WebM/MOV metadata samples to validate `ffprobe` tag extraction.
+- Optional MediaInfo support only if `ffprobe` proves insufficient.
 - Better handling for workflows that only store runtime-generated prompt output outside the PNG metadata.
 
 Not planned for this phase:
@@ -644,7 +646,7 @@ Recommended stabilization batch:
 
 1. Test more real ComfyUI PNG samples, especially custom prompt, string, wildcard, and LoRA loader nodes.
 2. Keep the metadata panel readable with many LoRA entries and long prompts.
-3. Decide whether optional `ffprobe` video-container metadata belongs in `v1.8.x` or later.
+3. Validate optional `ffprobe` video-container metadata with more real MP4/WebM/MOV samples.
 4. Keep unsupported or broken metadata non-fatal by returning normalized empty or partial metadata objects.
 5. Keep README, Chinese README, ROADMAP, and CHANGELOG synchronized before each GitHub release.
 

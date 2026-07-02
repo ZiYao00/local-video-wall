@@ -25,6 +25,11 @@
 - Added LoRA strength display when model / clip / strength values are available, and changed the metadata panel LoRA section from a comma-separated line into a scrollable per-LoRA list.
 - Reworked the metadata panel header so File Info appears first with pixel dimensions and aspect ratio, and made the LoRA and Prompt sections collapsible.
 - Changed metadata File Info to a labeled field list, merged Source / Path into it, suppressed successful metadata-source status text, and switched aspect-ratio display to common creative-ratio approximations such as 3:4.
+- Added optional `ffprobe` video metadata reading for container tags and basic video technical information, including prompt/workflow fields when they are embedded in MP4/WebM/MOV metadata.
+- Expanded ComfyUI model detection beyond checkpoint loaders to include UNET / diffusion / model loader nodes, and refreshed the batch-selection card checkbox icon.
+- Added compact top pagination controls, narrower column/page-size controls, and an optional scroll-triggered floating pager that follows the media grid area.
+- Centered the floating pager on the active media grid and replaced the derived wall autoplay count with a user-selectable play limit.
+- Updated bottom pagination to use the same page-number controls as the floating pager, and hide it whenever the floating pager is enabled.
 
 ## 1.6.12 - 2026-06-12
 

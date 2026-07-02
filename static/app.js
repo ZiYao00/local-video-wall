@@ -5,6 +5,7 @@ const state = {
   wallAutoplay: true,
   previewLargeVideos: false,
   pauseWhenInactive: false,
+  floatingPagerEnabled: false,
   confirmTrash: true,
   currentModalItem: null,
   currentModalMetadata: null,
@@ -13,7 +14,7 @@ const state = {
   visibleVideos: new Set(),
   columns: 6,
   pageSize: 120,
-  playLimit: 24,
+  playLimit: 36,
   recursive: false,
   filenameExcludeEnabled: true,
   filenameExcludeKeywords: ["fanart", "thumb"],
@@ -63,6 +64,8 @@ const state = {
   pathFavorites: [],
   perf: { scanMs: 0, renderMs: 0, pageItems: 0, loadedMedia: 0 },
   loadedStatTimer: null,
+  floatingPagerTimer: null,
+  floatingPagerHover: false,
   folderCache: new Map(),
   gridPage: 0,
   folderRootsLoaded: false,
@@ -82,6 +85,8 @@ const COMFYUI_URL = "http://127.0.0.1:8188/";
 const ICONS = {
   back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/><path d="M9 12h11"/></svg>',
   check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>',
+  checkbox: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3"/></svg>',
+  checkboxChecked: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M8.5 12.2l2.4 2.4 4.8-5.2"/></svg>',
   doubleCheck: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12l3 3L21 5"/><path d="M3 12l3 3 5-5"/></svg>',
   close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>',
   download: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>',
@@ -190,7 +195,8 @@ const i18n = {
     columnsTitle: "Grid columns",
   pageSizeTitle: "Items per page",
     pageSizeLabelText: "Per page",
-    wallAutoplay: "Auto play wall (2-9 cols)",
+    wallAutoplay: "Auto play wall",
+    wallPlayLimit: "Wall play limit",
     previewLargeVideos: "Preview videos over 500 MB in the wall",
     largeVideoTitle: "Large video",
     largeVideoHint: "Click to play on demand",
@@ -232,9 +238,12 @@ const i18n = {
     historyRemoved: "Path removed from history.",
     pagePrevious: "Previous",
     pageNext: "Next",
+    pageFirst: "First",
+    pageLast: "Last",
     pageStatus: (page, pages) => `Page ${page} / ${pages}`,
     pageInfo: (page, pages, count) => `Page ${page} / ${pages} · ${count} items`,
     pageSizeLabel: n => `${n} / page`,
+    floatingPager: "Floating pager",
     resetFilters: "Reset filters",
     filtersReset: "Filters reset.",
     batch: "Batch actions",
@@ -417,7 +426,8 @@ const i18n = {
     columnsTitle: "卡片列数",
   pageSizeTitle: "每页数量",
     pageSizeLabelText: "每页",
-    wallAutoplay: "墙内自动播放（2-9 列）",
+    wallAutoplay: "墙内自动播放",
+    wallPlayLimit: "墙内播放上限",
     previewLargeVideos: "允许墙内预览 500MB 以上视频",
     largeVideoTitle: "大文件视频",
     largeVideoHint: "点击后按需播放",
@@ -459,9 +469,12 @@ const i18n = {
     historyRemoved: "已删除这条路径历史。",
     pagePrevious: "上一页",
     pageNext: "下一页",
+    pageFirst: "首页",
+    pageLast: "末页",
     pageStatus: (page, pages) => `第 ${page} / ${pages} 页`,
     pageInfo: (page, pages, count) => `第 ${page} / ${pages} 页 · ${count} 项`,
     pageSizeLabel: n => `每页 ${n}`,
+    floatingPager: "悬浮分页条",
     resetFilters: "重置筛选",
     filtersReset: "筛选已重置。",
     batch: "批量操作",
@@ -575,9 +588,10 @@ const i18n = {
 const $ = s => document.querySelector(s);
 const grid = $("#grid");
 const gridPager = $("#gridPager");
-const gridPagePrev = $("#gridPagePrev");
-const gridPageNext = $("#gridPageNext");
-const gridPageInfo = $("#gridPageInfo");
+const topPager = $("#topPager");
+const topPagePrev = $("#topPagePrev");
+const topPageNext = $("#topPageNext");
+const floatingPager = $("#floatingPager");
 const subInfo = $("#subInfo");
 const pathInput = $("#pathInput");
 const folderPanelToggle = $("#folderPanelToggle");
@@ -613,8 +627,10 @@ const mediaFilterSeg = $("#mediaFilterSeg");
 const sortSelect = $("#sortSelect");
 const pageSizeInput = $("#pageSizeInput");
 const wallAutoplay = $("#wallAutoplay");
+const playLimitSelect = $("#playLimitSelect");
 const previewLargeVideos = $("#previewLargeVideos");
 const pauseWhenInactive = $("#pauseWhenInactive");
+const floatingPagerEnabled = $("#floatingPagerEnabled");
 const confirmTrash = $("#confirmTrash");
 const columnsSelect = $("#columnsSelect");
 const exportCsvBtn = $("#exportCsvBtn");
@@ -826,6 +842,8 @@ function applyActionButtons() {
   setButtonLabel(batchTrashBtn, tx.batchTrash, "trash", { iconOnly: true });
   setButtonLabel(batchExportBtn, tx.batchExport, "download", { iconOnly: true });
   setButtonLabel(batchExitBtn, tx.batchExit, "close", { iconOnly: true });
+  setButtonLabel(topPagePrev, tx.pagePrevious, "left", { iconOnly: true });
+  setButtonLabel(topPageNext, tx.pageNext, "right", { iconOnly: true });
   setButtonLabel(immersiveBtn, state.immersive ? tx.exitImmersive : tx.immersive, state.immersive ? "close" : "fullscreen", { iconOnly: true });
   updateContentAlignLabels();
   setButtonLabel(modalSlideshow, state.modalSlideshowPlaying ? tx.pause : tx.slideshow, state.modalSlideshowPlaying ? "pause" : "slideshow", { iconOnly: true });
@@ -927,8 +945,11 @@ function applyLanguage() {
   pageSizeInput.title = tx.pageSizeTitle;
   $("#pageSizeLabel").textContent = tx.pageSizeLabelText;
   $("#wallAutoplayLabel").textContent = tx.wallAutoplay;
+  $("#playLimitLabel").textContent = tx.wallPlayLimit;
+  playLimitSelect.title = tx.wallPlayLimit;
   $("#previewLargeVideosLabel").textContent = tx.previewLargeVideos;
   $("#pauseWhenInactiveLabel").textContent = tx.pauseWhenInactive;
+  $("#floatingPagerLabel").textContent = tx.floatingPager;
   $("#confirmTrashLabel").textContent = tx.confirmTrashSetting;
   trashConfirmTitle.textContent = tx.trashConfirmTitle;
   trashConfirmMessage.textContent = tx.trashConfirmMessage;
@@ -1016,6 +1037,7 @@ function applyLayout() {
   document.body.classList.toggle("dense-grid", cols >= 12);
   columnsSelect.value = String(cols);
   pageSizeInput.value = String(state.pageSize);
+  playLimitSelect.value = String(state.playLimit);
   updateSubInfo();
   scheduleUpdatePlaying();
 }
@@ -1226,23 +1248,123 @@ function gridPageCount() {
   return Math.max(1, Math.ceil(state.view.length / state.pageSize));
 }
 
+function shouldShowPager() {
+  return state.view.length > state.pageSize;
+}
+
+function modalIsOpen() {
+  return !modal.classList.contains("hidden") || !slideshow.classList.contains("hidden");
+}
+
+function updatePagerButtonState(prevButton, nextButton, pages) {
+  if (!prevButton || !nextButton) return;
+  prevButton.disabled = state.gridPage <= 0;
+  nextButton.disabled = state.gridPage >= pages - 1;
+}
+
+function visiblePageNumbers(current, pages) {
+  const count = window.innerWidth < 760 ? 3 : 5;
+  let start = Math.max(1, current - Math.floor(count / 2));
+  let end = Math.min(pages, start + count - 1);
+  start = Math.max(1, end - count + 1);
+  const result = [];
+  for (let page = start; page <= end; page += 1) result.push(page);
+  return result;
+}
+
+function floatingPagerButton(label, page, options = {}) {
+  const disabled = options.disabled ? " disabled" : "";
+  const active = options.active ? " active" : "";
+  const title = escapeHtml(options.title || label);
+  return `<button class="floating-page-btn${active}" type="button" data-page="${page}" title="${title}" aria-label="${title}"${disabled}>${escapeHtml(label)}</button>`;
+}
+
+function renderPagerButtons(pages) {
+  const tx = t();
+  const current = state.gridPage + 1;
+  const numbers = visiblePageNumbers(current, pages);
+  const parts = [
+    floatingPagerButton(tx.pageFirst, 1, { title: tx.pageFirst, disabled: state.gridPage <= 0 }),
+    floatingPagerButton("‹", current - 1, { title: tx.pagePrevious, disabled: state.gridPage <= 0 }),
+  ];
+  if (numbers[0] > 1) parts.push('<span class="floating-page-ellipsis">...</span>');
+  for (const page of numbers) {
+    parts.push(floatingPagerButton(String(page), page, { active: page === current, title: tx.pageStatus(page, pages) }));
+  }
+  if (numbers[numbers.length - 1] < pages) parts.push('<span class="floating-page-ellipsis">...</span>');
+  parts.push(
+    floatingPagerButton("›", current + 1, { title: tx.pageNext, disabled: state.gridPage >= pages - 1 }),
+    floatingPagerButton(tx.pageLast, pages, { title: tx.pageLast, disabled: state.gridPage >= pages - 1 }),
+  );
+  return parts.join("");
+}
+
+function renderBottomPager(pages) {
+  const show = shouldShowPager() && !state.floatingPagerEnabled;
+  gridPager.classList.toggle("hidden", !show);
+  if (!show) {
+    gridPager.innerHTML = "";
+    return;
+  }
+  gridPager.innerHTML = `
+    <div class="grid-pager-buttons">${renderPagerButtons(pages)}</div>
+    <span class="grid-pager-info">${escapeHtml(t().pageInfo(state.gridPage + 1, pages, state.view.length))}</span>
+  `;
+}
+
+function renderFloatingPager(pages) {
+  const show = shouldShowPager() && state.floatingPagerEnabled && !modalIsOpen();
+  floatingPager.classList.toggle("hidden", !show);
+  if (!show) {
+    floatingPager.innerHTML = "";
+    return;
+  }
+  floatingPager.innerHTML = renderPagerButtons(pages);
+  positionFloatingPager();
+}
+
+function positionFloatingPager() {
+  if (!floatingPager || floatingPager.classList.contains("hidden")) return;
+  const anchor = grid.offsetParent ? grid : document.getElementById("mainArea");
+  const rect = anchor.getBoundingClientRect();
+  const viewport = window.innerWidth || document.documentElement.clientWidth || 0;
+  const left = Math.max(12, Math.min(rect.left + rect.width / 2, viewport - 12));
+  floatingPager.style.setProperty("--floating-pager-left", `${Math.round(left)}px`);
+  floatingPager.classList.toggle("compact", rect.width < 560);
+}
+
+function showFloatingPagerTemporarily(ms = 1700) {
+  if (!state.floatingPagerEnabled || !shouldShowPager() || modalIsOpen()) return;
+  positionFloatingPager();
+  floatingPager.classList.add("visible");
+  window.clearTimeout(state.floatingPagerTimer);
+  state.floatingPagerTimer = window.setTimeout(() => {
+    if (!state.floatingPagerHover) floatingPager.classList.remove("visible");
+  }, ms);
+}
+
+function hideFloatingPager() {
+  window.clearTimeout(state.floatingPagerTimer);
+  floatingPager.classList.remove("visible");
+}
+
 function updateGridPager() {
   const pages = gridPageCount();
   state.gridPage = Math.max(0, Math.min(state.gridPage, pages - 1));
-  const show = state.view.length > state.pageSize;
-  gridPager.classList.toggle("hidden", !show);
-  gridPagePrev.disabled = state.gridPage <= 0;
-  gridPageNext.disabled = state.gridPage >= pages - 1;
-  gridPagePrev.textContent = t().pagePrevious;
-  gridPageNext.textContent = t().pageNext;
-  gridPageInfo.textContent = t().pageInfo(state.gridPage + 1, pages, state.view.length);
+  const show = shouldShowPager();
+  topPager.classList.toggle("hidden", !show);
+  updatePagerButtonState(topPagePrev, topPageNext, pages);
+  applyActionButtons();
+  renderBottomPager(pages);
+  renderFloatingPager(pages);
 }
 
 function setGridPage(page) {
   const pages = gridPageCount();
-  state.gridPage = Math.max(0, Math.min(Number(page) || 0, pages - 1));
+  state.gridPage = Math.max(0, Math.min(Math.floor(Number(page) || 1) - 1, pages - 1));
   renderGrid();
   document.getElementById("mainArea")?.scrollIntoView({ block: "start" });
+  showFloatingPagerTemporarily(2200);
 }
 
 function renderEmptyState() {
@@ -1355,7 +1477,7 @@ function updateReviewButtons() {
       favoriteBtn.classList.toggle("active", !!item.favorite);
     }
     if (batchBtn) {
-      setButtonLabel(batchBtn, state.batchSelected.has(item.key) ? tx.batchSelectedItem : tx.batchSelectItem, "check", { iconOnly: true });
+      setButtonLabel(batchBtn, state.batchSelected.has(item.key) ? tx.batchSelectedItem : tx.batchSelectItem, state.batchSelected.has(item.key) ? "checkboxChecked" : "checkbox", { iconOnly: true });
       batchBtn.classList.toggle("active", state.batchSelected.has(item.key));
     }
   });
@@ -1692,7 +1814,7 @@ function isNearPageBottom() {
 }
 
 function effectiveWallPlayLimit() {
-  return state.columns >= 10 ? 0 : state.columns * 2;
+  return state.columns >= 10 ? 0 : Math.max(12, Math.min(72, Number(state.playLimit) || 36));
 }
 
 function isWallPreviewStatic() {
@@ -2080,6 +2202,7 @@ function renderModalItem(item) {
 }
 
 function openModal(item) {
+  hideFloatingPager();
   pauseAllInline();
   renderModalItem(item);
   setModalControlsHidden(false);
@@ -2110,6 +2233,7 @@ function closeModal() {
   modalNext.classList.add("hidden");
   modal.classList.add("hidden");
   state.currentModalItem = null;
+  updateGridPager();
   if (state.playingEnabled) resumeVisibleInline();
 }
 
@@ -2278,6 +2402,7 @@ function showNextSlide(direction = 1) {
 }
 
 function openSlideshowFromCurrent(options = {}) {
+  hideFloatingPager();
   const current = state.currentModalItem;
   const images = currentImageItems();
   if (!current || current.type !== "image" || !images.length) {
@@ -2374,6 +2499,7 @@ function closeSlideshow(options = {}) {
   slideshow.classList.add("hidden");
   releaseMediaElement(slideshowImageA);
   releaseMediaElement(slideshowImageB);
+  updateGridPager();
   if (shouldResumeInline && state.playingEnabled) resumeVisibleInline();
 }
 
@@ -3102,6 +3228,7 @@ async function scanNow() {
       wall_autoplay: state.wallAutoplay,
       preview_large_videos: state.previewLargeVideos,
       pause_when_inactive: state.pauseWhenInactive,
+      floating_pager: state.floatingPagerEnabled,
       confirm_trash: state.confirmTrash,
       sort_mode: sortSelect.value,
       immersive: state.immersive,
@@ -3176,6 +3303,7 @@ async function saveSettingsSoft() {
         wall_autoplay: state.wallAutoplay,
         preview_large_videos: state.previewLargeVideos,
         pause_when_inactive: state.pauseWhenInactive,
+        floating_pager: state.floatingPagerEnabled,
         confirm_trash: state.confirmTrash,
         sort_mode: sortSelect.value,
         immersive: state.immersive,
@@ -3200,7 +3328,6 @@ async function saveSettingsSoft() {
 function setColumns(cols) {
   const next = Number(cols) || 6;
   state.columns = COLUMN_OPTIONS.includes(next) ? next : 6;
-  state.playLimit = effectiveWallPlayLimit();
   applyLayout();
   if (isWallPreviewStatic()) pauseAllInline();
   else resumeVisibleInline();
@@ -3219,6 +3346,16 @@ function setPageSize(size) {
   applyLayout();
   renderGrid();
   saveSettingsSoft();
+}
+
+function setPlayLimit(limit, save = true) {
+  const allowed = [12, 18, 24, 36, 48, 72];
+  const next = Number(limit) || 36;
+  state.playLimit = allowed.includes(next) ? next : 36;
+  playLimitSelect.value = String(state.playLimit);
+  if (isWallPreviewStatic()) pauseAllInline();
+  else resumeVisibleInline();
+  if (save) saveSettingsSoft();
 }
 
 function setWallAutoplay(enabled, save = true) {
@@ -3247,6 +3384,14 @@ function setPauseWhenInactive(enabled, save = true) {
   } else if (!document.hidden) {
     resumeActiveViewAfterInactive();
   }
+  if (save) saveSettingsSoft();
+}
+
+function setFloatingPager(enabled, save = true) {
+  state.floatingPagerEnabled = !!enabled;
+  floatingPagerEnabled.checked = state.floatingPagerEnabled;
+  updateGridPager();
+  if (state.floatingPagerEnabled) showFloatingPagerTemporarily(2200);
   if (save) saveSettingsSoft();
 }
 
@@ -3302,10 +3447,11 @@ async function init() {
     const cfgColumns = Number(cfg.columns || 6);
     state.columns = COLUMN_OPTIONS.includes(cfgColumns) ? cfgColumns : 6;
     state.pageSize = normalizePageSize(cfg.page_size || 120);
-    state.playLimit = effectiveWallPlayLimit();
+    state.playLimit = [12, 18, 24, 36, 48, 72].includes(Number(cfg.play_limit)) ? Number(cfg.play_limit) : 36;
     state.wallAutoplay = cfg.wall_autoplay !== false;
     state.previewLargeVideos = cfg.preview_large_videos === true;
     state.pauseWhenInactive = cfg.pause_when_inactive === true;
+    state.floatingPagerEnabled = cfg.floating_pager === true;
     state.confirmTrash = cfg.confirm_trash !== false;
     state.recursive = !!cfg.recursive;
     state.filenameExcludeEnabled = cfg.filename_exclude_enabled !== false;
@@ -3339,9 +3485,11 @@ async function init() {
     wallAutoplay.checked = state.wallAutoplay;
     previewLargeVideos.checked = state.previewLargeVideos;
     pauseWhenInactive.checked = state.pauseWhenInactive;
+    floatingPagerEnabled.checked = state.floatingPagerEnabled;
     confirmTrash.checked = state.confirmTrash;
     sortSelect.value = state.sortMode;
     pageSizeInput.value = String(state.pageSize);
+    playLimitSelect.value = String(state.playLimit);
     slideshowInterval.value = String(state.slideshowInterval);
     slideshowEffect.value = state.slideshowEffect;
     slideshowFit.value = state.slideshowFit;
@@ -3472,8 +3620,10 @@ pageSizeInput.addEventListener("keydown", e => {
   }
 });
 wallAutoplay.addEventListener("change", () => setWallAutoplay(wallAutoplay.checked));
+playLimitSelect.addEventListener("change", () => setPlayLimit(playLimitSelect.value));
 previewLargeVideos.addEventListener("change", () => setPreviewLargeVideos(previewLargeVideos.checked));
 pauseWhenInactive.addEventListener("change", () => setPauseWhenInactive(pauseWhenInactive.checked));
+floatingPagerEnabled.addEventListener("change", () => setFloatingPager(floatingPagerEnabled.checked));
 confirmTrash.addEventListener("change", () => {
   state.confirmTrash = confirmTrash.checked;
   saveSettingsSoft();
@@ -3492,8 +3642,27 @@ trashConfirmDialog.addEventListener("click", e => {
   if (e.target.dataset.trashConfirm === "cancel") closeTrashConfirmDialog(false);
 });
 clearHistoryBtn.addEventListener("click", clearPathHistory);
-gridPagePrev.addEventListener("click", () => setGridPage(state.gridPage - 1));
-gridPageNext.addEventListener("click", () => setGridPage(state.gridPage + 1));
+topPagePrev.addEventListener("click", () => setGridPage(state.gridPage));
+topPageNext.addEventListener("click", () => setGridPage(state.gridPage + 2));
+gridPager.addEventListener("click", e => {
+  const button = e.target.closest("button[data-page]");
+  if (!button || button.disabled) return;
+  setGridPage(button.dataset.page);
+});
+floatingPager.addEventListener("click", e => {
+  const button = e.target.closest("button[data-page]");
+  if (!button || button.disabled) return;
+  setGridPage(button.dataset.page);
+});
+floatingPager.addEventListener("mouseenter", () => {
+  state.floatingPagerHover = true;
+  window.clearTimeout(state.floatingPagerTimer);
+  floatingPager.classList.add("visible");
+});
+floatingPager.addEventListener("mouseleave", () => {
+  state.floatingPagerHover = false;
+  showFloatingPagerTemporarily(1200);
+});
 exportCsvBtn.addEventListener("click", exportCsv);
 resetFiltersBtn.addEventListener("click", resetFilters);
 batchToggleBtn.addEventListener("click", () => setBatchMode(!state.batchMode));
@@ -3752,9 +3921,13 @@ window.addEventListener("keydown", e => {
   }
 });
 document.addEventListener("fullscreenchange", handleFullscreenChange);
-window.addEventListener("scroll", () => scheduleUpdatePlaying(), { passive: true });
+window.addEventListener("scroll", () => {
+  scheduleUpdatePlaying();
+  showFloatingPagerTemporarily();
+}, { passive: true });
 window.addEventListener("resize", () => {
   applyLayout();
+  positionFloatingPager();
   scheduleUpdatePlaying();
 });
 document.addEventListener("visibilitychange", () => {

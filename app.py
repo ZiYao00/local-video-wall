@@ -77,7 +77,7 @@ DEFAULT_CONFIG = {
     "filename_exclude_scope": "image",
     "columns": 6,
     "page_size": 120,
-    "play_limit": 12,
+    "play_limit": 36,
     "wall_autoplay": True,
     "preview_large_videos": False,
     "pause_when_inactive": False,
@@ -89,6 +89,7 @@ DEFAULT_CONFIG = {
     "font_size": "standard",
     "content_align": "center",
     "button_style": "text",
+    "floating_pager": False,
     "path_history": [],
     "path_favorites": [],
     "slideshow_interval": 5,
@@ -120,8 +121,8 @@ def clamp_int(value, default: int, low: int, high: int) -> int:
     return max(low, min(high, n))
 
 
-def play_limit_for_columns(columns: int) -> int:
-    return 0 if columns >= 10 else columns * 2
+def normalize_play_limit(value) -> int:
+    return clamp_int(value, 36, 12, 72)
 
 
 def clean_path_list(value, max_items: int = 30) -> list[str]:
@@ -180,10 +181,11 @@ def load_config() -> dict:
         cfg["last_video_dir"] = ""
     cfg["columns"] = clamp_int(cfg.get("columns"), 6, 2, 20)
     cfg["page_size"] = clamp_int(cfg.get("page_size"), 120, 1, 240)
-    cfg["play_limit"] = play_limit_for_columns(cfg["columns"])
+    cfg["play_limit"] = normalize_play_limit(cfg.get("play_limit"))
     cfg["wall_autoplay"] = bool(cfg.get("wall_autoplay", True))
     cfg["pause_when_inactive"] = bool(cfg.get("pause_when_inactive", False))
     cfg["confirm_trash"] = bool(cfg.get("confirm_trash", True))
+    cfg["floating_pager"] = bool(cfg.get("floating_pager", False))
     cfg["language"] = normalize_language(cfg.get("language", "en"))
     cfg["path_history"] = clean_path_list(cfg.get("path_history"), 20)
     cfg["path_favorites"] = clean_path_list(cfg.get("path_favorites"), 30)
@@ -211,10 +213,11 @@ def save_config(cfg: dict) -> dict:
     merged["immersive"] = bool(merged.get("immersive"))
     merged["columns"] = clamp_int(merged.get("columns"), 6, 2, 20)
     merged["page_size"] = clamp_int(merged.get("page_size"), 120, 1, 240)
-    merged["play_limit"] = play_limit_for_columns(merged["columns"])
+    merged["play_limit"] = normalize_play_limit(merged.get("play_limit"))
     merged["wall_autoplay"] = bool(merged.get("wall_autoplay", True))
     merged["pause_when_inactive"] = bool(merged.get("pause_when_inactive", False))
     merged["confirm_trash"] = bool(merged.get("confirm_trash", True))
+    merged["floating_pager"] = bool(merged.get("floating_pager", False))
     merged["language"] = normalize_language(merged.get("language", "en"))
     merged["path_history"] = clean_path_list(merged.get("path_history"), 20)
     merged["path_favorites"] = clean_path_list(merged.get("path_favorites"), 30)
@@ -1105,7 +1108,7 @@ class AppHandler(BaseHTTPRequestHandler):
             remember_path = bool(payload.get("remember_path", False))
             columns = clamp_int(payload.get("columns"), 6, 2, 20)
             page_size = clamp_int(payload.get("page_size"), 120, 1, 240)
-            play_limit = play_limit_for_columns(columns)
+            play_limit = normalize_play_limit(payload.get("play_limit", DEFAULT_CONFIG["play_limit"]))
             sort_mode = payload.get("sort_mode", "mtime_desc")
             immersive = bool(payload.get("immersive", False))
             language = normalize_language(payload.get("language", "en"))
@@ -1133,6 +1136,7 @@ class AppHandler(BaseHTTPRequestHandler):
                 "preview_large_videos": bool(payload.get("preview_large_videos", DEFAULT_CONFIG["preview_large_videos"])),
                 "pause_when_inactive": bool(payload.get("pause_when_inactive", DEFAULT_CONFIG["pause_when_inactive"])),
                 "confirm_trash": bool(payload.get("confirm_trash", DEFAULT_CONFIG["confirm_trash"])),
+                "floating_pager": bool(payload.get("floating_pager", DEFAULT_CONFIG["floating_pager"])),
                 "sort_mode": sort_mode,
                 "immersive": immersive,
                 "language": language,
@@ -1170,10 +1174,12 @@ class AppHandler(BaseHTTPRequestHandler):
                 ) == "all" else "image",
                 "columns": clamp_int(payload.get("columns", cfg.get("columns", 6)), 6, 2, 20),
                 "page_size": clamp_int(payload.get("page_size", cfg.get("page_size", 120)), 120, 1, 240),
+                "play_limit": normalize_play_limit(payload.get("play_limit", cfg.get("play_limit", 36))),
                 "wall_autoplay": bool(payload.get("wall_autoplay", cfg.get("wall_autoplay", True))),
                 "preview_large_videos": bool(payload.get("preview_large_videos", cfg.get("preview_large_videos", False))),
                 "pause_when_inactive": bool(payload.get("pause_when_inactive", cfg.get("pause_when_inactive", False))),
                 "confirm_trash": bool(payload.get("confirm_trash", cfg.get("confirm_trash", True))),
+                "floating_pager": bool(payload.get("floating_pager", cfg.get("floating_pager", False))),
                 "sort_mode": payload.get("sort_mode", cfg.get("sort_mode", "mtime_desc")),
                 "immersive": bool(payload.get("immersive", cfg.get("immersive", False))),
                 "language": normalize_language(payload.get("language", cfg.get("language", "en"))),

@@ -240,6 +240,82 @@ def _looks_like_prompt_text(value: Any) -> bool:
     return True
 
 
+def _is_link_value(value: Any) -> bool:
+    return isinstance(value, (list, tuple)) and len(value) == 2 and isinstance(value[1], int)
+
+
+def _is_model_loader_class(class_type: str) -> bool:
+    lowered = class_type.casefold()
+    if any(token in lowered for token in ("lora", "vae", "clip", "controlnet", "upscale", "embedding")):
+        return False
+    compact = re.sub(r"[\s_\-]+", "", lowered)
+    return (
+        "checkpoint" in lowered
+        or "ckpt" in lowered
+        or "unet" in lowered
+        or "diffusion" in lowered
+        or ("model" in lowered and "loader" in lowered)
+        or "modelload" in compact
+    )
+
+
+def _looks_like_model_name(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    text = value.strip()
+    if len(text) < 2:
+        return False
+    lowered = text.casefold()
+    if lowered in {"none", "default", "auto", "cpu", "cuda", "fp8", "fp16", "bf16", "float16", "float32"}:
+        return False
+    if lowered.startswith(("http://", "https://")):
+        return False
+    if text[:1] in {"{", "["}:
+        return False
+    if re.fullmatch(r"[\d\s.,:;_+\-\\/]+", text):
+        return False
+    return True
+
+
+def _extract_models_from_inputs(class_type: str, inputs: dict[str, Any]) -> list[str]:
+    found: list[str] = []
+    if not _is_model_loader_class(class_type):
+        return found
+    key_tokens = ("ckpt", "checkpoint", "unet", "diffusion", "model")
+    skip_tokens = ("strength", "weight", "clip", "vae", "lora", "control", "dtype", "precision")
+    for key, value in inputs.items():
+        if _is_link_value(value):
+            continue
+        key_fold = str(key or "").casefold()
+        if not any(token in key_fold for token in key_tokens):
+            continue
+        if any(token in key_fold for token in skip_tokens):
+            continue
+        if _looks_like_model_name(value):
+            _add_unique_text(found, value)
+    return found
+
+
+def _extract_models_from_workflow(workflow: Any) -> list[str]:
+    found: list[str] = []
+    for node in _iter_workflow_nodes(workflow):
+        class_type = str(node.get("type") or node.get("class_type") or node.get("title") or "")
+        if not _is_model_loader_class(class_type):
+            continue
+        for key in ("properties", "inputs"):
+            value = node.get(key)
+            if isinstance(value, dict):
+                for model in _extract_models_from_inputs(class_type, value):
+                    _add_unique_text(found, model)
+        widgets = node.get("widgets_values")
+        if isinstance(widgets, list):
+            for value in widgets:
+                if _looks_like_model_name(value):
+                    _add_unique_text(found, value)
+                    break
+    return found
+
+
 def _text_kind_from_key(key: Any, class_type: str = "") -> str:
     text = f"{key or ''} {class_type}".casefold()
     if any(token in text for token in ("negative", "neg_prompt", "negative_prompt", "uncond")):
@@ -566,11 +642,8 @@ def _extract_comfy_metadata(prompt: Any, workflow: Any) -> dict[str, Any]:
             _add_unique_text(fallback_negatives, text)
         for text in node_clip_texts:
             _add_unique_text(clip_texts, text)
-        if ("CheckpointLoader" in class_type or "Checkpoint" in class_type) and inputs.get("ckpt_name"):
-            _add_unique_text(models, inputs.get("ckpt_name"))
-        for model_key in ("checkpoint", "checkpoint_name", "model_name"):
-            if "checkpoint" in class_type.casefold() and inputs.get(model_key):
-                _add_unique_text(models, inputs.get(model_key))
+        for model in _extract_models_from_inputs(class_type, inputs):
+            _add_unique_text(models, model)
         for lora in _extract_loras_from_comfy_inputs(class_type, inputs):
             _add_unique_text(loras, lora)
     workflow_positives, workflow_negatives = _extract_prompt_texts_from_workflow(workflow)
@@ -580,6 +653,8 @@ def _extract_comfy_metadata(prompt: Any, workflow: Any) -> dict[str, Any]:
         _add_unique_text(fallback_negatives, text)
     for lora in _extract_loras_from_workflow(workflow):
         _add_unique_text(loras, lora)
+    for model in _extract_models_from_workflow(workflow):
+        _add_unique_text(models, model)
     if not fallback_positives and clip_texts:
         _add_unique_text(fallback_positives, clip_texts[0])
     if not fallback_negatives and len(clip_texts) > 1:
