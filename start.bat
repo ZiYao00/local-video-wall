@@ -6,7 +6,7 @@ cd /d "%~dp0"
 set "APP_URL=http://127.0.0.1:8787"
 set "APP_PY=%~dp0app.py"
 
-echo Starting Local Civitai Video Wall v2...
+echo Starting Local Video Wall...
 echo.
 echo Browser will open automatically:
 echo %APP_URL%

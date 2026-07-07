@@ -30,6 +30,9 @@
 - Added compact top pagination controls, narrower column/page-size controls, and an optional scroll-triggered floating pager that follows the media grid area.
 - Centered the floating pager on the active media grid and replaced the derived wall autoplay count with a user-selectable play limit.
 - Updated bottom pagination to use the same page-number controls as the floating pager, and hide it whenever the floating pager is enabled.
+- Reworked the English and Chinese README introductions around the local AI media workflow, project status, safety notes, and clearer feature grouping.
+- Clarified the README's core value as a waterfall-style local video wall for previewing multiple videos at the same time, and expanded beginner installation and troubleshooting guidance.
+- Renamed the public project wording from Local Civitai Video Wall to Local Video Wall and updated release package examples.
 
 ## 1.6.12 - 2026-06-12
 

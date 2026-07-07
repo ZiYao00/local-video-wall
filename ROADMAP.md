@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap defines the current product direction for Local Civitai Video Wall.
+This roadmap defines the current product direction for Local Video Wall.
 
 The project should not become a second `infinite-image-browsing`, a cloud album, or a general file manager. Its target is narrower:
 
@@ -13,6 +13,12 @@ Primary use cases:
 - Quickly screen many local short videos and generated images.
 - Mark, favorite, reject, batch-review, and safely remove unwanted assets.
 - Later, find assets by prompt, model, LoRA, source URL, tags, notes, and local review status.
+
+Documentation note:
+
+- The README should explain the daily AI-media workflow problem before listing features.
+- The README should clearly distinguish the packaged GitHub Release, the main branch, current metadata features, and future roadmap items.
+- The project should not be described as a ComfyUI plugin. It is a local Windows-first AI media browser and review tool.
 
 ## Development Principles
 

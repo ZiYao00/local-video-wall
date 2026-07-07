@@ -34,7 +34,7 @@ if not "%~1"=="" (
 
 :menu
 cls
-echo Local Civitai Video Wall Service
+echo Local Video Wall Service
 echo.
 call :status_line
 echo.
@@ -116,7 +116,7 @@ if "%errorlevel%"=="0" (
   echo It uses a Windows Task Scheduler logon task and the APPDATA helper script.
   if "%COMMAND_MODE%"=="1" exit /b 0
 ) else (
-  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut('%STARTUP_LNK%'); $shortcut.TargetPath = 'wscript.exe'; $shortcut.Arguments = [char]34 + '%VBS_PATH%' + [char]34; $shortcut.WorkingDirectory = '%HELPER_DIR%'; $shortcut.WindowStyle = 1; $shortcut.Description = 'Start Local Civitai Video Wall in the background'; $shortcut.Save()" >nul 2>nul
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut('%STARTUP_LNK%'); $shortcut.TargetPath = 'wscript.exe'; $shortcut.Arguments = [char]34 + '%VBS_PATH%' + [char]34; $shortcut.WorkingDirectory = '%HELPER_DIR%'; $shortcut.WindowStyle = 1; $shortcut.Description = 'Start Local Video Wall in the background'; $shortcut.Save()" >nul 2>nul
   if exist "%STARTUP_LNK%" (
     if exist "%STARTUP_VBS%" del "%STARTUP_VBS%" >nul 2>nul
     echo Startup entry installed.
