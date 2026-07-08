@@ -38,6 +38,11 @@ const state = {
   modalSlideshowPlaying: false,
   modalSlideshowTimer: null,
   metadataRequestId: 0,
+  workflowStatusCache: new Map(),
+  workflowStatusQueue: [],
+  workflowStatusActive: 0,
+  workflowStatusQueued: new Set(),
+  workflowStatusVersion: 0,
   slideshowItems: [],
   slideshowIndex: 0,
   slideshowPlaying: true,
@@ -85,9 +90,11 @@ const COMFYUI_URL = "http://127.0.0.1:8188/";
 const ICONS = {
   back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/><path d="M9 12h11"/></svg>',
   check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>',
-  checkbox: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3"/></svg>',
-  checkboxChecked: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="3"/><path d="M8.5 12.2l2.4 2.4 4.8-5.2"/></svg>',
+  checkbox: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="3"/></svg>',
+  checkboxChecked: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect class="check-bg" x="5" y="5" width="14" height="14" rx="4"/><path class="check-mark" d="M8.5 12.2l2.4 2.4 4.8-5.2"/></svg>',
+  copyPath: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/></svg>',
   doubleCheck: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12l3 3L21 5"/><path d="M3 12l3 3 5-5"/></svg>',
+  multiSelect: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="7" height="7" rx="2"/><path d="M6 8.5l1.4 1.4L10 7"/><rect x="13" y="5" width="7" height="7" rx="2"/><rect x="4" y="14" width="7" height="7" rx="2"/><path d="M14 17.5l1.4 1.4L19 16"/></svg>',
   close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>',
   download: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>',
   externalOpen: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M20 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4"/></svg>',
@@ -106,13 +113,16 @@ const ICONS = {
   pause: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14"/><path d="M16 5v14"/></svg>',
   play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>',
   scan: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7V4h3"/><path d="M17 4h3v3"/><path d="M20 17v3h-3"/><path d="M7 20H4v-3"/><path d="M7 12h10"/></svg>',
+  searchIcon: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="M15 15l5 5"/></svg>',
   settings: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 0 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 0 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.1a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   reset: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v6h6"/></svg>',
   sidebar: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="M6 8h.01"/><path d="M6 12h.01"/></svg>',
   shuffle: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 3h5v5"/><path d="M4 7h3c4 0 5 10 9 10h5"/><path d="M16 21h5v-5"/><path d="M4 17h3c1.7 0 2.9-1.8 4-4"/><path d="M14 7c.8-.7 1.8-1 3-1h4"/></svg>',
   slideshow: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M10 8v5l4-2.5z"/></svg>',
-  star: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1.1 6.2L12 17.3l-5.6 2.9 1.1-6.2L3 9.6l6.2-.9z"/></svg>',
+  star: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.2l2.4 4.8 5.3.8-3.8 3.7.9 5.3-4.8-2.5-4.8 2.5.9-5.3-3.8-3.7 5.3-.8z"/></svg>',
+  starFilled: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.2l2.4 4.8 5.3.8-3.8 3.7.9 5.3-4.8-2.5-4.8 2.5.9-5.3-3.8-3.7 5.3-.8z"/></svg>',
   sun: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="M4.9 4.9l1.4 1.4"/><path d="M17.7 17.7l1.4 1.4"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="M4.9 19.1l1.4-1.4"/><path d="M17.7 6.3l1.4-1.4"/></svg>',
+  workflow: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="7" height="5.5" rx="1.6"/><rect x="13.5" y="5" width="7" height="5.5" rx="1.6"/><rect x="8.5" y="14" width="7" height="5.5" rx="1.6"/><path d="M10.5 7.8h3"/><path d="M7 10.5v2.2c0 .9.6 1.3 1.5 1.3H12"/><path d="M17 10.5v2.2c0 .9-.6 1.3-1.5 1.3H12"/></svg>',
   repeat: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>',
   textMode: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18h14"/><path d="M8 18l4-12 4 12"/><path d="M9.5 13h5"/></svg>',
   trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 14h10l1-14"/><path d="M9 7V4h6v3"/></svg>',
@@ -163,6 +173,12 @@ const i18n = {
     imagesOnly: "Images",
     favorite: "Favorite",
     favorited: "Favorited",
+    workflowBadge: "Contains workflow metadata",
+    workflowChecking: "Checking workflow metadata...",
+    workflowGeneration: "Contains generation parameters",
+    workflowOnly: "Workflow found, but no prompt/model/LoRA detected",
+    copyFullPath: "Copy full path",
+    pathCopied: "Full path copied.",
     metadataTitle: "Generation info",
     metadataModel: "Model",
     metadataLora: "LoRA",
@@ -394,6 +410,12 @@ const i18n = {
     imagesOnly: "图片",
     favorite: "收藏",
     favorited: "已收藏",
+    workflowBadge: "含有工作流数据",
+    workflowChecking: "正在检测工作流数据...",
+    workflowGeneration: "含有生成参数",
+    workflowOnly: "含有工作流，但未检测到 Prompt / 模型 / LoRA",
+    copyFullPath: "复制完整路径",
+    pathCopied: "已复制完整路径。",
     metadataTitle: "生成信息",
     metadataModel: "大模型",
     metadataLora: "LoRA",
@@ -741,6 +763,7 @@ function setButtonLabel(button, text, iconName, options = {}) {
   button.setAttribute("aria-label", title);
   button.classList.toggle("icon-only", iconOnly);
   button.classList.toggle("icon-text", !!options.iconText);
+  button.classList.toggle("filled-icon", iconName === "starFilled");
   if (options.iconText && iconName) {
     button.innerHTML = `${iconSvg(iconName)}<span>${escapeHtml(text)}</span>`;
     return;
@@ -834,10 +857,10 @@ function applyActionButtons() {
   setButtonLabel(clearHistoryBtn, tx.clearHistory, "trash", { iconOnly: false, iconText: true });
   setButtonLabel(pauseBtn, state.playingEnabled ? tx.pauseAll : tx.resume, state.playingEnabled ? "pause" : "play", { iconOnly: true });
   setButtonLabel(resetFiltersBtn, tx.resetFilters, "reset", { iconOnly: true });
-  setButtonLabel(batchToggleBtn, state.batchMode ? tx.batchExit : tx.batch, "doubleCheck", { iconOnly: true });
+  setButtonLabel(batchToggleBtn, state.batchMode ? tx.batchExit : tx.batch, "multiSelect", { iconOnly: true });
   setButtonLabel(batchSelectPageBtn, tx.batchSelectPage, "check", { iconOnly: true });
   setButtonLabel(batchClearBtn, tx.batchClear, "close", { iconOnly: true });
-  setButtonLabel(batchFavoriteBtn, tx.batchFavorite, "star", { iconOnly: true });
+  setButtonLabel(batchFavoriteBtn, tx.batchFavorite, "starFilled", { iconOnly: true });
   setButtonLabel(batchUnfavoriteBtn, tx.batchUnfavorite, "star", { iconOnly: true });
   setButtonLabel(batchTrashBtn, tx.batchTrash, "trash", { iconOnly: true });
   setButtonLabel(batchExportBtn, tx.batchExport, "download", { iconOnly: true });
@@ -882,6 +905,11 @@ function escapeHtml(str) {
     '"': "&quot;",
     "'": "&#39;",
   }[s]));
+}
+
+function escapeCssIdent(str) {
+  if (window.CSS?.escape) return CSS.escape(String(str));
+  return String(str).replace(/["\\]/g, "\\$&");
 }
 
 function showToast(message, ms = 2600) {
@@ -1030,11 +1058,13 @@ function applyLayout() {
   const cols = Number(state.columns) || 6;
   const gap = COLUMN_GAPS[cols] || 18;
   const contentWidth = getContentWidthRule();
+  const actionSize = Math.max(18, Math.min(32, Math.round((COLUMN_WIDTHS[cols] || 220) * 0.16)));
   applyContentAlign();
   document.documentElement.style.setProperty("--columns", cols);
   document.documentElement.style.setProperty("--gap", `${gap}px`);
   document.documentElement.style.setProperty("--content-width", contentWidth);
-  document.body.classList.toggle("dense-grid", cols >= 12);
+  document.documentElement.style.setProperty("--card-action-size", `${actionSize}px`);
+  document.body.classList.toggle("dense-grid", cols >= 10);
   columnsSelect.value = String(cols);
   pageSizeInput.value = String(state.pageSize);
   playLimitSelect.value = String(state.playLimit);
@@ -1418,21 +1448,24 @@ function renderGrid() {
     card.innerHTML = `
       <div class="video-wrap" title="${escapeHtml(item.name)}">
         ${mediaHtml}
+        <div class="workflow-badge hidden" title="${escapeHtml(t().workflowBadge)}">${ICONS.workflow}</div>
         <div class="card-quick-actions">
-          <button class="review-btn card-favorite-btn" data-review-field="favorite"></button>
           <button class="batch-select-btn" data-batch-select="${escapeHtml(item.key)}"></button>
         </div>
         <div class="video-overlay"><div class="video-name">${escapeHtml(item.name)}</div></div>
       </div>
       <div class="card-footer">
-        <div class="meta">
-          <div>${escapeHtml(item.name)}</div>
-          <div>${fmtBytes(item.size_mb)} · ${escapeHtml(item.mtime_text)}</div>
+        <div class="card-actions">
+          <button class="card-action-btn card-favorite-btn" data-card-action="favorite"></button>
+          <button class="card-action-btn" data-card-action="copy-path"></button>
+          <button class="card-action-btn" data-card-action="open-folder"></button>
+          <button class="card-action-btn danger" data-card-action="trash"></button>
+          <button class="card-action-btn" data-card-action="select"></button>
         </div>
-        <button class="tiny-btn" data-open="${escapeHtml(item.rel)}">${t().location}</button>
       </div>`;
     card.classList.toggle("is-favorite", !!item.favorite);
     card.classList.toggle("is-batch-selected", state.batchSelected.has(item.key));
+    applyWorkflowStatusToCard(card, item);
     card.querySelector(".video-wrap").addEventListener("click", () => {
       if (state.batchMode) {
         toggleBatchItem(item.key);
@@ -1440,25 +1473,22 @@ function renderGrid() {
       }
       openModal(item);
     });
-    card.querySelector(".tiny-btn").addEventListener("click", e => {
-      e.stopPropagation();
-      openInExplorer(item);
-    });
-    card.querySelectorAll(".review-btn").forEach(btn => {
-      btn.addEventListener("click", e => {
-        e.stopPropagation();
-        toggleReview(item, btn.dataset.reviewField);
-      });
-    });
     card.querySelector(".batch-select-btn").addEventListener("click", e => {
       e.stopPropagation();
       toggleBatchItem(item.key);
+    });
+    card.querySelectorAll("[data-card-action]").forEach(btn => {
+      btn.addEventListener("click", e => {
+        e.stopPropagation();
+        handleCardAction(btn.dataset.cardAction, item);
+      });
     });
     frag.appendChild(card);
   }
   grid.appendChild(frag);
   updateReviewButtons();
   setupObservers();
+  queueCurrentPageImageWorkflowStatus();
   updateGridPager();
   state.perf.renderMs = Math.round(performance.now() - renderStart);
   state.perf.loadedMedia = countLoadedMedia();
@@ -1470,16 +1500,29 @@ function updateReviewButtons() {
   document.querySelectorAll(".video-card").forEach(card => {
     const item = state.all.find(v => v.key === card.dataset.key);
     if (!item) return;
-    const favoriteBtn = card.querySelector('[data-review-field="favorite"]');
+    const favoriteBtn = card.querySelector('[data-card-action="favorite"]');
+    const copyPathBtn = card.querySelector('[data-card-action="copy-path"]');
+    const openFolderBtn = card.querySelector('[data-card-action="open-folder"]');
+    const trashBtn = card.querySelector('[data-card-action="trash"]');
+    const selectActionBtn = card.querySelector('[data-card-action="select"]');
     const batchBtn = card.querySelector("[data-batch-select]");
     if (favoriteBtn) {
-      setButtonLabel(favoriteBtn, item.favorite ? tx.favorited : tx.favorite, "star", { iconOnly: true });
+      setButtonLabel(favoriteBtn, item.favorite ? tx.favorited : tx.favorite, item.favorite ? "starFilled" : "star", { iconOnly: true });
       favoriteBtn.classList.toggle("active", !!item.favorite);
+    }
+    if (copyPathBtn) setButtonLabel(copyPathBtn, tx.copyFullPath, "copyPath", { iconOnly: true });
+    if (openFolderBtn) setButtonLabel(openFolderBtn, tx.showInFolder, "folder", { iconOnly: true });
+    if (trashBtn) setButtonLabel(trashBtn, tx.moveTrash, "trash", { iconOnly: true });
+    if (selectActionBtn) {
+      const selected = state.batchSelected.has(item.key);
+      setButtonLabel(selectActionBtn, selected ? tx.batchSelectedItem : tx.batchSelectItem, selected ? "checkboxChecked" : "checkbox", { iconOnly: true });
+      selectActionBtn.classList.toggle("select-active", selected);
     }
     if (batchBtn) {
       setButtonLabel(batchBtn, state.batchSelected.has(item.key) ? tx.batchSelectedItem : tx.batchSelectItem, state.batchSelected.has(item.key) ? "checkboxChecked" : "checkbox", { iconOnly: true });
       batchBtn.classList.toggle("active", state.batchSelected.has(item.key));
     }
+    card.classList.toggle("is-batch-selected", state.batchSelected.has(item.key));
   });
   updateBatchUI();
 }
@@ -1544,6 +1587,23 @@ function clearBatchSelection() {
   updateReviewButtons();
 }
 
+function syncReviewItemState(item, review) {
+  item.favorite = !!review.favorite;
+  item.selected = !!review.selected;
+  state.all = state.all.map(v => v.key === item.key ? { ...v, favorite: item.favorite, selected: item.selected } : v);
+  state.view = state.view.map(v => v.key === item.key ? { ...v, favorite: item.favorite, selected: item.selected } : v);
+}
+
+function refreshAfterFavoriteChange(forceFilter = false) {
+  if (forceFilter || state.mediaType === "favorites") {
+    applyFilters(false);
+    return;
+  }
+  updateReviewButtons();
+  updateSubInfo();
+  updateBatchUI();
+}
+
 async function setBatchFavorite(value) {
   if (state.batchBusy) return;
   const items = selectedBatchItems();
@@ -1553,6 +1613,7 @@ async function setBatchFavorite(value) {
   }
   let done = 0;
   const errors = [];
+  const reviewUpdates = new Map();
   state.batchBusy = true;
   updateBatchUI();
   showToast(t().batchWorking, 1800);
@@ -1566,9 +1627,13 @@ async function setBatchFavorite(value) {
         });
         const data = await res.json();
         if (!data.ok) throw new Error(data.error || t().reviewFail);
-        item.favorite = !!data.review.favorite;
-        state.all = state.all.map(v => v.key === item.key ? { ...v, favorite: item.favorite } : v);
-        state.view = state.view.map(v => v.key === item.key ? { ...v, favorite: item.favorite } : v);
+        const nextReview = {
+          favorite: !!data.review.favorite,
+          selected: !!data.review.selected,
+        };
+        item.favorite = nextReview.favorite;
+        item.selected = nextReview.selected;
+        reviewUpdates.set(item.key, nextReview);
         done += 1;
       } catch (err) {
         console.error(err);
@@ -1578,7 +1643,11 @@ async function setBatchFavorite(value) {
   } finally {
     state.batchBusy = false;
   }
-  applyFilters(false);
+  if (reviewUpdates.size) {
+    state.all = state.all.map(v => reviewUpdates.has(v.key) ? { ...v, ...reviewUpdates.get(v.key) } : v);
+    state.view = state.view.map(v => reviewUpdates.has(v.key) ? { ...v, ...reviewUpdates.get(v.key) } : v);
+  }
+  refreshAfterFavoriteChange();
   if (errors.length && done) showToast(t().batchPartial(done, errors.length, errors[0]), 6200);
   else if (errors.length) showToast(t().batchFailed(errors[0]), 6200);
   else showToast(t().batchDone(done));
@@ -1637,11 +1706,8 @@ async function toggleReview(item, field) {
     });
     const data = await res.json();
     if (!data.ok) throw new Error(data.error || t().reviewFail);
-    item.favorite = !!data.review.favorite;
-    item.selected = !!data.review.selected;
-    state.all = state.all.map(v => v.key === item.key ? { ...v, favorite: item.favorite, selected: item.selected } : v);
-    state.view = state.view.map(v => v.key === item.key ? { ...v, favorite: item.favorite, selected: item.selected } : v);
-    applyFilters(false);
+    syncReviewItemState(item, data.review);
+    refreshAfterFavoriteChange();
     showToast(t().reviewSaved);
   } catch (err) {
     console.error(err);
@@ -1695,12 +1761,97 @@ function exportBatchCsv() {
 
 let loadObserver = null;
 let playObserver = null;
+let workflowObserver = null;
+
+function resetWorkflowStatusState() {
+  state.workflowStatusVersion += 1;
+  state.workflowStatusCache.clear();
+  state.workflowStatusQueue = [];
+  state.workflowStatusQueued.clear();
+}
+
+function workflowStatusKey(item) {
+  return `${state.scanId || ""}::${item?.key || ""}`;
+}
+
+function applyWorkflowStatusToCard(card, item) {
+  const badge = card?.querySelector(".workflow-badge");
+  if (!badge || !item) return;
+  const status = state.workflowStatusCache.get(workflowStatusKey(item));
+  const pending = status?.state === "pending";
+  const kind = status?.workflow_kind || (status?.has_generation ? "generation" : status?.has_workflow ? "workflow_only" : "none");
+  const visible = pending || kind === "generation" || kind === "workflow_only";
+  badge.classList.toggle("hidden", !visible);
+  badge.classList.toggle("pending", pending);
+  badge.classList.toggle("generation", !pending && kind === "generation");
+  badge.classList.toggle("workflow-only", !pending && kind === "workflow_only");
+  badge.innerHTML = pending ? ICONS.searchIcon : ICONS.workflow;
+  badge.title = pending ? t().workflowChecking : kind === "generation" ? t().workflowGeneration : kind === "workflow_only" ? t().workflowOnly : t().workflowBadge;
+}
+
+function applyWorkflowStatusForItem(item) {
+  if (!item) return;
+  document.querySelectorAll(`.video-card[data-key="${escapeCssIdent(item.key)}"]`).forEach(card => {
+    applyWorkflowStatusToCard(card, item);
+  });
+}
+
+function queueWorkflowStatusForItem(item) {
+  if (!item || !state.scanId) return;
+  const cacheKey = workflowStatusKey(item);
+  if (state.workflowStatusCache.has(cacheKey) || state.workflowStatusQueued.has(cacheKey)) return;
+  state.workflowStatusQueued.add(cacheKey);
+  state.workflowStatusCache.set(cacheKey, { state: "pending", has_workflow: false });
+  applyWorkflowStatusForItem(item);
+  state.workflowStatusQueue.push({ item, version: state.workflowStatusVersion });
+  pumpWorkflowStatusQueue();
+}
+
+function queueWorkflowStatusForCard(card) {
+  if (!card?.dataset?.key) return;
+  const item = state.all.find(entry => entry.key === card.dataset.key);
+  queueWorkflowStatusForItem(item);
+}
+
+async function pumpWorkflowStatusQueue() {
+  while (state.workflowStatusActive < 2 && state.workflowStatusQueue.length) {
+    const queued = state.workflowStatusQueue.shift();
+    const item = queued?.item;
+    const version = queued?.version;
+    if (!item || version !== state.workflowStatusVersion) continue;
+    const cacheKey = workflowStatusKey(item);
+    state.workflowStatusActive += 1;
+    try {
+      const params = new URLSearchParams({ path: item.rel, scan_id: state.scanId });
+      const res = await fetch(`/api/workflow-status?${params.toString()}`);
+      const data = await res.json();
+      if (version === state.workflowStatusVersion) {
+        state.workflowStatusCache.set(cacheKey, data.ok ? { ...data, state: data.workflow_kind === "none" ? "empty" : "ok" } : { state: "error", workflow_kind: "none", has_workflow: false, error: data.error || "" });
+      }
+    } catch (err) {
+      if (version === state.workflowStatusVersion) {
+        state.workflowStatusCache.set(cacheKey, { state: "error", workflow_kind: "none", has_workflow: false, error: String(err || "") });
+      }
+    } finally {
+      state.workflowStatusQueued.delete(cacheKey);
+      state.workflowStatusActive -= 1;
+      if (version === state.workflowStatusVersion) applyWorkflowStatusForItem(item);
+      pumpWorkflowStatusQueue();
+    }
+  }
+}
+
+function queueCurrentPageImageWorkflowStatus() {
+  currentPageItems().filter(item => item.type === "image").forEach(queueWorkflowStatusForItem);
+}
 
 function destroyObservers() {
   if (loadObserver) loadObserver.disconnect();
   if (playObserver) playObserver.disconnect();
+  if (workflowObserver) workflowObserver.disconnect();
   loadObserver = null;
   playObserver = null;
+  workflowObserver = null;
 }
 
 function releaseMediaElement(media) {
@@ -1721,6 +1872,14 @@ function releaseGridMedia() {
 function setupObservers() {
   const images = [...document.querySelectorAll(".video-wrap img.media-image")];
   const videos = [...document.querySelectorAll(".video-wrap video")];
+  const cards = [...document.querySelectorAll(".video-card")];
+  workflowObserver = new IntersectionObserver(entries => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      queueWorkflowStatusForCard(entry.target);
+      workflowObserver.unobserve(entry.target);
+    }
+  }, { root: null, rootMargin: "500px 0px", threshold: .01 });
   loadObserver = new IntersectionObserver(entries => {
     for (const entry of entries) {
       const media = entry.target;
@@ -1747,8 +1906,11 @@ function setupObservers() {
     scheduleUpdatePlaying();
   }, { root: null, rootMargin: "160px 0px 220px 0px", threshold: [0, .1, .25, .5] });
   for (const image of images) loadObserver.observe(image);
+  for (const card of cards) {
+    const item = state.all.find(entry => entry.key === card.dataset.key);
+    if (item?.type === "video") workflowObserver.observe(card);
+  }
   for (const video of videos) {
-    loadObserver.observe(video);
     playObserver.observe(video);
   }
   scheduleUpdatePlaying();
@@ -1802,15 +1964,63 @@ function visibleAreaRatio(el) {
   return (width * height) / area;
 }
 
-function distanceToViewportCenter(el) {
-  const r = el.getBoundingClientRect();
-  return Math.hypot((r.left + r.width / 2) - window.innerWidth / 2, (r.top + r.height / 2) - window.innerHeight / 2);
+function preloadMarginForVideo(video) {
+  const height = video.getBoundingClientRect().height || 0;
+  return Math.min(900, Math.max(400, height * 1.2));
 }
 
-function isNearPageBottom() {
-  const scrollTop = window.scrollY || document.documentElement.scrollTop || 0;
-  const docHeight = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
-  return scrollTop + window.innerHeight >= docHeight - 160;
+function isWithinVideoPreloadRange(video) {
+  const r = video.getBoundingClientRect();
+  const margin = preloadMarginForVideo(video);
+  return r.bottom >= -margin && r.top <= window.innerHeight + margin && r.right > 0 && r.left < window.innerWidth;
+}
+
+function updateVideoPlayCandidate(video, ratio) {
+  const wasCandidate = video.dataset.playCandidate === "1";
+  if (ratio >= .25) {
+    video.dataset.playCandidate = "1";
+    return true;
+  }
+  if (ratio < .1) {
+    video.dataset.playCandidate = "0";
+    return false;
+  }
+  return wasCandidate;
+}
+
+function selectVideosByVisibleRows(candidates, playLimit) {
+  if (playLimit <= 0) return [];
+  const rows = [];
+  const sorted = candidates
+    .map(video => ({ video, rect: video.getBoundingClientRect(), ratio: visibleAreaRatio(video) }))
+    .sort((a, b) => a.rect.top - b.rect.top || a.rect.left - b.rect.left);
+  for (const item of sorted) {
+    const row = rows.find(group => Math.abs(group.top - item.rect.top) <= Math.max(12, item.rect.height * .25));
+    if (row) {
+      row.items.push(item);
+      row.top = Math.min(row.top, item.rect.top);
+      row.ratioTotal += item.ratio;
+      row.maxRatio = Math.max(row.maxRatio, item.ratio);
+    } else {
+      rows.push({ top: item.rect.top, ratioTotal: item.ratio, maxRatio: item.ratio, items: [item] });
+    }
+  }
+  rows.sort((a, b) => {
+    const avgA = a.ratioTotal / Math.max(1, a.items.length);
+    const avgB = b.ratioTotal / Math.max(1, b.items.length);
+    if (Math.abs(avgB - avgA) > .08) return avgB - avgA;
+    if (Math.abs(b.maxRatio - a.maxRatio) > .08) return b.maxRatio - a.maxRatio;
+    return a.top - b.top;
+  });
+  const selected = [];
+  for (const row of rows) {
+    row.items.sort((a, b) => a.rect.left - b.rect.left);
+    for (const item of row.items) {
+      selected.push(item.video);
+      if (selected.length >= playLimit) return selected;
+    }
+  }
+  return selected;
 }
 
 function effectiveWallPlayLimit() {
@@ -1830,20 +2040,29 @@ function scheduleUpdatePlaying() {
 }
 
 function updatePlaying() {
-  const videos = [...state.visibleVideos].filter(v => v.isConnected && isActuallyVisible(v) && visibleAreaRatio(v) >= .08);
+  const allVideos = [...document.querySelectorAll(".video-wrap video")].filter(v => v.isConnected);
   const playLimit = effectiveWallPlayLimit();
-  const nearBottom = isNearPageBottom();
-  const selected = videos.sort((a, b) => {
-    const ratioDelta = visibleAreaRatio(b) - visibleAreaRatio(a);
-    if (Math.abs(ratioDelta) > .12) return ratioDelta;
-    if (nearBottom) return b.getBoundingClientRect().top - a.getBoundingClientRect().top;
-    return distanceToViewportCenter(a) - distanceToViewportCenter(b);
-  }).slice(0, playLimit);
+  const preloadedVideos = [];
+  const candidates = [];
+  for (const video of allVideos) {
+    const card = video.closest(".video-card");
+    if (!isWithinVideoPreloadRange(video)) {
+      video.dataset.playCandidate = "0";
+      card?.classList.remove("paused-by-limit");
+      pauseAndRelease(video);
+      continue;
+    }
+    ensureSrc(video);
+    preloadedVideos.push(video);
+    const ratio = isActuallyVisible(video) ? visibleAreaRatio(video) : 0;
+    if (updateVideoPlayCandidate(video, ratio)) candidates.push(video);
+  }
+  const selected = selectVideosByVisibleRows(candidates, playLimit);
   const selectedSet = new Set(selected);
-  for (const video of videos) {
+  const candidateSet = new Set(candidates);
+  for (const video of preloadedVideos) {
     const card = video.closest(".video-card");
     if (isWallPreviewStatic() && state.playingEnabled && modal.classList.contains("hidden")) {
-      ensureSrc(video);
       video.pause();
       card?.classList.remove("paused-by-limit");
       continue;
@@ -1855,14 +2074,13 @@ function updatePlaying() {
     }
     if (selectedSet.has(video)) {
       card?.classList.remove("paused-by-limit");
-      ensureSrc(video);
       video.muted = true;
       video.loop = true;
       video.playsInline = true;
       video.play().catch(() => {});
     } else {
       video.pause();
-      card?.classList.add("paused-by-limit");
+      card?.classList.toggle("paused-by-limit", candidateSet.has(video) && playLimit > 0);
     }
   }
 }
@@ -1955,6 +2173,27 @@ function renderMetadataBlock(title, value, options = {}) {
     </section>`;
 }
 
+function parseLoraDisplay(raw) {
+  const original = String(raw || "").trim();
+  const badges = [];
+  let name = original;
+  name = name.replace(/\s+-\s+(model\s+)?strength\s+([-+]?\d*\.?\d+)/ig, (_, label, value) => {
+    badges.push(`${label ? "model " : ""}${value}`);
+    return "";
+  });
+  name = name.replace(/\s+-\s+clip\s+strength\s+([-+]?\d*\.?\d+)/ig, (_, value) => {
+    badges.push(`clip ${value}`);
+    return "";
+  });
+  name = name.replace(/\s*\((model|clip|strength)\s*[:=]\s*([-+]?\d*\.?\d+)\)\s*/ig, (_, label, value) => {
+    badges.push(label.toLowerCase() === "strength" ? value : `${label.toLowerCase()} ${value}`);
+    return " ";
+  });
+  name = name.trim();
+  const fileName = name.split(/[\\/]/).filter(Boolean).pop() || name || original;
+  return { original, name: fileName, badges };
+}
+
 function renderMetadataLoraBlock(value, options = {}) {
   const items = Array.isArray(value)
     ? value.map(item => String(item || "").trim()).filter(Boolean)
@@ -1963,7 +2202,11 @@ function renderMetadataLoraBlock(value, options = {}) {
   const copyText = items.join("\n");
   const content = `
     <ul class="metadata-lora-list">
-      ${items.map(item => `<li>${escapeHtml(item)}</li>`).join("")}
+      ${items.map(item => {
+        const parsed = parseLoraDisplay(item);
+        const badges = parsed.badges.map(badge => `<span class="metadata-lora-badge">${escapeHtml(badge)}</span>`).join("");
+        return `<li title="${escapeHtml(parsed.original)}"><span class="metadata-lora-name">${escapeHtml(parsed.name)}</span>${badges ? `<span class="metadata-lora-badges">${badges}</span>` : ""}</li>`;
+      }).join("")}
     </ul>`;
   if (options.collapsed) {
     return `
@@ -2642,6 +2885,47 @@ async function openInExplorer(item) {
   }
 }
 
+async function copyFullPath(item) {
+  const rel = item?.rel || "";
+  const scanId = item?.scan_id || state.scanId || "";
+  try {
+    const params = new URLSearchParams({ path: rel });
+    if (scanId) params.set("scan_id", scanId);
+    const res = await fetch("/api/file-path?" + params.toString());
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || t().openFail);
+    await navigator.clipboard.writeText(data.path || "");
+    showToast(t().pathCopied, 1800);
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || t().openFail, 3600);
+  }
+}
+
+function handleCardAction(action, item) {
+  if (!item) return;
+  if (action === "favorite") {
+    toggleReview(item, "favorite");
+    return;
+  }
+  if (action === "copy-path") {
+    copyFullPath(item);
+    return;
+  }
+  if (action === "open-folder") {
+    openInExplorer(item);
+    return;
+  }
+  if (action === "trash") {
+    runFileAction("move_trash", item, "grid");
+    return;
+  }
+  if (action === "select") {
+    if (!state.batchMode) setBatchMode(true);
+    toggleBatchItem(item.key);
+  }
+}
+
 async function openInDefaultApp(item) {
   const rel = item?.rel;
   const scanId = item?.scan_id || state.scanId || "";
@@ -3212,6 +3496,7 @@ async function scanNow() {
   emptyState.classList.add("hidden");
   destroyObservers();
   releaseGridMedia();
+  resetWorkflowStatusState();
   grid.innerHTML = "";
   pauseAllInline();
   try {

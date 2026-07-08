@@ -62,6 +62,8 @@ STATIC_DIR = BASE_DIR / "static"
 CONFIG_FILE = BASE_DIR / "config.json"
 REVIEW_FILE = BASE_DIR / "review_data.json"
 ACTION_LOG_FILE = BASE_DIR / "file_actions.log"
+WORKFLOW_STATUS_CACHE = {}
+WORKFLOW_STATUS_LOCK = threading.Lock()
 
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v"}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
@@ -503,6 +505,62 @@ def safe_rel_to_path(root: Path, rel: str) -> Path:
     except ValueError:
         raise ValueError("Path outside video directory")
     return full
+
+
+def read_media_metadata(file_path: Path, media_type: str):
+    metadata_parts = [
+        read_embedded_metadata(file_path, media_type),
+        read_sidecar_metadata(file_path),
+    ]
+    if media_type == "video":
+        metadata_parts.append(read_ffprobe_metadata(file_path, media_type))
+    return merge_metadata(*metadata_parts)
+
+
+def workflow_status_cache_key(file_path: Path) -> str:
+    stat = file_path.stat()
+    return f"{str(file_path.resolve())}|{stat.st_mtime_ns}|{stat.st_size}"
+
+
+def read_workflow_status(file_path: Path, media_type: str) -> dict:
+    cache_key = workflow_status_cache_key(file_path)
+    with WORKFLOW_STATUS_LOCK:
+        cached = WORKFLOW_STATUS_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    metadata = metadata_to_dict(read_media_metadata(file_path, media_type))
+    sources = metadata.get("metadata_sources")
+    if not isinstance(sources, list):
+        sources = []
+    has_workflow = bool(metadata.get("workflow"))
+    has_generation = bool(
+        metadata.get("prompt")
+        or metadata.get("negative_prompt")
+        or metadata.get("model")
+        or metadata.get("loras")
+    )
+    if has_generation:
+        workflow_kind = "generation"
+    elif has_workflow:
+        workflow_kind = "workflow_only"
+    else:
+        workflow_kind = "none"
+    result = {
+        "has_workflow": has_workflow,
+        "has_generation": has_generation,
+        "workflow_kind": workflow_kind,
+        "has_prompt": bool(metadata.get("prompt") or metadata.get("negative_prompt")),
+        "has_model": bool(metadata.get("model")),
+        "has_lora": bool(metadata.get("loras")),
+        "metadata_status": metadata.get("metadata_status", "empty"),
+        "metadata_sources": sources,
+    }
+    with WORKFLOW_STATUS_LOCK:
+        if len(WORKFLOW_STATUS_CACHE) > 4096:
+            WORKFLOW_STATUS_CACHE.clear()
+        WORKFLOW_STATUS_CACHE[cache_key] = result
+    return result
 
 
 def scan_videos(
@@ -949,6 +1007,21 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         self.send_json({"ok": True})
 
+    def api_file_path(self, rel: str, scan_id: str = ""):
+        root = get_scan_root(scan_id)
+        if root is None:
+            self.send_json({"ok": False, "error": "Please choose and scan a media folder first."}, 400)
+            return
+        try:
+            file_path = safe_rel_to_path(root, rel)
+        except ValueError:
+            self.send_json({"ok": False, "error": "Invalid path"}, 403)
+            return
+        if not file_path.exists() or not file_path.is_file():
+            self.send_json({"ok": False, "error": "File not found"}, 404)
+            return
+        self.send_json({"ok": True, "path": str(file_path)})
+
     def api_metadata(self, rel: str, scan_id: str = ""):
         root = get_scan_root(scan_id)
         if root is None:
@@ -968,16 +1041,34 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         media_type = "video" if suffix in VIDEO_EXTENSIONS else "image"
         try:
-            metadata_parts = [
-                read_embedded_metadata(file_path, media_type),
-                read_sidecar_metadata(file_path),
-            ]
-            if media_type == "video":
-                metadata_parts.append(read_ffprobe_metadata(file_path, media_type))
-            metadata = merge_metadata(*metadata_parts)
+            metadata = read_media_metadata(file_path, media_type)
             self.send_json({"ok": True, "metadata": metadata_to_dict(metadata)})
         except Exception as exc:
             self.send_json({"ok": False, "error": f"Metadata read failed: {exc}"}, 500)
+
+    def api_workflow_status(self, rel: str, scan_id: str = ""):
+        root = get_scan_root(scan_id)
+        if root is None:
+            self.send_json({"ok": False, "error": "Please choose and scan a media folder first."}, 400)
+            return
+        try:
+            file_path = safe_rel_to_path(root, rel)
+        except ValueError:
+            self.send_json({"ok": False, "error": "Invalid path"}, 403)
+            return
+        if not file_path.exists() or not file_path.is_file():
+            self.send_json({"ok": False, "error": "File not found"}, 404)
+            return
+        suffix = file_path.suffix.lower()
+        if suffix not in MEDIA_EXTENSIONS:
+            self.send_json({"ok": False, "error": "Unsupported media type"}, 415)
+            return
+        media_type = "video" if suffix in VIDEO_EXTENSIONS else "image"
+        try:
+            result = read_workflow_status(file_path, media_type)
+            self.send_json({"ok": True, **result})
+        except Exception as exc:
+            self.send_json({"ok": False, "error": f"Workflow status read failed: {exc}"}, 500)
 
     def api_file_action(self, payload: dict):
         root = get_scan_root(str(payload.get("scan_id", "")))
@@ -1072,10 +1163,20 @@ class AppHandler(BaseHTTPRequestHandler):
             scan_id = qs.get("scan_id", [""])[0]
             self.api_open_file_default_app(rel, scan_id)
             return
+        if path == "/api/file-path":
+            rel = qs.get("path", [""])[0]
+            scan_id = qs.get("scan_id", [""])[0]
+            self.api_file_path(rel, scan_id)
+            return
         if path == "/api/metadata":
             rel = qs.get("path", [""])[0]
             scan_id = qs.get("scan_id", [""])[0]
             self.api_metadata(rel, scan_id)
+            return
+        if path == "/api/workflow-status":
+            rel = qs.get("path", [""])[0]
+            scan_id = qs.get("scan_id", [""])[0]
+            self.api_workflow_status(rel, scan_id)
             return
         if path == "/api/review":
             self.send_json({"ok": True, "review": load_review_data()})

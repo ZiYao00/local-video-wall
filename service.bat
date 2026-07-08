@@ -3,18 +3,18 @@ setlocal EnableExtensions
 chcp 65001 >nul
 cd /d "%~dp0"
 
-set "APP_NAME=LocalCivitaiVideoWall"
+set "APP_NAME=LocalVideoWall"
 set "APP_URL=http://127.0.0.1:8787"
 set "APP_PORT=8787"
-set "TASK_NAME=LocalCivitaiVideoWall"
+set "TASK_NAME=LocalVideoWall"
 set "SCRIPT_DIR=%~dp0"
 set "APP_PY=%SCRIPT_DIR%app.py"
-set "HELPER_DIR=%APPDATA%\LocalCivitaiVideoWall"
+set "HELPER_DIR=%APPDATA%\LocalVideoWall"
 set "VBS_PATH=%HELPER_DIR%\start_hidden.vbs"
 set "LOG_PATH=%HELPER_DIR%\service.log"
 set "STARTUP_DIR=%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup"
-set "STARTUP_VBS=%STARTUP_DIR%\LocalCivitaiVideoWall.vbs"
-set "STARTUP_LNK=%STARTUP_DIR%\LocalCivitaiVideoWall.lnk"
+set "STARTUP_VBS=%STARTUP_DIR%\LocalVideoWall.vbs"
+set "STARTUP_LNK=%STARTUP_DIR%\LocalVideoWall.lnk"
 set "PY_CMD="
 set "COMMAND_MODE=0"
 
