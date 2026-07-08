@@ -1,24 +1,55 @@
-# Roadmap
+﻿# Roadmap
 
-This roadmap defines the current product direction for Local Video Wall.
+This roadmap defines the product direction for Local Video Wall.
 
-The project should not become a second `infinite-image-browsing`, a cloud album, or a general file manager. Its target is narrower:
+Local Video Wall should not become a second `infinite-image-browsing`, a cloud album, or a general file manager. Its target is narrower:
 
-**A local AI image/video asset browser for fast review, screening, marking, and retrieval.**
+> A local AI image/video asset browser for fast review, screening, marking, metadata inspection, and retrieval.
 
-Primary use cases:
+## Product Boundary
 
-- Browse Civitai-downloaded images and videos.
-- Browse local outputs from ComfyUI, Stable Diffusion WebUI / A1111, Wan, Kling, Runway, and similar tools.
-- Quickly screen many local short videos and generated images.
-- Mark, favorite, reject, batch-review, and safely remove unwanted assets.
-- Later, find assets by prompt, model, LoRA, source URL, tags, notes, and local review status.
+### The app should focus on
 
-Documentation note:
+- Browsing local AI image and video folders.
+- Reviewing Civitai-downloaded images and videos.
+- Reviewing local outputs from ComfyUI, Stable Diffusion WebUI / A1111, Wan, Kling, Runway, and similar tools.
+- Screening many local short videos and generated images quickly.
+- Marking, favoriting, rejecting, batch-reviewing, and safely moving unwanted assets to the Windows Recycle Bin.
+- Inspecting available generation metadata such as Prompt, Negative Prompt, model, LoRA, seed, workflow, source URL, and technical media information.
+- Later, finding assets by prompt, model, LoRA, source URL, tags, notes, rating, and local review status.
 
-- The README should explain the daily AI-media workflow problem before listing features.
-- The README should clearly distinguish the packaged GitHub Release, the main branch, current metadata features, and future roadmap items.
-- The project should not be described as a ComfyUI plugin. It is a local Windows-first AI media browser and review tool.
+### The app should not become
+
+- A cloud album.
+- A multi-user DAM system.
+- A remote sync service.
+- A full video editor.
+- A ComfyUI plugin.
+- A Docker-first server app.
+- A large framework rewrite for its own sake.
+
+## Documentation Direction
+
+The README should be written for daily users first, not only for developers.
+
+Recommended README order:
+
+1. Explain the daily AI-media workflow problem.
+2. Explain how Local Video Wall solves that problem.
+3. Show a typical usage flow.
+4. Summarize core capabilities in a few clear groups.
+5. Explain what the tool is good for and not good for.
+6. Explain installation, startup, and troubleshooting.
+7. Explain local/safety behavior.
+8. Explain current status and future roadmap.
+
+Documentation rules:
+
+- Do not describe the project as a ComfyUI plugin.
+- Do not describe unfinished features as finished.
+- Keep `README.md`, `README.zh-CN.md`, `ROADMAP.md`, and `CHANGELOG.md` synchronized before each GitHub release.
+- Clearly distinguish packaged GitHub Releases, the `main` branch, current metadata features, and future roadmap items.
+- Keep technical details available, but do not let them hide the user problem and workflow value.
 
 ## Development Principles
 
@@ -29,6 +60,70 @@ Documentation note:
 - Keep every release runnable; avoid large rewrites that leave the app half-migrated.
 - Keep destructive operations reversible, visible, and clearly confirmed.
 - Prioritize Windows local use. Cross-platform behavior is useful, but not the first constraint.
+- Avoid mandatory external dependencies for normal browsing.
+- Avoid persistent cache generation unless the user opts in.
+
+## Product Pillars
+
+### 1. Fast local media review
+
+The app should make it easy to scan a large folder visually without opening each file one by one.
+
+Key ideas:
+
+- Waterfall-style media wall.
+- Multi-video silent autoplay for visible videos.
+- Static previews for dense grid modes.
+- Pagination and page-size controls for large folders.
+- Good default settings for normal browsing and fast screening.
+
+### 2. AI-media context
+
+The app should understand common AI generation metadata when it exists.
+
+Key ideas:
+
+- A1111 PNG `parameters`.
+- ComfyUI PNG `prompt` and `workflow`.
+- Same-name sidecar JSON.
+- Prompt and Negative Prompt.
+- Model and LoRA information.
+- Optional video container metadata through `ffprobe`.
+
+### 3. Lightweight local review workflow
+
+The app should help users decide what to keep, revisit, export, or remove.
+
+Key ideas:
+
+- Favorites.
+- Batch selection.
+- CSV export.
+- Review state that can later evolve into tags, notes, ratings, and collections.
+- Safe move-to-Recycle-Bin behavior.
+
+### 4. Local-first safety
+
+The app should be predictable and private for local media folders.
+
+Key ideas:
+
+- Run locally on `127.0.0.1`.
+- Do not upload media files.
+- Keep settings and review data local.
+- Make local paths visible and understandable.
+- Use reversible cleanup behavior whenever possible.
+
+### 5. Small, reviewable architecture
+
+The app should evolve through small backend boundaries, not large rewrites.
+
+Key ideas:
+
+- Keep `app.py` as entry and route layer while extracting small helpers.
+- Use adapters for optional metadata tools.
+- Keep frontend changes incremental.
+- Do not introduce React, Vue, Vite, Docker-first distribution, cloud accounts, or a database until they solve a real product need.
 
 ## Completed Milestones
 
@@ -38,11 +133,11 @@ Goal: make the video wall useful for reviewing and picking good clips without to
 
 Completed:
 
-- Favorites
-- Selected / featured marks
-- Filter by all / favorites / selected
-- Persist review data locally
-- Bilingual UI text for review controls
+- Favorites.
+- Selected / featured marks.
+- Filter by all / favorites / selected.
+- Persist review data locally.
+- Bilingual UI text for review controls.
 
 ### v1.2.0 - Library Review Tools
 
@@ -50,10 +145,10 @@ Goal: make larger folders easier to audit and share with other tools.
 
 Completed:
 
-- Export current results to CSV
-- More filters, including file size and modified date
-- More useful metadata in cards and overlays
-- Improved empty states and scan summaries
+- Export current results to CSV.
+- More filters, including file size and modified date.
+- More useful metadata in cards and overlays.
+- Improved empty states and scan summaries.
 
 ### v1.3.0 - Mixed Media And Safe File Actions
 
@@ -61,11 +156,11 @@ Goal: expand from video browsing to safer media management.
 
 Completed:
 
-- Mixed image + video browsing
-- Safe move actions to `_video_wall_review`
-- Safe trash actions, later changed to the Windows Recycle Bin
-- Local-only review data
-- Safer file handling without permanent deletion by default
+- Mixed image + video browsing.
+- Safe move actions to `_video_wall_review`.
+- Safe trash actions, later changed to the Windows Recycle Bin.
+- Local-only review data.
+- Safer file handling without permanent deletion by default.
 
 ### v1.4.0 - Image Slideshow
 
@@ -73,14 +168,14 @@ Goal: add a visual review mode specifically for images.
 
 Completed:
 
-- Image-only fullscreen slideshow from the image modal
-- Play / pause
-- Previous / next
-- Interval controls
-- Fade / slide / drift / random effects
-- Contain / cover fit modes
-- Loop toggle
-- Keyboard and mouse-wheel navigation
+- Image-only fullscreen slideshow from the image modal.
+- Play / pause.
+- Previous / next.
+- Interval controls.
+- Fade / slide / drift / random effects.
+- Contain / cover fit modes.
+- Loop toggle.
+- Keyboard and mouse-wheel navigation.
 
 ### v1.5.0 - Slideshow Refinement
 
@@ -88,12 +183,12 @@ Goal: make image viewing feel smoother and more intentional.
 
 Completed:
 
-- 1-15 second slideshow interval choices
-- No-effect slideshow option
-- Cleaner fade, slide, and drift transitions
-- Larger side navigation arrows
-- Hide / show controls for image preview and slideshow viewing
-- Dense grid options for fast image screening
+- 1-15 second slideshow interval choices.
+- No-effect slideshow option.
+- Cleaner fade, slide, and drift transitions.
+- Larger side navigation arrows.
+- Hide / show controls for image preview and slideshow viewing.
+- Dense grid options for fast image screening.
 
 ### v1.6.0 - Video Preview And Interface Polish
 
@@ -101,16 +196,16 @@ Goal: make video preview closer to the image preview experience.
 
 Completed:
 
-- Previous / next navigation in the video preview modal
-- Mouse-wheel volume control for video preview
-- Loop one, sequential playback, and random playback modes
-- Video fullscreen support
-- Overlay toolbar for video controls
-- Hide / show controls for cleaner viewing
-- Larger mouse-activated media navigation arrows
-- Light theme
-- Icon-first toolbar controls
-- Improved fullscreen, close, and playback-mode icons
+- Previous / next navigation in the video preview modal.
+- Mouse-wheel volume control for video preview.
+- Loop one, sequential playback, and random playback modes.
+- Video fullscreen support.
+- Overlay toolbar for video controls.
+- Hide / show controls for cleaner viewing.
+- Larger mouse-activated media navigation arrows.
+- Light theme.
+- Icon-first toolbar controls.
+- Improved fullscreen, close, and playback-mode icons.
 
 ### v1.7.0 - Path, Performance, Batch Review, And Layout
 
@@ -118,29 +213,29 @@ Goal: keep routine browsing responsive while making larger folders, large videos
 
 Completed:
 
-- Individual removal for favorite paths and path history
-- Split-layout folder sidebar with drive roots, lazy-loaded folder expansion, recent paths, and favorite paths
-- One-level typed path autocomplete
-- 500 MB large-video wall placeholder with an opt-in preview setting
-- On-demand modal playback for large videos
-- Viewport-aware image loading and distant image resource release
-- Adjustable page-size input for large mixed-media folders, capped at 240 cards per page
-- Configurable filename exclusion rules with editable keywords and image/all-media scope
-- No persistent thumbnail cache by default
-- 2-20 grid columns
-- Automatic wall playback derived from column count
-- Static wall previews for 10 or more columns
-- Toolbar filters for all / videos / images / favorites
-- Reset-filters action
-- Batch mode for visible media selection, favorite / unfavorite, Recycle Bin move, and CSV export
-- More reliable Recycle Bin handling for Chinese paths and locked media files
-- Improved image and video viewer controls with cleaner fullscreen behavior
-- Left / center / right content layout for wide screens
-- Half-width left/right video preview modal
-- Half-width left/right image preview modal, with metadata hidden in side mode
-- Open media with the system default app
-- Small / standard / large interface font-size settings
-- More reliable startup installation with Task Scheduler support, fallback Startup shortcut, and service logging
+- Individual removal for favorite paths and path history.
+- Split-layout folder sidebar with drive roots, lazy-loaded folder expansion, recent paths, and favorite paths.
+- One-level typed path autocomplete.
+- 500 MB large-video wall placeholder with an opt-in preview setting.
+- On-demand modal playback for large videos.
+- Viewport-aware image loading and distant image resource release.
+- Adjustable page-size input for large mixed-media folders, capped at 240 cards per page.
+- Configurable filename exclusion rules with editable keywords and image/all-media scope.
+- No persistent thumbnail cache by default.
+- 2-20 grid columns.
+- Automatic wall playback derived from column count.
+- Static wall previews for 10 or more columns.
+- Toolbar filters for all / videos / images / favorites.
+- Reset-filters action.
+- Batch mode for visible media selection, favorite / unfavorite, Recycle Bin move, and CSV export.
+- More reliable Recycle Bin handling for Chinese paths and locked media files.
+- Improved image and video viewer controls with cleaner fullscreen behavior.
+- Left / center / right content layout for wide screens.
+- Half-width left/right video preview modal.
+- Half-width left/right image preview modal, with metadata hidden in side mode.
+- Open media with the system default app.
+- Small / standard / large interface font-size settings.
+- More reliable startup installation with Task Scheduler support, fallback Startup shortcut, and service logging.
 
 ### v1.7.5 - Architecture Guardrails
 
@@ -155,115 +250,12 @@ Completed:
 - Added `review/` package with schema-version direction and compatibility normalization.
 - Preserved current favorite / selected UI behavior while allowing future review fields such as status, rating, tags, collections, and notes.
 - Added `metadata/` package with normalized metadata schema and safe normalizer.
-- Added metadata reader entry points for embedded metadata, sidecar JSON, and ffprobe without making external tools mandatory.
+- Added metadata reader entry points for embedded metadata, sidecar JSON, and `ffprobe` without making external tools mandatory.
 - Kept `app.py` as the entry and route layer.
 - Did not split `static/app.js`, add a frontend framework, or change the script loading model.
 - Verified imports, source compilation, local service startup, `/api/config`, and `/api/review`.
 
-## Phase 0 - Current Version Stabilization
-
-Recommended version: `v1.7.x Maintenance`
-
-Goal: stabilize the current local media wall baseline before adding heavier AI metadata features.
-
-Tasks:
-
-- Keep `README.md` and `README.zh-CN.md` synchronized.
-- Keep this `ROADMAP.md` aligned with the actual product direction.
-- Keep `CHANGELOG.md` updated before each GitHub release.
-- Document current capabilities accurately:
-  - 2-20 grid columns
-  - column-derived wall autoplay
-  - static preview for 10 or more columns
-  - batch mode
-  - filter reset
-  - filename exclusion rules
-  - left / center / right layout
-  - half-width image and video preview modes
-  - default-app opening
-  - Windows Recycle Bin file action
-  - service menu and startup behavior
-- Maintain a minimal smoke-test checklist:
-  - start service
-  - scan a small folder
-  - scan a folder with subfolders
-  - open image preview
-  - open slideshow
-  - open video preview
-  - favorite / unfavorite
-  - batch select and clear selection
-  - export CSV
-  - confirm Recycle Bin move
-
-Not planned for this phase:
-
-- SQLite
-- AI semantic search
-- persistent image thumbnail cache
-- persistent video cover cache
-
-## Phase 1 - Architecture Guardrails
-
-Recommended version: `v1.7.5 - Architecture Guardrails`
-
-Status: completed.
-
-Goal: add small, reviewable architecture boundaries before AI metadata, tags, SQLite, and search make the codebase more complex.
-
-This is not a rewrite phase. The app should keep the same UI, startup flow, scan behavior, review behavior, and local file-action behavior.
-
-Recommended backend module skeleton:
-
-```text
-core/
-  __init__.py
-  json_store.py
-  path_utils.py
-  file_identity.py
-
-review/
-  __init__.py
-  schema.py
-  store.py
-
-metadata/
-  __init__.py
-  schema.py
-  normalizer.py
-```
-
-Initial responsibilities:
-
-- `core/json_store.py`: safe UTF-8 JSON read/write helpers using temp-file replacement for writes.
-- `core/path_utils.py`: normalized path helpers and safe path checks.
-- `core/file_identity.py`: future path/stat/quick-identity helpers without hashing large videos by default.
-- `review/schema.py`: review-state field definitions and schema-version direction.
-- `review/store.py`: review-data loading/saving compatibility layer.
-- `metadata/schema.py`: shared metadata object fields.
-- `metadata/normalizer.py`: safe normalization for partial or broken metadata.
-- `metadata/embedded_reader.py`: entry point for future A1111 / ComfyUI embedded metadata.
-- `metadata/sidecar_reader.py`: sidecar JSON candidate path rules.
-- `metadata/ffprobe_reader.py`: entry point for optional future ffprobe integration.
-
-Rules:
-
-- Keep `app.py` as the startup and route layer.
-- Do not split all of `app.py` at once.
-- Do not split `static/app.js` into module files yet.
-- Do not introduce React, Vue, Vite, bundlers, Docker-first distribution, or cloud accounts.
-- Do not change current runtime behavior unless a later task explicitly approves it.
-- All new modules must be importable and small enough to review.
-
-Acceptance checklist:
-
-- Existing app still starts. Completed.
-- Existing config and review data still load. Completed.
-- No UI behavior changes. Completed.
-- No new mandatory external dependency. Completed.
-- No thumbnail/video cache generation. Completed.
-- No destructive file behavior changes. Completed.
-
-## Phase 2 - AI Metadata Preview
+## Current Phase - v1.8.x Metadata Stabilization
 
 Recommended version: `v1.8.x - AI Metadata Preview / Metadata Stabilization`
 
@@ -271,84 +263,35 @@ Status: core image metadata preview is implemented; optional `ffprobe` video/con
 
 Goal: show AI generation information inside image and video previews without turning the grid into a crowded database UI.
 
-Recommended metadata priority:
+### Metadata priority
 
-1. Embedded image/video metadata
-2. Same-name sidecar JSON
-3. `ffprobe` / MediaInfo technical metadata
-4. Basic filesystem information
+1. Embedded image/video metadata.
+2. Same-name sidecar JSON.
+3. `ffprobe` / MediaInfo technical metadata.
+4. Basic filesystem information.
 
 Reason: ComfyUI and Stable Diffusion WebUI images often already contain prompt, workflow, or parameter metadata in the image file itself. Sidecar JSON remains important, but should not be the only first-class source.
 
-Implemented module layout:
+### Implemented metadata sources
 
-```text
-metadata/
-  __init__.py
-  schema.py
-  embedded_reader.py
-  sidecar_reader.py
-  ffprobe_reader.py
-  normalizer.py
-```
-
-Planned optional modules:
-
-```text
-metadata/
-  exiftool_reader.py
-  mediainfo_reader.py
-```
-
-Unified metadata fields:
-
-```text
-file_path
-media_type
-width
-height
-duration
-fps
-codec
-format
-prompt
-negative_prompt
-model
-loras
-seed
-sampler
-steps
-cfg_scale
-source_app
-source_url
-civitai_model_url
-civitai_version_url
-workflow
-raw_metadata
-metadata_sources
-metadata_status
-```
-
-Implemented sources:
-
-- Stable Diffusion WebUI / A1111 PNG `parameters`
-- ComfyUI `prompt` and `workflow`
-- same-name sidecar JSON:
+- Stable Diffusion WebUI / A1111 PNG `parameters`.
+- ComfyUI `prompt` and `workflow`.
+- Same-name sidecar JSON:
   - `name.json`
   - `name.ext.json`
   - `name.info.json`
   - `name.civitai.json`
-- basic filesystem information
-- optional video container tags and technical information through `ffprobe` when available on PATH
+- Basic filesystem information.
+- Optional video container tags and technical information through `ffprobe` when available on PATH.
 
-Implemented ComfyUI behavior:
+### Implemented ComfyUI behavior
 
 - KSampler positive / negative conditioning chain is preferred when extracting prompts.
 - Disconnected, FaceDetailer, and unused text nodes are less likely to pollute the main Prompt field.
 - LoRA detection supports standard LoRA loader fields and Power Lora Loader / rgthree-style workflow values.
 - LoRA strength is displayed when model / clip / strength values are available.
 
-Implemented preview UI:
+### Implemented preview UI
 
 - File Info as labeled fields:
   - path
@@ -357,30 +300,32 @@ Implemented preview UI:
   - modified date
   - pixel dimensions
   - approximate creative aspect ratio
-- Prompt
-- Negative Prompt
-- Model
-- LoRA as a scrollable list
-- Raw metadata actions
-- Copy Raw metadata
-- Copy ComfyUI workflow JSON
-- Open local ComfyUI page
+- Prompt.
+- Negative Prompt.
+- Model.
+- LoRA as a scrollable list.
+- Raw metadata actions:
+  - Copy raw metadata.
+  - Copy ComfyUI workflow JSON.
+  - Open local ComfyUI page.
 
-Still pending in `v1.8.x`:
+### Remaining stabilization work
 
-- More real-world ComfyUI node format samples.
-- WebP / JPEG embedded metadata where practical.
-- More real-world MP4/WebM/MOV metadata samples to validate `ffprobe` tag extraction.
-- Optional MediaInfo support only if `ffprobe` proves insufficient.
-- Better handling for workflows that only store runtime-generated prompt output outside the PNG metadata.
+- Test more real ComfyUI PNG samples, especially custom prompt, string, wildcard, and LoRA loader nodes.
+- Keep the metadata panel readable with many LoRA entries and long prompts.
+- Validate optional `ffprobe` video-container metadata with more real MP4/WebM/MOV samples.
+- Keep unsupported or broken metadata non-fatal by returning normalized empty or partial metadata objects.
+- Test WebP / JPEG embedded metadata where practical.
+- Consider optional MediaInfo support only if `ffprobe` proves insufficient.
+- Handle workflows that only store runtime-generated prompt output outside the PNG metadata.
 
 Not planned for this phase:
 
-- SQLite
-- full-text search
-- AI summarization
-- automatic tagging
-- mandatory external tools
+- SQLite.
+- Full-text search.
+- AI summarization.
+- Automatic tagging.
+- Mandatory external tools.
 
 ## Phase 3 - Tags And Review Workflow
 
@@ -390,7 +335,7 @@ Goal: make the app useful for organizing assets, not only previewing them.
 
 First implementation:
 
-- User-defined tags
+- User-defined tags.
 - Built-in starter tags:
   - `reference`
   - `usable`
@@ -406,30 +351,30 @@ First implementation:
   - `expression`
   - `nsfw`
   - `sfw`
-- Chinese UI labels for built-in tags
-- Single-item tag add/remove
-- Batch add/remove tags
-- Tag filter
-- Tag search
-- Recently used tags
-- Tag counts
-- CSV export with `tags`, `note`, and `rating`
+- Chinese UI labels for built-in tags.
+- Single-item tag add/remove.
+- Batch add/remove tags.
+- Tag filter.
+- Tag search.
+- Recently used tags.
+- Tag counts.
+- CSV export with `tags`, `note`, and `rating`.
 
 Short-term storage:
 
-- Continue using `review_data.json`
-- Keep the structure migration-friendly for SQLite later
+- Continue using `review_data.json`.
+- Keep the structure migration-friendly for SQLite later.
 
 Reference only:
 
-- TagSpaces local tag ideas
-- digiKam rating/tag/filter ideas
+- TagSpaces local tag ideas.
+- digiKam rating/tag/filter ideas.
 
 Not planned for this phase:
 
-- cloud sync
-- multi-user permissions
-- full DAM system
+- Cloud sync.
+- Multi-user permissions.
+- Full DAM system.
 
 ## Phase 4 - SQLite Lightweight Index
 
@@ -448,7 +393,7 @@ Principles:
 Suggested database:
 
 ```text
-local_civitai_video_wall.db
+local_video_wall.db
 ```
 
 Suggested tables:
@@ -503,10 +448,10 @@ Search foundation:
 
 Not planned for this phase:
 
-- remote database
-- multi-user service
-- embedding semantic search
-- complex sync
+- Remote database.
+- Multi-user service.
+- Embedding semantic search.
+- Complex sync.
 
 ## Phase 5 - Metadata Search And Advanced Filters
 
@@ -547,9 +492,9 @@ UI direction:
 
 Not planned for this phase:
 
-- natural-language AI search
-- automatic classification
-- online search
+- Natural-language AI search.
+- Automatic classification.
+- Online search.
 
 ## Phase 6 - Optional Preview Cache
 
@@ -559,8 +504,8 @@ Goal: improve static high-column previews without forcing persistent cache behav
 
 Possible tools:
 
-- `ffmpeg` for video first-frame or 3-second cover generation
-- Pillow for image thumbnails
+- `ffmpeg` for video first-frame or 3-second cover generation.
+- Pillow for image thumbnails.
 
 Cache layout:
 
@@ -589,13 +534,13 @@ Goal: make the app easier for non-technical users to download, start, and troubl
 
 Tasks:
 
-- GitHub Release ZIP
-- one-click start path
-- background service menu
-- Python version check
-- port occupation check
-- optional `ffmpeg` / `ffprobe` / `exiftool` availability checks
-- optional `portable_tools/` support
+- GitHub Release ZIP.
+- One-click start path.
+- Background service menu.
+- Python version check.
+- Port occupation check.
+- Optional `ffmpeg` / `ffprobe` / `exiftool` availability checks.
+- Optional `portable_tools/` support.
 
 Optional structure:
 
@@ -608,37 +553,37 @@ portable_tools/
 
 Not planned:
 
-- complex installer
-- Docker-first distribution
-- account system
-- cloud sync
+- Complex installer.
+- Docker-first distribution.
+- Account system.
+- Cloud sync.
 
 ## Open-Source Reuse Strategy
 
 Good candidates for direct integration through adapters:
 
-- Pillow
-- `ffprobe`
-- ExifTool
-- MediaInfo
-- SQLite FTS5
+- Pillow.
+- `ffprobe`.
+- ExifTool.
+- MediaInfo.
+- SQLite FTS5.
 
 Projects to study, not merge wholesale:
 
-- `infinite-image-browsing`
-- TagSpaces
-- digiKam
-- Immich
+- `infinite-image-browsing`.
+- TagSpaces.
+- digiKam.
+- Immich.
 
 External code can be copied or adapted only when:
 
-- license is compatible
-- the module is small and focused
-- it does not force a large framework change
-- it can be tested independently
-- original copyright notices are kept
-- `THIRD_PARTY_NOTICES.md` is updated
-- a minimal demo is tested before integration
+- The license is compatible.
+- The module is small and focused.
+- It does not force a large framework change.
+- It can be tested independently.
+- Original copyright notices are kept.
+- `THIRD_PARTY_NOTICES.md` is updated.
+- A minimal demo is tested before integration.
 
 ## Recommended Next Step
 
@@ -664,8 +609,8 @@ v1.9.0 - Tags & Review Workflow
 
 Still deferred:
 
-- tags / rating / notes UI
-- SQLite index
-- metadata search
-- thumbnail or video cover cache
-- mandatory ExifTool / ffprobe dependency
+- Tags / rating / notes UI.
+- SQLite index.
+- Metadata search.
+- Thumbnail or video cover cache.
+- Mandatory ExifTool / ffprobe dependency.

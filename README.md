@@ -1,30 +1,30 @@
-# Local Video Wall
+﻿# Local Video Wall
 
 [中文说明](README.zh-CN.md)
 
-A local waterfall-style video wall for previewing many local videos at the same time.
+A Windows-first local AI image/video media wall for fast browsing, screening, metadata review, and safe cleanup.
 
 ![Preview](assets/preview01.gif)
 
-Local Video Wall lets you open a local folder as a browser-based video wall. The main point is simple: display many local videos at once, autoplay the videos currently visible on screen, and make it faster to screen a large folder without opening files one by one.
+Local Video Wall turns a local folder into a browser-based media wall. It is designed for people who generate, download, and review large batches of local AI images and videos.
 
-It also supports images, batch review, safe cleanup, and AI generation metadata, so it can be used as a local AI media review tool. It is not a cloud album, a general file manager, or a ComfyUI plugin.
+It is not a cloud album, not a general file manager, and not a ComfyUI plugin. Its target is narrower and more practical: local AI media review, screening, marking, and retrieval.
 
 ## Why This Exists
 
-Video and AI media folders grow quickly. A normal file explorer is not ideal when:
+AI media folders grow quickly. A normal file explorer is not ideal when:
 
 - One folder contains hundreds or thousands of short videos and images.
 - Videos need to be opened one by one before you know whether they are useful.
 - You want to compare many clips visually while several videos play at the same time.
 - Good assets, bad assets, references, and unfinished experiments are mixed together.
 - Prompt, model, LoRA, and workflow information is hard to inspect after generation.
-- You want local review and cleanup without uploading media to a cloud library.
-- Direct deletion is risky when you are still screening large batches.
+- You want to review local media without uploading it to a cloud library.
+- Direct deletion is risky while you are still screening large batches.
 
 ## How It Helps
 
-The app turns a local folder into a waterfall-style video and media wall:
+Local Video Wall turns a local folder into a waterfall-style image/video wall:
 
 - Scan local videos and images and browse them in a responsive grid.
 - Autoplay multiple visible wall videos silently at the same time.
@@ -33,59 +33,75 @@ The app turns a local folder into a waterfall-style video and media wall:
 - Open images in a large preview or fullscreen slideshow.
 - Open videos in a larger player with navigation, volume wheel, fullscreen, and playback modes.
 - Inspect common AI generation metadata, including Prompt, Negative Prompt, model, LoRA, and ComfyUI workflow data.
-- Keep file actions local and reversible by using the Windows Recycle Bin for trash moves.
+- Move unwanted files to the Windows Recycle Bin instead of deleting them permanently by default.
+
+## Typical Workflow
+
+1. Start the app with `start.bat` or `service.bat`.
+2. Choose a local media folder, such as a ComfyUI output folder or a Civitai download folder.
+3. Set the wall density, for example 6 columns for normal review or 8-9 columns for faster screening.
+4. Browse images and videos together in the media wall.
+5. Open promising items in the image or video preview.
+6. Inspect Prompt, Negative Prompt, model, LoRA, workflow, and file information when metadata exists.
+7. Favorite useful assets, batch-select unwanted items, export CSV, or move files to the Windows Recycle Bin.
+
+## Core Capabilities
+
+### Multi-video wall preview
+
+Browse many local videos in one page. Visible videos can autoplay silently at the same time, while off-screen media pauses or releases resources.
+
+### Mixed image/video media wall
+
+Browse downloaded video assets, AI-generated images, ComfyUI outputs, Stable Diffusion WebUI / A1111 images, Wan / Kling / Runway clips, and similar local folders.
+
+### Fast screening and cleanup
+
+Use toolbar filters, search, sorting, favorites, batch selection, CSV export, filename exclusion rules, and safe moves to the Windows Recycle Bin.
+
+### AI generation metadata review
+
+Read common generation metadata when available:
+
+- Stable Diffusion WebUI / A1111 PNG `parameters`
+- ComfyUI PNG `prompt` and `workflow`
+- Same-name sidecar JSON files
+- Prompt and Negative Prompt
+- Model and UNET / diffusion model loader names
+- LoRA names and strength values when available
+- Workflow / generation badges on media cards, with separate states for checking, generation metadata, and workflow-only files
+- Optional video container tags through `ffprobe`
+
+For ComfyUI images, prompt extraction prefers the KSampler conditioning chain where possible, reducing noise from disconnected, FaceDetailer, or unused text nodes.
+
+### Windows-first local use
+
+The app runs as a local Python service and stores settings and review data locally. It uses `start.bat` for manual startup and `service.bat` for background service actions.
+
+## Good Fit / Not A Good Fit
+
+| Good fit | Not a good fit |
+| --- | --- |
+| Browsing many local short videos at once | Streaming online videos |
+| Reviewing AI-generated image/video batches | Professional video editing |
+| Screening ComfyUI / A1111 / Wan / Kling / Runway outputs | Cloud album or remote sync service |
+| Inspecting prompt, model, LoRA, and workflow metadata | Multi-user digital asset management |
+| Local favorites, batch selection, CSV export, and Recycle Bin cleanup | Users with no local media folder to browse |
 
 ## Project Status
 
 | Area | Status |
 | --- | --- |
-| Stable Release | The packaged GitHub Release may be older than the main branch. |
-| Main Branch | Contains the latest development features and documentation. |
-| Metadata Features | PNG metadata preview and optional `ffprobe` video metadata reading are available on the current main branch. |
-| Future Work | Tags, notes, ratings, SQLite indexing, metadata search, and optional preview cache are planned. |
-
-## Core Capabilities
-
-- **Multi-video waterfall preview**: browse many local videos in one wall and autoplay the visible videos at the same time.
-- **Local AI media wall**: browse downloaded video assets, generated images, ComfyUI outputs, A1111 images, Wan / Kling / Runway clips, and similar local folders.
-- **Fast review of large folders**: 2-20 grid columns, page-size control up to 240 cards, top pagination, optional floating pagination, and large-video placeholders over 500 MB.
-- **Viewport-aware performance**: visible videos can autoplay up to a user-selected limit, off-screen videos pause or release resources, and wall images load near the viewport without a persistent thumbnail cache.
-- **Review and cleanup workflow**: favorites, toolbar filters, batch selection, CSV export, filename exclusion rules, and safe moves to the Windows Recycle Bin.
-- **Image and video viewers**: image preview, fullscreen slideshow with fade / slide / drift / random effects, video preview with previous / next, loop / sequence / random modes, fullscreen, and default-app opening.
-- **AI generation metadata**: read A1111 PNG `parameters`, ComfyUI PNG `prompt` / `workflow`, same-name sidecar JSON, LoRA strength values, UNET / diffusion model loader names, and optional video tags through `ffprobe`.
-- **Windows-first local use**: manual `start.bat`, service menu through `service.bat`, local `config.json`, local review data, English UI by default, and Chinese toggle in the toolbar.
-
-## Use Cases
-
-- Browse folders with many local short videos
-- Preview multiple videos at the same time without opening a separate media player for each file
-- Review AI-generated videos and image batches
-- Browse outputs from ComfyUI / Stable Diffusion / Wan / Kling / Runway and similar tools
-- Quickly screen large local media folders without importing them into a cloud service
-- Use a local folder as a dynamic visual reference wall
-- Inspect prompts, models, LoRA usage, and workflow metadata from generated images
-- Prepare local assets for future tagging, metadata search, and prompt/model review
-
-## Good Fit / Not A Good Fit
-
-Good fit:
-
-- You have many local videos and want to preview several of them at once.
-- You want a fast visual wall for screening generated videos, downloaded clips, or mixed image/video folders.
-- You want simple local review actions such as favorites, batch selection, CSV export, and Recycle Bin cleanup.
-- You want to inspect AI generation metadata when it exists.
-
-Not a good fit:
-
-- You want to stream online videos.
-- You need a professional video editor.
-- You need a cloud album, multi-user asset system, or remote sync service.
-- You do not have local video or image files to browse.
+| GitHub Release | Packaged releases may be older than the `main` branch. |
+| Main branch | Contains the latest development features and documentation. |
+| Current metadata features | PNG metadata preview and optional `ffprobe` video/container metadata reading are available on the current main branch. |
+| Current focus | Metadata stabilization and real-world sample validation. |
+| Planned work | Tags, notes, ratings, SQLite indexing, metadata search, and optional preview cache. |
 
 ## Requirements
 
 - Windows 10 / Windows 11
-- Python 3.10 or later. Python 3.12 is recommended.
+- Python 3.10 or later; Python 3.12 is recommended
 - Chrome or Edge recommended
 
 This project runs as a local Python service. If Python is not installed, `start.bat` and `service.bat` cannot start the app directly.
@@ -145,13 +161,11 @@ Developers can also clone the repository and run it from source.
 
 Manual mode:
 
-Double-click:
-
 ```text
 start.bat
 ```
 
-The browser will open automatically. A command window stays visible while the app is running. Closing that command window stops the app.
+The browser opens automatically. A command window stays visible while the app is running. Closing that command window stops the app.
 
 Service mode:
 
@@ -159,7 +173,7 @@ Service mode:
 service.bat
 ```
 
-This opens an English menu where you can start the app in the background, stop or restart the background service, install startup, uninstall startup, open the browser, start and open the browser together, or check status. Startup uses a stable helper script under your Windows APPDATA folder instead of a temporary file.
+This opens a menu where you can start the app in the background, stop or restart the background service, install startup, uninstall startup, open the browser, start and open the browser together, or check status.
 
 You can also run:
 
@@ -189,31 +203,31 @@ Check these items first:
 
 You can:
 
-- Enter a folder path manually with one-level folder autocomplete, for example `C:\Users\YourName\Videos`
-- Click the sidebar button to open the split-layout folder tree
-- Use the star button inside the path field to favorite the current path
-- Use the history button inside the path field to reopen recent paths or clear path history
-- Click `Choose Folder`
-- Enable `Remember path`
-- Enable `Scan subfolders`
+- Enter a folder path manually with one-level folder autocomplete, for example `C:\Users\YourName\Videos`.
+- Click the sidebar button to open the split-layout folder tree.
+- Use the star button inside the path field to favorite the current path.
+- Use the history button inside the path field to reopen recent paths or clear path history.
+- Click `Choose Folder`.
+- Enable `Remember path`.
+- Enable `Scan subfolders`.
 
 Choosing a path from the folder panel or Windows folder picker fills the path field and starts scanning automatically. If you type a path manually, press Enter or click `Scan`.
 
 ### 5. Browse and review media
 
 - Use the top toolbar to switch between `All`, `Videos`, `Images`, and `Favorites`.
-- Use the column selector to change wall density. For 2-9 columns, visible videos autoplay up to the wall play limit set in Settings; 10 or more columns use static wall previews.
+- Use the column selector to change wall density.
+- For 2-9 columns, visible videos autoplay up to the wall play limit set in Settings.
+- For 10 or more columns, the wall uses static previews.
 - Use the page-size input to control how many cards are rendered per page, up to 240.
-- Use the top pagination arrows, the optional floating pager, or the bottom pager when the floating pager is disabled.
+- Use the top pagination arrows, optional floating pager, or bottom pager when the floating pager is disabled.
 - Click an image to open the image preview.
-- Use the side arrows, keyboard arrows, or mouse wheel to move to the previous / next image.
-- Click `Slideshow (Fullscreen)` to enter the fullscreen image slideshow.
-- In slideshow mode, use play / pause, interval, effect, fit, loop, and fullscreen controls from the top toolbar.
+- Use side arrows, keyboard arrows, or mouse wheel to move to the previous / next image.
+- Click `Slideshow (Fullscreen)` to enter fullscreen image slideshow.
 - Click a video to open the video preview.
-- Use the side arrows to move to the previous / next video.
+- Use side arrows to move to the previous / next video.
 - Use the mouse wheel inside the video preview to adjust volume.
 - Use the video mode control to switch between loop one, sequential playback, and random playback.
-- Viewer controls auto-hide for cleaner image, slideshow, and video viewing. Move the mouse near the top-right control area to show them again.
 - Click the batch button to select multiple visible items, then favorite / unfavorite, move to Recycle Bin, or export CSV.
 - In the preview metadata panel, inspect file information, prompt, negative prompt, model, LoRA list with strength values when available, source/path, and raw metadata actions.
 - For ComfyUI images, prompt extraction prefers the KSampler conditioning chain, reducing noise from FaceDetailer, disconnected, or unused text nodes.
@@ -221,18 +235,17 @@ Choosing a path from the folder panel or Windows folder picker fills the path fi
 
 ### 6. Interface options
 
-The top toolbar and Settings menu contain quick controls for:
+The top toolbar and Settings menu contain controls for:
 
 - Language: English / Chinese
 - Theme: dark / light
 - Layout position: center / left / right
-- Path history: clear recent paths while keeping favorites
-- Remove individual history entries or favorite paths directly from their lists
-- Filename exclusion rules: add or remove up to 30 case-insensitive filename keywords; defaults to `fanart` and `thumb` for images
-- Large video wall preview: disabled by default for files over 500 MB; clicking a placeholder still opens the video on demand
-- Wall play limit: choose how many visible videos can autoplay at once
-- Floating pager: show a temporary page control while scrolling; when enabled, the bottom pager is hidden
-- Interface text size: small / standard / large
+- Path history and favorite paths
+- Filename exclusion rules
+- Large video wall preview behavior
+- Wall play limit
+- Floating pager
+- Interface text size
 - Grid columns: 2-20
 - Page size: 1-240 cards
 - Toolbar filters: all / videos / images / favorites
@@ -260,14 +273,6 @@ Fast screening:
 10-20 columns for static overview
 ```
 
-## Notes
-
-Browsers usually require videos to be muted before autoplay is allowed, so videos in the wall are muted by default. Videos over 500 MB use a placeholder in the wall by default so large movies or concert files are not loaded accidentally. This can be changed in Settings.
-
-Click a video to open it in a larger player. You can enable audio manually in that player.
-
-Video embedded generation metadata depends on how the video was created. If `ffprobe` is available on PATH, the app can read MP4/WebM/MOV container tags such as prompt, workflow, comment, description, duration, codec, and resolution. If `ffprobe` is not installed, video metadata reading safely falls back to sidecar JSON and basic file information.
-
 ## Local And Safety Notes
 
 - The app runs as a local Python service on `http://127.0.0.1:8787`.
@@ -277,6 +282,10 @@ Video embedded generation metadata depends on how the video was created. If `ffp
 - Move-to-trash actions use the Windows Recycle Bin, so files can usually be restored from Windows unless the Recycle Bin is disabled or emptied.
 - Large videos are not previewed in the wall by default when they are over 500 MB.
 - Persistent image thumbnail and video-cover caches are not generated by default.
+
+Browsers usually require videos to be muted before autoplay is allowed, so videos in the wall are muted by default. Videos over 500 MB use a placeholder in the wall by default so large movies or concert files are not loaded accidentally. This can be changed in Settings.
+
+Video embedded generation metadata depends on how the video was created. If `ffprobe` is available on PATH, the app can read MP4/WebM/MOV container tags such as prompt, workflow, comment, description, duration, codec, and resolution. If `ffprobe` is not installed, video metadata reading safely falls back to sidecar JSON and basic file information.
 
 ## Configuration
 
@@ -292,7 +301,7 @@ Settings such as language, theme, font size, columns, page size, wall play limit
 
 ## Future Direction
 
-The app has moved beyond the baseline media wall into `v1.8.x` AI metadata preview work. Core embedded PNG metadata preview is implemented, and optional `ffprobe` video/container metadata reading is available when `ffprobe` is installed.
+The app has moved beyond the baseline media wall into AI metadata preview and stabilization work.
 
 Recommended order:
 
