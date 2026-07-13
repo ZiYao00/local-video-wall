@@ -38,6 +38,7 @@ import threading
 import time
 import uuid
 import ctypes
+from datetime import datetime, timezone
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, quote
@@ -69,6 +70,10 @@ VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v"}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
 MEDIA_EXTENSIONS = VIDEO_EXTENSIONS | IMAGE_EXTENSIONS
 INTERNAL_MEDIA_DIRS = {"_video_wall_trash", "_video_wall_review"}
+TRASH_DIR_NAME = "_video_wall_trash"
+TRASH_ITEM_META_NAME = "item.json"
+API_VERSION = 3
+API_CAPABILITIES = ["local_trash", "batch_trash", "trash_restore", "system_trash"]
 
 DEFAULT_CONFIG = {
     "remember_path": False,
@@ -104,6 +109,7 @@ runtime_lock = threading.Lock()
 runtime_video_dir = ""
 runtime_scan_roots: dict[str, str] = {}
 review_lock = threading.Lock()
+trash_lock = threading.RLock()
 
 
 def normalize_path(p: str) -> str:
@@ -291,52 +297,174 @@ def unique_destination(dest_dir: Path, filename: str) -> Path:
             return candidate
     raise RuntimeError("Could not create a unique destination filename")
 
-def move_to_windows_recycle_bin(file_path: Path) -> None:
+def move_to_windows_recycle_bin(file_path: Path) -> dict:
     if os.name != "nt":
         raise RuntimeError("System recycle bin is only supported on Windows.")
-    script = (
-        "$ErrorActionPreference = 'Stop'; "
-        "$ProgressPreference = 'SilentlyContinue'; "
-        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "
-        "$OutputEncoding = [System.Text.Encoding]::UTF8; "
-        "$Path = [Environment]::GetEnvironmentVariable('LOCAL_VIDEO_WALL_RECYCLE_PATH', 'Process'); "
-        "if ([string]::IsNullOrWhiteSpace($Path)) { throw 'Missing recycle path.' }; "
-        "Add-Type -AssemblyName Microsoft.VisualBasic; "
-        "[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteFile("
-        "$Path, "
-        "[Microsoft.VisualBasic.FileIO.UIOption]::OnlyErrorDialogs, "
-        "[Microsoft.VisualBasic.FileIO.RecycleOption]::SendToRecycleBin)"
-    )
-    encoded_script = base64.b64encode(script.encode("utf-16le")).decode("ascii")
-    env = os.environ.copy()
-    env["LOCAL_VIDEO_WALL_RECYCLE_PATH"] = str(file_path)
-    last_message = "Unknown recycle bin error"
-    for attempt in range(6):
-        result = subprocess.run(
-            [
-                "powershell.exe",
-                "-NoProfile",
-                "-NonInteractive",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-EncodedCommand",
-                encoded_script,
-            ],
-            env=env,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=30,
-        )
-        if result.returncode == 0:
-            return
-        last_message = clean_powershell_error(result.stderr or result.stdout or last_message)
-        if "being used by another process" not in last_message and "另一个程序正在使用" not in last_message:
-            break
-        if attempt < 5:
-            time.sleep(0.45)
-    raise RuntimeError(last_message)
+    total_start = time.perf_counter()
+    from ctypes import wintypes
+
+    class SHFILEOPSTRUCTW(ctypes.Structure):
+        _fields_ = [
+            ("hwnd", wintypes.HWND),
+            ("wFunc", wintypes.UINT),
+            ("pFrom", wintypes.LPCWSTR),
+            ("pTo", wintypes.LPCWSTR),
+            ("fFlags", wintypes.WORD),
+            ("fAnyOperationsAborted", wintypes.BOOL),
+            ("hNameMappings", wintypes.LPVOID),
+            ("lpszProgressTitle", wintypes.LPCWSTR),
+        ]
+
+    operation = SHFILEOPSTRUCTW()
+    operation.wFunc = 0x0003  # FO_DELETE
+    operation.pFrom = f"{file_path.resolve()}\0\0"
+    operation.fFlags = 0x0004 | 0x0010 | 0x0040  # silent, no confirmation, allow undo
+    result = ctypes.windll.shell32.SHFileOperationW(ctypes.byref(operation))
+    if result:
+        raise ctypes.WinError(result)
+    if operation.fAnyOperationsAborted:
+        raise RuntimeError("Move to system recycle bin was cancelled")
+    return {"total_ms": round((time.perf_counter() - total_start) * 1000), "retry_count": 0}
+
+
+def trash_root_for(root: Path) -> Path:
+    return root.resolve() / TRASH_DIR_NAME
+
+
+def trash_item_path(root: Path, trash_id: str) -> Path:
+    if not re.fullmatch(r"[0-9a-f]{32}", str(trash_id or "")):
+        raise ValueError("Invalid trash item")
+    return trash_root_for(root) / trash_id
+
+
+def trash_item_meta_path(root: Path, trash_id: str) -> Path:
+    return trash_item_path(root, trash_id) / TRASH_ITEM_META_NAME
+
+
+def load_trash_item(root: Path, trash_id: str) -> dict:
+    item = read_json_file(trash_item_meta_path(root, trash_id), {})
+    if not isinstance(item, dict) or item.get("id") != trash_id:
+        raise ValueError("Trash item not found")
+    return item
+
+
+def save_trash_item(root: Path, item: dict) -> None:
+    write_json_file(trash_item_meta_path(root, str(item.get("id", ""))), item)
+
+
+def media_type_for_path(path: Path) -> str:
+    return "video" if path.suffix.lower() in VIDEO_EXTENSIONS else "image"
+
+
+def media_item_payload(root: Path, path: Path, scan_id: str) -> dict:
+    stat = path.stat()
+    key = str(path.resolve())
+    rel = path.resolve().relative_to(root.resolve()).as_posix()
+    review = review_for_key(load_review_data(), key)
+    return {
+        "id": 0,
+        "key": key,
+        "type": media_type_for_path(path),
+        "name": path.name,
+        "rel": rel,
+        "full_path": key,
+        "scan_id": scan_id,
+        "url": f"/media?scan_id={quote(scan_id, safe='')}&path={quote(rel, safe='')}",
+        "size_mb": round(stat.st_size / 1024 / 1024, 2),
+        "mtime": int(stat.st_mtime),
+        "mtime_text": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(stat.st_mtime)),
+        "favorite": review["favorite"],
+        "selected": review["selected"],
+    }
+
+
+def move_to_local_trash(root: Path, rel: str) -> dict:
+    root = root.resolve()
+    source = safe_rel_to_path(root, rel)
+    trash_root = trash_root_for(root)
+    if not source.exists() or not source.is_file():
+        raise FileNotFoundError("File not found")
+    if trash_root == source or trash_root in source.parents:
+        raise ValueError("File is already inside the recycle folder")
+
+    with trash_lock:
+        trash_id = uuid.uuid4().hex
+        item_dir = trash_item_path(root, trash_id)
+        item_dir.mkdir(parents=True, exist_ok=False)
+        destination = item_dir / source.name
+        item = {
+            "id": trash_id,
+            "name": source.name,
+            "type": media_type_for_path(source),
+            "size_bytes": source.stat().st_size,
+            "original_rel": source.relative_to(root).as_posix(),
+            "trash_rel": destination.relative_to(trash_root).as_posix(),
+            "deleted_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
+            "status": "trashed",
+        }
+        try:
+            shutil.move(str(source), str(destination))
+            save_trash_item(root, item)
+        except Exception:
+            if destination.exists() and not source.exists():
+                shutil.move(str(destination), str(source))
+            raise
+    log_file_action("move_trash", source, destination)
+    return item
+
+
+def list_local_trash(root: Path) -> list[dict]:
+    trash_root = trash_root_for(root)
+    if not trash_root.exists():
+        return []
+    items = []
+    with trash_lock:
+        for item_dir in trash_root.iterdir():
+            if not item_dir.is_dir():
+                continue
+            item = read_json_file(item_dir / TRASH_ITEM_META_NAME, {})
+            if isinstance(item, dict) and item.get("status") == "trashed" and item.get("id") == item_dir.name:
+                items.append(item)
+    return sorted(items, key=lambda item: str(item.get("deleted_at", "")), reverse=True)
+
+
+def restore_from_local_trash(root: Path, trash_id: str, copy_name_on_conflict: bool = True) -> dict:
+    root = root.resolve()
+    with trash_lock:
+        item = load_trash_item(root, trash_id)
+        if item.get("status") != "trashed":
+            raise ValueError("Trash item is not restorable")
+        source = safe_rel_to_path(trash_root_for(root), str(item.get("trash_rel", "")))
+        if not source.exists() or not source.is_file():
+            raise FileNotFoundError("Trashed file is missing")
+        destination = safe_rel_to_path(root, str(item.get("original_rel", "")))
+        if destination.exists():
+            if not copy_name_on_conflict:
+                raise FileExistsError("Restore target already exists")
+            destination = unique_destination(destination.parent, destination.name)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(source), str(destination))
+        item["status"] = "restored"
+        item["restored_at"] = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+        item["restored_rel"] = destination.relative_to(root).as_posix()
+        save_trash_item(root, item)
+    log_file_action("restore_trash", source, destination)
+    return item
+
+
+def move_local_trash_to_system_recycle_bin(root: Path, trash_id: str) -> dict:
+    root = root.resolve()
+    with trash_lock:
+        item = load_trash_item(root, trash_id)
+        if item.get("status") != "trashed":
+            raise ValueError("Trash item is not removable")
+        source = safe_rel_to_path(trash_root_for(root), str(item.get("trash_rel", "")))
+        timings = move_to_windows_recycle_bin(source)
+        item["status"] = "system_trashed"
+        item["system_trashed_at"] = datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds")
+        save_trash_item(root, item)
+    log_file_action("system_trash", source, Path("Windows Recycle Bin"))
+    return {**item, "timings_ms": timings}
 
 
 def clean_powershell_error(message: str) -> str:
@@ -1071,7 +1199,10 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json({"ok": False, "error": f"Workflow status read failed: {exc}"}, 500)
 
     def api_file_action(self, payload: dict):
-        root = get_scan_root(str(payload.get("scan_id", "")))
+        request_start = time.perf_counter()
+        timings = {}
+        scan_id = str(payload.get("scan_id", ""))
+        root = get_scan_root(scan_id)
         if root is None:
             self.send_json({"ok": False, "error": "Please choose and scan a media folder first."}, 400)
             return
@@ -1088,18 +1219,31 @@ class AppHandler(BaseHTTPRequestHandler):
         except ValueError:
             self.send_json({"ok": False, "error": "Invalid path"}, 403)
             return
+        timings["path_check_ms"] = round((time.perf_counter() - request_start) * 1000)
         if not file_path.exists() or not file_path.is_file():
             self.send_json({"ok": False, "error": "File not found"}, 404)
             return
         if action == "move_trash":
             try:
-                move_to_windows_recycle_bin(file_path)
+                timings["local_trash"] = move_to_local_trash(root, rel)
             except Exception as exc:
-                self.send_json({"ok": False, "error": f"Move to Recycle Bin failed: {exc}"}, 500)
+                self.send_json({"ok": False, "error": f"Move to recycle folder failed: {exc}"}, 500)
                 return
-            destination = "Windows Recycle Bin"
-            log_file_action(action, file_path, Path(destination))
-            self.send_json({"ok": True, "action": action, "destination": destination, "new_rel": ""})
+            destination = str(trash_root_for(root))
+            timings["total_ms"] = round((time.perf_counter() - request_start) * 1000)
+            print(
+                "[delete-perf] "
+                + json.dumps(
+                    {
+                        "action": action,
+                        "name": file_path.name,
+                        "timings_ms": timings,
+                    },
+                    ensure_ascii=False,
+                ),
+                flush=True,
+            )
+            self.send_json({"ok": True, "action": action, "destination": destination, "new_rel": "", "trash_item": timings["local_trash"], "timings_ms": timings})
             return
 
         target_name = "_video_wall_review"
@@ -1119,7 +1263,78 @@ class AppHandler(BaseHTTPRequestHandler):
             new_rel = dest.resolve().relative_to(root.resolve()).as_posix()
         except Exception:
             new_rel = dest.name
-        self.send_json({"ok": True, "action": action, "destination": str(dest), "new_rel": new_rel})
+        timings["total_ms"] = round((time.perf_counter() - request_start) * 1000)
+        self.send_json({"ok": True, "action": action, "destination": str(dest), "new_rel": new_rel, "timings_ms": timings})
+
+    def api_batch_file_action(self, payload: dict):
+        root = get_scan_root(str(payload.get("scan_id", "")))
+        if root is None:
+            self.send_json({"ok": False, "error": "Please choose and scan a media folder first."}, 400)
+            return
+        if payload.get("action") != "move_trash" or not bool(payload.get("confirm", False)):
+            self.send_json({"ok": False, "error": "Unsupported batch action."}, 400)
+            return
+        rels = payload.get("rels")
+        if not isinstance(rels, list) or not rels:
+            self.send_json({"ok": False, "error": "No files selected."}, 400)
+            return
+        if len(rels) > 240:
+            self.send_json({"ok": False, "error": "Too many files selected."}, 400)
+            return
+
+        started = time.perf_counter()
+        results = []
+        for rel in rels:
+            try:
+                item = move_to_local_trash(root, str(rel or ""))
+                results.append({"ok": True, "rel": str(rel), "item": item})
+            except Exception as exc:
+                results.append({"ok": False, "rel": str(rel), "error": str(exc)})
+        self.send_json({
+            "ok": True,
+            "action": "move_trash",
+            "results": results,
+            "timings_ms": {"total_ms": round((time.perf_counter() - started) * 1000)},
+        })
+
+    def api_trash_list(self, scan_id: str):
+        root = get_scan_root(scan_id)
+        if root is None:
+            self.send_json({"ok": False, "error": "Please choose and scan a media folder first."}, 400)
+            return
+        try:
+            self.send_json({"ok": True, "items": list_local_trash(root)})
+        except Exception as exc:
+            self.send_json({"ok": False, "error": str(exc)}, 500)
+
+    def api_trash_action(self, payload: dict):
+        scan_id = str(payload.get("scan_id", ""))
+        root = get_scan_root(scan_id)
+        if root is None:
+            self.send_json({"ok": False, "error": "Please choose and scan a media folder first."}, 400)
+            return
+        action = str(payload.get("action", "")).strip()
+        ids = payload.get("ids")
+        if action not in {"restore", "system_trash"} or not isinstance(ids, list) or not ids:
+            self.send_json({"ok": False, "error": "Invalid recycle folder action."}, 400)
+            return
+        if len(ids) > 240:
+            self.send_json({"ok": False, "error": "Too many recycle folder items."}, 400)
+            return
+
+        results = []
+        for trash_id in ids:
+            try:
+                if action == "restore":
+                    item = restore_from_local_trash(root, str(trash_id), copy_name_on_conflict=True)
+                    restored_path = safe_rel_to_path(root, str(item.get("restored_rel", "")))
+                    item["media"] = media_item_payload(root, restored_path, scan_id)
+                else:
+                    item = move_local_trash_to_system_recycle_bin(root, str(trash_id))
+                results.append({"ok": True, "id": str(trash_id), "item": item})
+            except Exception as exc:
+                results.append({"ok": False, "id": str(trash_id), "error": str(exc)})
+        self.send_json({"ok": True, "action": action, "results": results})
 
     def do_GET(self):
         path, _, query = self.path.partition("?")
@@ -1178,6 +1393,9 @@ class AppHandler(BaseHTTPRequestHandler):
             scan_id = qs.get("scan_id", [""])[0]
             self.api_workflow_status(rel, scan_id)
             return
+        if path == "/api/trash/list":
+            self.api_trash_list(qs.get("scan_id", [""])[0])
+            return
         if path == "/api/review":
             self.send_json({"ok": True, "review": load_review_data()})
             return
@@ -1188,7 +1406,13 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/health":
             cfg = load_config()
-            self.send_json({"ok": True, "config": cfg, "runtime_video_dir": str(get_current_video_dir() or "")})
+            self.send_json({
+                "ok": True,
+                "api_version": API_VERSION,
+                "capabilities": API_CAPABILITIES,
+                "config": cfg,
+                "runtime_video_dir": str(get_current_video_dir() or ""),
+            })
             return
         if path == "/":
             self.serve_static("index.html")
@@ -1341,6 +1565,12 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/file-action":
             self.api_file_action(payload)
+            return
+        if path == "/api/file-actions/batch":
+            self.api_batch_file_action(payload)
+            return
+        if path == "/api/trash/action":
+            self.api_trash_action(payload)
             return
         self.send_error(404)
 

@@ -26,6 +26,14 @@ const state = {
   batchMode: false,
   batchSelected: new Set(),
   batchBusy: false,
+  showTrash: false,
+  trashItems: [],
+  trashSelected: new Set(),
+  trashBusy: false,
+  mediaNeedsRender: false,
+  backendCompatible: false,
+  backendVersion: 0,
+  backendCapabilities: new Set(),
   sizeFilter: "all",
   dateFilter: "all",
   mediaType: "all",
@@ -86,6 +94,8 @@ const COLUMN_GAPS = { 2: 18, 3: 18, 4: 18, 5: 18, 6: 18, 7: 16, 8: 14, 9: 12, 10
 const COLUMN_OPTIONS = Object.keys(COLUMN_WIDTHS).map(Number);
 const LARGE_VIDEO_MB = 500;
 const COMFYUI_URL = "http://127.0.0.1:8188/";
+const EXPECTED_API_VERSION = 3;
+const REQUIRED_TRASH_CAPABILITIES = ["local_trash", "batch_trash", "trash_restore", "system_trash"];
 
 const ICONS = {
   back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/><path d="M9 12h11"/></svg>',
@@ -93,6 +103,7 @@ const ICONS = {
   checkbox: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="3"/></svg>',
   checkboxChecked: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect class="check-bg" x="5" y="5" width="14" height="14" rx="4"/><path class="check-mark" d="M8.5 12.2l2.4 2.4 4.8-5.2"/></svg>',
   copyPath: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1"/></svg>',
+  more: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>',
   doubleCheck: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12l3 3L21 5"/><path d="M3 12l3 3 5-5"/></svg>',
   multiSelect: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="7" height="7" rx="2"/><path d="M6 8.5l1.4 1.4L10 7"/><rect x="13" y="5" width="7" height="7" rx="2"/><rect x="4" y="14" width="7" height="7" rx="2"/><path d="M14 17.5l1.4 1.4L19 16"/></svg>',
   close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>',
@@ -101,6 +112,8 @@ const ICONS = {
   eye: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   eyeOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6A3 3 0 0 0 13.4 13.4"/><path d="M9.9 4.3A10.6 10.6 0 0 1 12 4c6 0 10 8 10 8a17.8 17.8 0 0 1-3.1 4.3"/><path d="M6.2 6.5C3.5 8.3 2 12 2 12s4 8 10 8a10 10 0 0 0 5-1.4"/></svg>',
   folder: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h5l2 2"/></svg>',
+  grid: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>',
+  film: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9h4M3 15h4M17 9h4M17 15h4"/></svg>',
   fullscreen: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5"/><path d="M16 3h5v5"/><path d="M21 16v5h-5"/><path d="M8 21H3v-5"/></svg>',
   fullscreenExit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v6H3"/><path d="M15 3v6h6"/><path d="M15 21v-6h6"/><path d="M9 21v-6H3"/></svg>',
   globe: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18"/><path d="M12 3a15 15 0 0 0 0 18"/></svg>',
@@ -126,6 +139,9 @@ const ICONS = {
   repeat: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 2l4 4-4 4"/><path d="M3 11V9a3 3 0 0 1 3-3h15"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v2a3 3 0 0 1-3 3H3"/></svg>',
   textMode: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 18h14"/><path d="M8 18l4-12 4 12"/><path d="M9.5 13h5"/></svg>',
   trash: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 14h10l1-14"/><path d="M9 7V4h6v3"/></svg>',
+  archiveTray: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v5H4z"/><path d="M4 9l2 11h12l2-11"/><path d="M9 14h6"/><path d="M8 4l1.5-2h5L16 4"/></svg>',
+  restore: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v6h6"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>',
+  files: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8l4 4v13H8z"/><path d="M16 3v5h5"/><path d="M4 7v14h12"/></svg>',
   left: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>',
   right: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 18l6-6-6-6"/></svg>',
 };
@@ -178,6 +194,7 @@ const i18n = {
     workflowGeneration: "Contains generation parameters",
     workflowOnly: "Workflow found, but no prompt/model/LoRA detected",
     copyFullPath: "Copy full path",
+    moreActions: "More actions",
     pathCopied: "Full path copied.",
     metadataTitle: "Generation info",
     metadataModel: "Model",
@@ -213,6 +230,12 @@ const i18n = {
     pageSizeLabelText: "Per page",
     wallAutoplay: "Auto play wall",
     wallPlayLimit: "Wall play limit",
+    playLimitOptions: {
+      12: "12 · Minimum load", 18: "18 · Low load", 24: "24 · Light",
+      36: "36 · Balanced", 48: "48 · High load", 72: "72 · Maximum load",
+    },
+    columnsAutoplay: "Autoplay · 2-9 cols",
+    columnsStatic: "Static preview · 10-20 cols",
     previewLargeVideos: "Preview videos over 500 MB in the wall",
     largeVideoTitle: "Large video",
     largeVideoHint: "Click to play on demand",
@@ -243,11 +266,12 @@ const i18n = {
     playbackSettings: "Playback",
     filterSettings: "Filters",
     actionSettings: "Actions",
-    confirmTrashSetting: "Confirm before moving media to Recycle Bin",
-    trashConfirmTitle: "Move to Recycle Bin?",
-    trashConfirmMessage: "Move this file to the Windows Recycle Bin?",
+    confirmTrashSetting: "Confirm before moving media to recycle folder",
+    trashConfirmTitle: "Move to recycle folder?",
+    trashConfirmMessage: "Move this file to this folder's recycle folder?",
     trashConfirmDontAsk: "Don't ask again",
     trashConfirmMove: "Move",
+    backendRestartRequired: "The page and service versions do not match. Restart Local Video Wall, then reload this page.",
     clearHistory: "Clear Path History",
     historyCleared: "Path history cleared.",
     removeHistory: "Remove from history",
@@ -269,7 +293,7 @@ const i18n = {
     batchClear: "Clear",
     batchFavorite: "Favorite",
     batchUnfavorite: "Unfavorite",
-    batchTrash: "Move to Recycle Bin",
+    batchTrash: "Move to recycle folder",
     batchExport: "Export CSV",
     batchSelectItem: "Select",
     batchSelectedItem: "Selected",
@@ -278,7 +302,7 @@ const i18n = {
     batchWorking: "Batch action in progress...",
     batchFailed: reason => `Batch action failed: ${reason}`,
     batchPartial: (done, failed, reason) => `Batch action finished: ${done} succeeded, ${failed} failed. ${reason}`,
-    batchTrashConfirm: n => `Move ${n} selected item(s) to the Windows Recycle Bin?`,
+    batchTrashConfirm: n => `Move ${n} selected item(s) to this folder's recycle folder?`,
     shuffle: "Shuffle",
     exportCsv: "Export CSV",
     exportEmpty: "No visible items to export.",
@@ -345,9 +369,24 @@ const i18n = {
     reviewSaved: "Review mark saved.",
     reviewFail: "Could not save review mark.",
     moveReview: "Move to Review Folder",
-    moveTrash: "Move to Recycle Bin",
+    moveTrash: "Move to recycle folder",
     confirmReview: "Move this file to _video_wall_review? The original file path will change.",
     fileActionDone: "File moved. The current list was updated.",
+    recycleFolder: "Recycle folder",
+    showRecycleFolder: "Show recycle folder",
+    showMediaWall: "Back to media wall",
+    recycleEmpty: "The recycle folder is empty.",
+    recycleItems: n => `${n} item(s) in this folder's recycle folder`,
+    recycleSelectAll: "Select all",
+    recycleRestore: "Restore",
+    recycleSystemTrash: "Move to system recycle bin",
+    recycleRestoreTitle: "Restore to the original path. A new name is used if that path already exists.",
+    recycleSystemTitle: "Move to the Windows system recycle bin",
+    recycleOriginalPath: "Original path",
+    recycleDeletedAt: "Moved",
+    recycleActionDone: n => `${n} recycle folder item(s) processed.`,
+    recycleActionFailed: reason => `Recycle folder action failed: ${reason}`,
+    recycleSystemConfirm: n => `Move ${n} item(s) to the Windows system recycle bin?`,
     fileActionFail: "File action failed.",
     perfInfo: stats => `scan ${stats.scanMs}ms · render ${stats.renderMs}ms · page ${stats.pageItems} · loaded ${stats.loadedMedia}`,
     scanDone: (n, excluded = 0) => excluded > 0
@@ -415,6 +454,7 @@ const i18n = {
     workflowGeneration: "含有生成参数",
     workflowOnly: "含有工作流，但未检测到 Prompt / 模型 / LoRA",
     copyFullPath: "复制完整路径",
+    moreActions: "更多操作",
     pathCopied: "已复制完整路径。",
     metadataTitle: "生成信息",
     metadataModel: "大模型",
@@ -450,6 +490,12 @@ const i18n = {
     pageSizeLabelText: "每页",
     wallAutoplay: "墙内自动播放",
     wallPlayLimit: "墙内播放上限",
+    playLimitOptions: {
+      12: "12 · 极省资源", 18: "18 · 省资源", 24: "24 · 轻量",
+      36: "36 · 均衡", 48: "48 · 高负载", 72: "72 · 极限负载",
+    },
+    columnsAutoplay: "自动播放 · 2-9 列",
+    columnsStatic: "静态预览 · 10-20 列",
     previewLargeVideos: "允许墙内预览 500MB 以上视频",
     largeVideoTitle: "大文件视频",
     largeVideoHint: "点击后按需播放",
@@ -480,11 +526,12 @@ const i18n = {
     playbackSettings: "播放",
     filterSettings: "筛选",
     actionSettings: "操作",
-    confirmTrashSetting: "移到回收站前确认",
-    trashConfirmTitle: "移到回收站？",
-    trashConfirmMessage: "要把这个文件移动到 Windows 系统回收站吗？",
+    confirmTrashSetting: "移到回收文件夹前确认",
+    trashConfirmTitle: "移到回收文件夹？",
+    trashConfirmMessage: "要把这个文件移动到当前目录的回收文件夹吗？",
     trashConfirmDontAsk: "以后不再提示",
     trashConfirmMove: "移动",
+    backendRestartRequired: "页面与后台服务版本不一致，请重启 Local Video Wall 后刷新页面。",
     clearHistory: "清空路径历史",
     historyCleared: "路径历史已清空。",
     removeHistory: "删除这条历史记录",
@@ -506,7 +553,7 @@ const i18n = {
     batchClear: "清空",
     batchFavorite: "收藏",
     batchUnfavorite: "取消收藏",
-    batchTrash: "移到回收站",
+    batchTrash: "移到回收文件夹",
     batchExport: "导出 CSV",
     batchSelectItem: "选择",
     batchSelectedItem: "已选择",
@@ -515,7 +562,7 @@ const i18n = {
     batchWorking: "正在执行批量操作...",
     batchFailed: reason => `批量操作失败：${reason}`,
     batchPartial: (done, failed, reason) => `批量操作完成：成功 ${done} 个，失败 ${failed} 个。${reason}`,
-    batchTrashConfirm: n => `要把已选择的 ${n} 个项目移到 Windows 回收站吗？`,
+    batchTrashConfirm: n => `要把已选择的 ${n} 个项目移到当前目录的回收文件夹吗？`,
     shuffle: "随机",
     exportCsv: "导出 CSV",
     exportEmpty: "当前没有可导出的项目。",
@@ -582,9 +629,24 @@ const i18n = {
     reviewSaved: "标记已保存。",
     reviewFail: "标记保存失败。",
     moveReview: "移到整理夹",
-    moveTrash: "移到回收站",
+    moveTrash: "移到回收文件夹",
     confirmReview: "要把这个文件移动到 _video_wall_review 整理夹吗？原文件路径会变化。",
     fileActionDone: "文件已移动，当前列表已更新。",
+    recycleFolder: "回收文件夹",
+    showRecycleFolder: "打开回收文件夹",
+    showMediaWall: "返回媒体墙",
+    recycleEmpty: "回收文件夹为空。",
+    recycleItems: n => `当前目录的回收文件夹内有 ${n} 项`,
+    recycleSelectAll: "全选",
+    recycleRestore: "恢复",
+    recycleSystemTrash: "移到系统回收站",
+    recycleRestoreTitle: "恢复到原路径；若已有同名文件，则自动使用新名称保留两者。",
+    recycleSystemTitle: "移到 Windows 系统回收站",
+    recycleOriginalPath: "原路径",
+    recycleDeletedAt: "移入时间",
+    recycleActionDone: n => `已处理 ${n} 个回收文件夹项目。`,
+    recycleActionFailed: reason => `回收文件夹操作失败：${reason}`,
+    recycleSystemConfirm: n => `要把 ${n} 个项目移到 Windows 系统回收站吗？`,
     fileActionFail: "文件操作失败。",
     perfInfo: stats => `扫描 ${stats.scanMs}ms · 渲染 ${stats.renderMs}ms · 本页 ${stats.pageItems} · 已加载 ${stats.loadedMedia}`,
     scanDone: (n, excluded = 0) => excluded > 0
@@ -671,6 +733,14 @@ const batchExportBtn = $("#batchExportBtn");
 const batchExitBtn = $("#batchExitBtn");
 const immersiveBtn = $("#immersiveBtn");
 const expandBtn = $("#expandBtn");
+const trashToggle = $("#trashToggle");
+const trashView = $("#trashView");
+const trashViewTitle = $("#trashViewTitle");
+const trashViewInfo = $("#trashViewInfo");
+const trashList = $("#trashList");
+const trashSelectAllBtn = $("#trashSelectAllBtn");
+const trashRestoreBtn = $("#trashRestoreBtn");
+const trashSystemBtn = $("#trashSystemBtn");
 const settingsToggle = $("#settingsToggle");
 const settingsMenu = $("#settingsMenu");
 const langToggle = $("#langToggle");
@@ -688,6 +758,8 @@ const trashConfirmDontAskLabel = $("#trashConfirmDontAskLabel");
 const trashConfirmCancel = $("#trashConfirmCancel");
 const trashConfirmOk = $("#trashConfirmOk");
 let trashConfirmResolve = null;
+let trashConfirmAllowDontAsk = true;
+const trashConfirmDontAskWrap = trashConfirmDontAsk.closest("label");
 const modal = $("#modal");
 const modalContent = $(".modal-content");
 const modalVideo = $("#modalVideo");
@@ -846,6 +918,8 @@ function applyActionButtons() {
   const themeText = state.theme === "dark" ? labelText("lightTheme", "Light Theme", "亮色主题") : labelText("darkTheme", "Dark Theme", "暗色主题");
   document.body.classList.add("icon-buttons");
   setButtonLabel(settingsToggle, tx.settings, "settings", { iconOnly: true });
+  setButtonLabel(trashToggle, state.showTrash ? tx.showMediaWall : tx.showRecycleFolder, "archiveTray", { iconOnly: true });
+  trashToggle.classList.toggle("active", state.showTrash);
   setButtonLabel(folderPanelToggle, tx.folders, "sidebar", { iconOnly: true });
   setButtonLabel(pathHistoryToggle, tx.pathHistory, "list", { iconOnly: true });
   setButtonLabel(langToggle, tx.langToggle, "language", { iconOnly: false, iconText: true, title: switchLanguageTitle });
@@ -857,6 +931,10 @@ function applyActionButtons() {
   setButtonLabel(clearHistoryBtn, tx.clearHistory, "trash", { iconOnly: false, iconText: true });
   setButtonLabel(pauseBtn, state.playingEnabled ? tx.pauseAll : tx.resume, state.playingEnabled ? "pause" : "play", { iconOnly: true });
   setButtonLabel(resetFiltersBtn, tx.resetFilters, "reset", { iconOnly: true });
+  setButtonLabel(mediaFilterSeg.querySelector('[data-media-filter="all"]'), tx.allMedia, "grid", { iconOnly: true });
+  setButtonLabel(mediaFilterSeg.querySelector('[data-media-filter="video"]'), tx.videosOnly, "film", { iconOnly: true });
+  setButtonLabel(mediaFilterSeg.querySelector('[data-media-filter="image"]'), tx.imagesOnly, "image", { iconOnly: true });
+  setButtonLabel(mediaFilterSeg.querySelector('[data-media-filter="favorites"]'), tx.favorites, "star", { iconOnly: true });
   setButtonLabel(batchToggleBtn, state.batchMode ? tx.batchExit : tx.batch, "multiSelect", { iconOnly: true });
   setButtonLabel(batchSelectPageBtn, tx.batchSelectPage, "check", { iconOnly: true });
   setButtonLabel(batchClearBtn, tx.batchClear, "close", { iconOnly: true });
@@ -917,6 +995,28 @@ function showToast(message, ms = 2600) {
   toast.classList.remove("hidden");
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => toast.classList.add("hidden"), ms);
+}
+
+async function checkBackendCompatibility(showError = false) {
+  try {
+    const response = await fetch("/health", { cache: "no-store" });
+    const data = await response.json();
+    state.backendVersion = Number(data.api_version || 0);
+    state.backendCapabilities = new Set(Array.isArray(data.capabilities) ? data.capabilities : []);
+    state.backendCompatible = response.ok
+      && data.ok === true
+      && state.backendVersion === EXPECTED_API_VERSION
+      && REQUIRED_TRASH_CAPABILITIES.every(capability => state.backendCapabilities.has(capability));
+  } catch {
+    state.backendCompatible = false;
+  }
+  if (!state.backendCompatible && showError) showToast(t().backendRestartRequired, 7000);
+  return state.backendCompatible;
+}
+
+async function ensureTrashBackend() {
+  if (state.backendCompatible) return true;
+  return checkBackendCompatibility(true);
 }
 
 function setBusy(isBusy) {
@@ -1040,6 +1140,15 @@ function applyLanguage() {
   [...columnsSelect.options].forEach(opt => {
     opt.textContent = tx.colLabel(opt.value);
   });
+  $("#columnsAutoplayGroup").label = tx.columnsAutoplay;
+  $("#columnsStaticGroup").label = tx.columnsStatic;
+  [...playLimitSelect.options].forEach(opt => {
+    opt.textContent = tx.playLimitOptions?.[opt.value] || opt.value;
+  });
+  trashViewTitle.textContent = tx.recycleFolder;
+  trashSelectAllBtn.textContent = tx.recycleSelectAll;
+  trashRestoreBtn.textContent = tx.recycleRestore;
+  trashSystemBtn.textContent = tx.recycleSystemTrash;
   pageSizeInput.setAttribute("aria-label", tx.pageSizeTitle);
   updateMediaFilterUI();
   document.querySelectorAll(".tiny-btn").forEach(btn => btn.textContent = tx.location);
@@ -1204,6 +1313,11 @@ async function saveExcludeRules() {
 
 function updateSubInfo() {
   const tx = t();
+  if (state.showTrash) {
+    subInfo.classList.add("hidden");
+    subInfo.textContent = "";
+    return;
+  }
   if (!state.all.length && !state.scannedPath) {
     subInfo.classList.add("hidden");
     subInfo.textContent = "";
@@ -1460,7 +1574,13 @@ function renderGrid() {
           <button class="card-action-btn" data-card-action="copy-path"></button>
           <button class="card-action-btn" data-card-action="open-folder"></button>
           <button class="card-action-btn danger" data-card-action="trash"></button>
-          <button class="card-action-btn" data-card-action="select"></button>
+          <div class="card-more-actions">
+            <button class="card-action-btn card-more-toggle" type="button" aria-expanded="false"></button>
+            <div class="card-more-menu hidden">
+              <button type="button" data-card-action="copy-path"></button>
+              <button type="button" data-card-action="open-folder"></button>
+            </div>
+          </div>
         </div>
       </div>`;
     card.classList.toggle("is-favorite", !!item.favorite);
@@ -1477,9 +1597,19 @@ function renderGrid() {
       e.stopPropagation();
       toggleBatchItem(item.key);
     });
+    const moreToggle = card.querySelector(".card-more-toggle");
+    const moreMenu = card.querySelector(".card-more-menu");
+    moreToggle?.addEventListener("click", e => {
+      e.stopPropagation();
+      const open = moreMenu.classList.contains("hidden");
+      moreMenu.classList.toggle("hidden", !open);
+      moreToggle.setAttribute("aria-expanded", open ? "true" : "false");
+    });
     card.querySelectorAll("[data-card-action]").forEach(btn => {
       btn.addEventListener("click", e => {
         e.stopPropagation();
+        moreMenu?.classList.add("hidden");
+        moreToggle?.setAttribute("aria-expanded", "false");
         handleCardAction(btn.dataset.cardAction, item);
       });
     });
@@ -1504,8 +1634,10 @@ function updateReviewButtons() {
     const copyPathBtn = card.querySelector('[data-card-action="copy-path"]');
     const openFolderBtn = card.querySelector('[data-card-action="open-folder"]');
     const trashBtn = card.querySelector('[data-card-action="trash"]');
-    const selectActionBtn = card.querySelector('[data-card-action="select"]');
     const batchBtn = card.querySelector("[data-batch-select]");
+    const moreToggle = card.querySelector(".card-more-toggle");
+    const moreCopyPathBtn = card.querySelector('.card-more-menu [data-card-action="copy-path"]');
+    const moreOpenFolderBtn = card.querySelector('.card-more-menu [data-card-action="open-folder"]');
     if (favoriteBtn) {
       setButtonLabel(favoriteBtn, item.favorite ? tx.favorited : tx.favorite, item.favorite ? "starFilled" : "star", { iconOnly: true });
       favoriteBtn.classList.toggle("active", !!item.favorite);
@@ -1513,11 +1645,9 @@ function updateReviewButtons() {
     if (copyPathBtn) setButtonLabel(copyPathBtn, tx.copyFullPath, "copyPath", { iconOnly: true });
     if (openFolderBtn) setButtonLabel(openFolderBtn, tx.showInFolder, "folder", { iconOnly: true });
     if (trashBtn) setButtonLabel(trashBtn, tx.moveTrash, "trash", { iconOnly: true });
-    if (selectActionBtn) {
-      const selected = state.batchSelected.has(item.key);
-      setButtonLabel(selectActionBtn, selected ? tx.batchSelectedItem : tx.batchSelectItem, selected ? "checkboxChecked" : "checkbox", { iconOnly: true });
-      selectActionBtn.classList.toggle("select-active", selected);
-    }
+    if (moreToggle) setButtonLabel(moreToggle, tx.moreActions, "more", { iconOnly: true });
+    if (moreCopyPathBtn) setButtonLabel(moreCopyPathBtn, tx.copyFullPath, "copyPath", { iconOnly: true });
+    if (moreOpenFolderBtn) setButtonLabel(moreOpenFolderBtn, tx.showInFolder, "folder", { iconOnly: true });
     if (batchBtn) {
       setButtonLabel(batchBtn, state.batchSelected.has(item.key) ? tx.batchSelectedItem : tx.batchSelectItem, state.batchSelected.has(item.key) ? "checkboxChecked" : "checkbox", { iconOnly: true });
       batchBtn.classList.toggle("active", state.batchSelected.has(item.key));
@@ -1660,39 +1790,248 @@ async function moveBatchToTrash() {
     showToast(t().batchNoSelection);
     return;
   }
-  if (state.confirmTrash && !window.confirm(t().batchTrashConfirm(items.length))) return;
+  if (!(await ensureTrashBackend())) return;
+  if (!(await requestTrashConfirmation(items.length))) return;
   let done = 0;
   const errors = [];
   state.batchBusy = true;
   updateBatchUI();
   showToast(t().batchWorking, 1800);
+  const batchStart = performance.now();
   try {
-    for (const item of items) {
-      try {
-        await releaseMediaBeforeFileAction(item, "batch");
-        const res = await fetch("/api/file-action", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action: "move_trash", rel: item.rel, scan_id: item.scan_id || state.scanId || "", confirm: true }),
-        });
-        const data = await res.json();
-        if (!data.ok) throw new Error(data.error || t().fileActionFail);
-        state.batchSelected.delete(item.key);
-        state.all = state.all.filter(v => v.key !== item.key);
-        state.view = state.view.filter(v => v.key !== item.key);
-        done += 1;
-      } catch (err) {
-        console.error(err);
-        errors.push(err.message || t().fileActionFail);
-      }
-    }
+    const releaseTimings = await releaseMediaBeforeBatchAction(items);
+    const res = await fetch("/api/file-actions/batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "move_trash",
+        rels: items.map(item => item.rel),
+        scan_id: state.scanId || "",
+        confirm: true,
+      }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || t().fileActionFail);
+    const successRels = new Set((data.results || []).filter(result => result.ok).map(result => result.rel));
+    const succeeded = items.filter(item => successRels.has(item.rel));
+    done = succeeded.length;
+    mergeTrashItems((data.results || []).filter(result => result.ok).map(result => result.item));
+    (data.results || []).filter(result => !result.ok).forEach(result => errors.push(result.error || t().fileActionFail));
+    if (succeeded.length) removeItemsFromState(succeeded);
+    if (errors.length) renderGrid();
+    console.info("[delete-perf] batch release", releaseTimings);
+  } catch (err) {
+    console.error(err);
+    errors.push(err.message || t().fileActionFail);
   } finally {
     state.batchBusy = false;
   }
-  applyFilters(false);
+  console.info("[delete-perf] batch summary", {
+    count: items.length,
+    done,
+    failed: errors.length,
+    total_ms: Math.round(performance.now() - batchStart),
+    ui_refresh: "patched-visible-cards",
+  });
+  updateBatchUI();
   if (errors.length && done) showToast(t().batchPartial(done, errors.length, errors[0]), 6200);
   else if (errors.length) showToast(t().batchFailed(errors[0]), 6200);
   else showToast(t().batchDone(done));
+}
+
+function formatTrashBytes(bytes) {
+  const value = Math.max(0, Number(bytes) || 0);
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+  return `${(value / 1024 / 1024).toFixed(2)} MB`;
+}
+
+function mergeTrashItems(items) {
+  const next = new Map(state.trashItems.map(item => [item.id, item]));
+  items.filter(item => item?.id).forEach(item => next.set(item.id, item));
+  state.trashItems = [...next.values()].sort((a, b) => String(b.deleted_at || "").localeCompare(String(a.deleted_at || "")));
+  if (state.showTrash) renderTrashView();
+}
+
+function renderTrashView() {
+  const tx = t();
+  const validIds = new Set(state.trashItems.map(item => item.id));
+  const visibleItems = ["video", "image"].includes(state.mediaType)
+    ? state.trashItems.filter(item => item.type === state.mediaType)
+    : state.trashItems;
+  state.trashSelected = new Set([...state.trashSelected].filter(id => validIds.has(id)));
+  trashViewInfo.textContent = visibleItems.length ? tx.recycleItems(visibleItems.length) : tx.recycleEmpty;
+  trashSelectAllBtn.disabled = state.trashBusy || !visibleItems.length;
+  trashRestoreBtn.disabled = state.trashBusy || !state.trashSelected.size;
+  trashSystemBtn.disabled = state.trashBusy || !state.trashSelected.size;
+  trashSelectAllBtn.classList.toggle("active", visibleItems.length > 0 && visibleItems.every(item => state.trashSelected.has(item.id)));
+  trashList.replaceChildren();
+  if (!visibleItems.length) {
+    const empty = document.createElement("div");
+    empty.className = "trash-empty";
+    empty.textContent = tx.recycleEmpty;
+    trashList.append(empty);
+    return;
+  }
+  for (const item of visibleItems) {
+    const card = document.createElement("article");
+    card.className = "trash-card";
+    card.classList.toggle("is-selected", state.trashSelected.has(item.id));
+    const media = document.createElement("div");
+    media.className = "trash-card-media";
+    const trashPath = `_video_wall_trash/${item.trash_rel || ""}`;
+    const mediaUrl = `/media?scan_id=${encodeURIComponent(state.scanId || "")}&path=${encodeURIComponent(trashPath)}`;
+    const type = document.createElement("span");
+    type.className = "trash-card-type";
+    type.textContent = item.type === "video" ? tx.videosOnly : tx.imagesOnly;
+    if (item.type === "video") {
+      const video = document.createElement("video");
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = "metadata";
+      video.src = mediaUrl;
+      video.addEventListener("loadedmetadata", () => {
+        if (Number.isFinite(video.duration) && video.duration > 0) video.currentTime = Math.min(0.1, video.duration / 20);
+      });
+      video.addEventListener("play", () => video.pause());
+      media.append(video);
+    } else {
+      const image = document.createElement("img");
+      image.src = mediaUrl;
+      image.alt = item.name || item.id;
+      image.loading = "lazy";
+      image.decoding = "async";
+      media.append(image);
+    }
+    const select = document.createElement("input");
+    select.className = "trash-card-select";
+    select.type = "checkbox";
+    select.checked = state.trashSelected.has(item.id);
+    select.setAttribute("aria-label", item.name || item.id);
+    select.addEventListener("click", event => event.stopPropagation());
+    select.addEventListener("change", () => {
+      if (select.checked) state.trashSelected.add(item.id);
+      else state.trashSelected.delete(item.id);
+      renderTrashView();
+    });
+    media.append(type, select);
+    const info = document.createElement("div");
+    info.className = "trash-card-info";
+    const name = document.createElement("strong");
+    name.title = item.name || item.id;
+    name.textContent = item.name || item.id;
+    info.append(name);
+    const actions = document.createElement("div");
+    actions.className = "trash-card-actions";
+    const restore = document.createElement("button");
+    restore.className = "btn ghost";
+    restore.disabled = state.trashBusy;
+    setButtonLabel(restore, tx.recycleRestore, "restore", { iconOnly: true, title: tx.recycleRestoreTitle });
+    restore.addEventListener("click", event => {
+      event.stopPropagation();
+      runTrashAction("restore", [item.id]);
+    });
+    const systemTrash = document.createElement("button");
+    systemTrash.className = "btn ghost danger";
+    systemTrash.disabled = state.trashBusy;
+    setButtonLabel(systemTrash, tx.recycleSystemTrash, "trash", { iconOnly: true, title: tx.recycleSystemTitle });
+    systemTrash.addEventListener("click", event => {
+      event.stopPropagation();
+      runTrashAction("system_trash", [item.id]);
+    });
+    actions.append(restore, systemTrash);
+    info.append(actions);
+    card.append(media, info);
+    card.addEventListener("click", () => {
+      if (state.trashSelected.has(item.id)) state.trashSelected.delete(item.id);
+      else state.trashSelected.add(item.id);
+      renderTrashView();
+    });
+    trashList.append(card);
+  }
+}
+
+async function loadTrashView() {
+  if (!state.scanId && !state.scannedPath) return;
+  if (!(await ensureTrashBackend())) return;
+  try {
+    const res = await fetch(`/api/trash/list?scan_id=${encodeURIComponent(state.scanId || "")}`);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || t().recycleActionFailed(t().unknown));
+    state.trashItems = Array.isArray(data.items) ? data.items : [];
+    renderTrashView();
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || t().recycleActionFailed(t().unknown), 5200);
+  }
+}
+
+function setTrashView(visible) {
+  if (visible && !state.scannedPath) {
+    showToast(t().needPath);
+    return;
+  }
+  state.showTrash = !!visible;
+  if (state.showTrash) {
+    setBatchMode(false);
+    batchBar.classList.add("hidden");
+    [grid, gridPager, floatingPager, emptyState, subInfo].forEach(node => node.classList.add("hidden"));
+    trashView.classList.remove("hidden");
+    loadTrashView();
+  } else {
+    trashView.classList.add("hidden");
+    grid.classList.remove("hidden");
+    subInfo.classList.toggle("hidden", !state.scannedPath);
+    if (state.mediaNeedsRender) {
+      state.mediaNeedsRender = false;
+      applyFilters(false);
+    } else {
+      updateGridPager();
+      updateSubInfo();
+      if (!state.view.length) renderEmptyState();
+      scheduleUpdatePlaying();
+    }
+  }
+  applyActionButtons();
+}
+
+async function runTrashAction(action, ids) {
+  const selected = [...new Set(ids)].filter(Boolean);
+  if (!selected.length || state.trashBusy) return;
+  if (!(await ensureTrashBackend())) return;
+  if (action === "system_trash" && !(await requestTrashConfirmation(selected.length, {
+    title: t().recycleSystemTitle,
+    message: t().recycleSystemConfirm(selected.length),
+    confirmText: t().recycleSystemTrash,
+    allowDontAsk: false,
+  }))) return;
+  state.trashBusy = true;
+  renderTrashView();
+  try {
+    const res = await fetch("/api/trash/action", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action, ids: selected, scan_id: state.scanId || "" }),
+    });
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || t().recycleActionFailed(t().unknown));
+    const successes = (data.results || []).filter(result => result.ok);
+    const removedIds = new Set(successes.map(result => result.id));
+    if (action === "restore") {
+      successes.map(result => result.item?.media).filter(Boolean).forEach(media => state.all.push(media));
+      if (successes.length) state.mediaNeedsRender = true;
+    }
+    state.trashItems = state.trashItems.filter(item => !removedIds.has(item.id));
+    removedIds.forEach(id => state.trashSelected.delete(id));
+    const errors = (data.results || []).filter(result => !result.ok);
+    if (errors.length) showToast(t().recycleActionFailed(errors[0].error || t().unknown), 5200);
+    else showToast(t().recycleActionDone(successes.length));
+  } catch (err) {
+    console.error(err);
+    showToast(err.message || t().recycleActionFailed(t().unknown), 5200);
+  } finally {
+    state.trashBusy = false;
+    renderTrashView();
+  }
 }
 
 async function toggleReview(item, field) {
@@ -2946,7 +3285,7 @@ async function openInDefaultApp(item) {
 }
 
 function closeTrashConfirmDialog(confirmed) {
-  const dontAsk = trashConfirmDontAsk.checked;
+  const dontAsk = trashConfirmAllowDontAsk && trashConfirmDontAsk.checked;
   trashConfirmDialog.classList.add("hidden");
   if (confirmed && dontAsk) {
     state.confirmTrash = false;
@@ -2957,19 +3296,46 @@ function closeTrashConfirmDialog(confirmed) {
   trashConfirmResolve = null;
 }
 
-function requestTrashConfirmation() {
-  if (!state.confirmTrash) return Promise.resolve(true);
+function requestTrashConfirmation(count = 1, options = {}) {
+  const allowDontAsk = options.allowDontAsk !== false;
+  if (allowDontAsk && !state.confirmTrash) return Promise.resolve(true);
+  trashConfirmAllowDontAsk = allowDontAsk;
+  trashConfirmTitle.textContent = options.title || t().trashConfirmTitle;
+  trashConfirmMessage.textContent = options.message || (count > 1 ? t().batchTrashConfirm(count) : t().trashConfirmMessage);
+  trashConfirmOk.textContent = options.confirmText || t().trashConfirmMove;
   trashConfirmDontAsk.checked = false;
+  trashConfirmDontAskWrap?.classList.toggle("hidden", !allowDontAsk);
   trashConfirmDialog.classList.remove("hidden");
   return new Promise(resolve => {
     trashConfirmResolve = resolve;
   });
 }
 
+function removeItemsFromState(items) {
+  const start = performance.now();
+  const keys = new Set(items.map(item => item.key));
+  const cards = [...grid.querySelectorAll(".video-card")].filter(card => keys.has(card.dataset.key));
+  cards.forEach(card => card.classList.add("is-removing"));
+  state.all = state.all.filter(item => !keys.has(item.key));
+  state.view = state.view.filter(item => !keys.has(item.key));
+  keys.forEach(key => state.batchSelected.delete(key));
+  const pages = gridPageCount();
+  if (state.view.length && state.gridPage >= pages) {
+    state.gridPage = pages - 1;
+    renderGrid();
+  } else {
+    updateGridPager();
+    updateBatchUI();
+    updateSubInfo();
+    syncLoadedMediaStatNow();
+    scheduleUpdatePlaying();
+    window.setTimeout(() => cards.forEach(card => card.remove()), 140);
+  }
+  return Math.round(performance.now() - start);
+}
+
 function removeItemFromState(item) {
-  state.all = state.all.filter(v => v.key !== item.key);
-  state.view = state.view.filter(v => v.key !== item.key);
-  applyFilters(false);
+  return removeItemsFromState([item]);
 }
 
 function releaseActionPreviewMedia(source) {
@@ -2982,16 +3348,20 @@ function releaseActionPreviewMedia(source) {
   releaseMediaElement(modalImage);
 }
 
-function waitForMediaRelease(ms = 450) {
+function waitForMediaRelease(ms = 0) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 async function releaseMediaBeforeFileAction(item, source) {
-  if (!item) return;
+  const start = performance.now();
+  let matchedGridMedia = 0;
+  let videoWaitMs = 0;
+  if (!item) return { total_ms: 0, matched_grid_media: 0, video_wait_ms: 0 };
   if (source === "slideshow") releaseActionPreviewMedia(source);
   if (state.currentModalItem?.key === item.key) releaseActionPreviewMedia("modal");
   document.querySelectorAll(".video-wrap video, .video-wrap img.media-image").forEach(media => {
     if (media.dataset.rel === item.rel || media.dataset.src === item.url || media.getAttribute("src") === item.url) {
+      matchedGridMedia += 1;
       releaseMediaElement(media);
     }
   });
@@ -3001,7 +3371,43 @@ async function releaseMediaBeforeFileAction(item, source) {
     }
   });
   syncLoadedMediaStatNow();
-  if (item.type === "video") await waitForMediaRelease();
+  if (item.type === "video" && source !== "batch") {
+    const waitStart = performance.now();
+    await waitForMediaRelease();
+    videoWaitMs = Math.round(performance.now() - waitStart);
+  }
+  return {
+    total_ms: Math.round(performance.now() - start),
+    matched_grid_media: matchedGridMedia,
+    video_wait_ms: videoWaitMs,
+  };
+}
+
+async function releaseMediaBeforeBatchAction(items) {
+  const start = performance.now();
+  const rels = new Set(items.map(item => item.rel));
+  const urls = new Set(items.map(item => item.url).filter(Boolean));
+  let matchedGridMedia = 0;
+  document.querySelectorAll(".video-wrap video, .video-wrap img.media-image").forEach(media => {
+    if (rels.has(media.dataset.rel) || urls.has(media.dataset.src) || urls.has(media.getAttribute("src"))) {
+      matchedGridMedia += 1;
+      releaseMediaElement(media);
+    }
+  });
+  [...state.visibleVideos].forEach(video => {
+    if (rels.has(video.dataset.rel) || urls.has(video.dataset.src) || urls.has(video.getAttribute("src"))) {
+      state.visibleVideos.delete(video);
+    }
+  });
+  syncLoadedMediaStatNow();
+  const waitStart = performance.now();
+  await waitForMediaRelease();
+  return {
+    total_ms: Math.round(performance.now() - start),
+    matched_grid_media: matchedGridMedia,
+    video_wait_ms: Math.round(performance.now() - waitStart),
+    dom_scans: 1,
+  };
 }
 
 function restoreActionPreviewMedia(item, source) {
@@ -3043,22 +3449,42 @@ function continueAfterFileAction(item, source, oldIndex) {
 
 async function runFileAction(action, item = state.currentModalItem, source = "modal") {
   if (!item) return;
+  if (action === "move_trash" && !(await ensureTrashBackend())) return;
+  const actionStart = performance.now();
   const sameTypeItems = item.type === "image" ? currentImageItems() : currentVideoItems();
   const oldIndex = Math.max(0, sameTypeItems.findIndex(v => v.key === item.key));
   if (action === "move_review" && !window.confirm(t().confirmReview)) return;
-  if (action === "move_trash" && !(await requestTrashConfirmation())) return;
+  if (action === "move_trash" && !(await requestTrashConfirmation(1))) return;
   try {
-    await releaseMediaBeforeFileAction(item, source);
+    const releaseTimings = await releaseMediaBeforeFileAction(item, source);
+    const fetchStart = performance.now();
     const res = await fetch("/api/file-action", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, rel: item.rel, scan_id: item.scan_id || state.scanId || "", confirm: true }),
     });
     const data = await res.json();
+    const requestMs = Math.round(performance.now() - fetchStart);
     if (!data.ok) throw new Error(data.error || t().fileActionFail);
+    if (action === "move_trash") mergeTrashItems([data.trash_item]);
     releaseActionPreviewMedia(source);
-    removeItemFromState(item);
+    const uiRefreshMs = removeItemFromState(item);
     continueAfterFileAction(item, source, oldIndex);
+    console.info("[delete-perf] single action", {
+      name: item.name,
+      type: item.type,
+      source,
+      action,
+      total_ms: Math.round(performance.now() - actionStart),
+      release_ms: releaseTimings.total_ms,
+      video_wait_ms: releaseTimings.video_wait_ms,
+      matched_grid_media: releaseTimings.matched_grid_media,
+      request_ms: requestMs,
+      backend_total_ms: data.timings_ms?.total_ms,
+      recycle_total_ms: data.timings_ms?.recycle_bin?.total_ms,
+      recycle_retries: data.timings_ms?.recycle_bin?.retry_count,
+      ui_refresh_ms: uiRefreshMs,
+    });
     showToast(t().fileActionDone, 3600);
   } catch (err) {
     console.error(err);
@@ -3540,6 +3966,11 @@ async function scanNow() {
     state.all = data.videos || [];
     state.scannedPath = data.video_dir || videoDir;
     state.scanId = data.scan_id || "";
+    if (state.showTrash) {
+      state.showTrash = false;
+      trashView.classList.add("hidden");
+      grid.classList.remove("hidden");
+    }
     state.pathHistory = data.config?.path_history || state.pathHistory;
     state.pathFavorites = data.config?.path_favorites || state.pathFavorites;
     state.recursive = !!data.recursive;
@@ -3784,6 +4215,7 @@ async function init() {
     renderPathPanel();
     applyLayout();
     setImmersive(state.immersive);
+    await checkBackendCompatibility(true);
     if (state.rememberPath && pathInput.value.trim()) scanNow();
     else updateSubInfo();
   } catch (e) {
@@ -3823,6 +4255,19 @@ pathHistoryMenu.addEventListener("click", e => {
 pathSuggestMenu.addEventListener("click", e => e.stopPropagation());
 chooseFolderBtn.addEventListener("click", chooseFolder);
 scanBtn.addEventListener("click", scanNow);
+trashToggle.addEventListener("click", async e => {
+  e.stopPropagation();
+  if (!state.showTrash && !(await ensureTrashBackend())) return;
+  setTrashView(!state.showTrash);
+});
+trashSelectAllBtn.addEventListener("click", () => {
+  if (state.trashBusy) return;
+  if (state.trashSelected.size === state.trashItems.length) state.trashSelected.clear();
+  else state.trashSelected = new Set(state.trashItems.map(item => item.id));
+  renderTrashView();
+});
+trashRestoreBtn.addEventListener("click", () => runTrashAction("restore", [...state.trashSelected]));
+trashSystemBtn.addEventListener("click", () => runTrashAction("system_trash", [...state.trashSelected]));
 settingsToggle.addEventListener("click", e => {
   e.stopPropagation();
   toggleSettingsMenu();
@@ -3894,6 +4339,11 @@ mediaFilterSeg.addEventListener("click", e => {
   state.reviewFilter = "all";
   state.mediaType = btn.dataset.mediaFilter;
   updateMediaFilterUI();
+  if (state.showTrash) {
+    renderTrashView();
+    saveSettingsSoft();
+    return;
+  }
   applyFilters();
 });
 columnsSelect.addEventListener("change", () => setColumns(columnsSelect.value));

@@ -41,25 +41,15 @@
           <option value="random">Random order</option>
         </select>
         <select id="columnsSelect" class="select small" title="Grid columns">
-          <option value="2">2 cols</option>
-          <option value="3">3 cols</option>
-          <option value="4">4 cols</option>
-          <option value="5">5 cols</option>
-          <option value="6">6 cols</option>
-          <option value="7">7 cols</option>
-          <option value="8">8 cols</option>
-          <option value="9">9 cols</option>
-          <option value="10">10 cols</option>
-          <option value="11">11 cols</option>
-          <option value="12">12 cols</option>
-          <option value="13">13 cols</option>
-          <option value="14">14 cols</option>
-          <option value="15">15 cols</option>
-          <option value="16">16 cols</option>
-          <option value="17">17 cols</option>
-          <option value="18">18 cols</option>
-          <option value="19">19 cols</option>
-          <option value="20">20 cols</option>
+          <optgroup id="columnsAutoplayGroup" label="Autoplay · 2-9 cols">
+            <option value="2">2 cols</option><option value="3">3 cols</option><option value="4">4 cols</option><option value="5">5 cols</option>
+            <option value="6">6 cols</option><option value="7">7 cols</option><option value="8">8 cols</option><option value="9">9 cols</option>
+          </optgroup>
+          <optgroup id="columnsStaticGroup" label="Static preview · 10-20 cols">
+            <option value="10">10 cols</option><option value="11">11 cols</option><option value="12">12 cols</option><option value="13">13 cols</option>
+            <option value="14">14 cols</option><option value="15">15 cols</option><option value="16">16 cols</option><option value="17">17 cols</option>
+            <option value="18">18 cols</option><option value="19">19 cols</option><option value="20">20 cols</option>
+          </optgroup>
         </select>
         <span id="pageSizeLabel" class="toolbar-label">Per page</span>
         <input id="pageSizeInput" class="page-size-input" type="number" min="1" max="240" step="1" value="120" title="Items per page" />
@@ -69,6 +59,8 @@
         </div>
         <button id="pauseBtn" class="btn ghost">Pause All</button>
         <button id="immersiveBtn" class="btn">Immersive</button>
+        <span class="toolbar-divider" aria-hidden="true"></span>
+        <button id="trashToggle" class="btn icon-toggle" title="Recycle Folder" aria-label="Recycle Folder"></button>
         <button id="settingsToggle" class="btn icon-toggle" title="Settings" aria-label="Settings"></button>
         <div id="settingsMenu" class="settings-menu hidden">
         <div class="settings-section">
@@ -105,12 +97,12 @@
           <div class="settings-field">
             <span id="playLimitLabel" class="settings-field-label">Wall play limit</span>
             <select id="playLimitSelect" class="select settings-select" title="Wall play limit">
-              <option value="12">12</option>
-              <option value="18">18</option>
-              <option value="24">24</option>
-              <option value="36">36</option>
-              <option value="48">48</option>
-              <option value="72">72</option>
+              <option value="12">12 · Minimum load</option>
+              <option value="18">18 · Low load</option>
+              <option value="24">24 · Light</option>
+              <option value="36">36 · Balanced</option>
+              <option value="48">48 · High load</option>
+              <option value="72">72 · Maximum load</option>
             </select>
           </div>
           <label class="check settings-check"><input id="previewLargeVideos" type="checkbox"><span id="previewLargeVideosLabel">Preview large videos</span></label>
@@ -161,6 +153,17 @@
       </div>
     </aside>
     <main id="mainArea">
+      <section id="trashView" class="trash-view hidden" aria-live="polite">
+        <div class="trash-view-head">
+          <div><h2 id="trashViewTitle">Recycle Folder</h2><p id="trashViewInfo"></p></div>
+          <div class="trash-view-actions">
+            <button id="trashSelectAllBtn" class="btn ghost" type="button">Select all</button>
+            <button id="trashRestoreBtn" class="btn" type="button">Restore</button>
+            <button id="trashSystemBtn" class="btn ghost" type="button">Move to system recycle bin</button>
+          </div>
+        </div>
+        <div id="trashList" class="trash-list"></div>
+      </section>
       <div id="batchBar" class="batch-bar hidden">
         <span id="batchInfo">0 selected</span>
         <button id="batchSelectPageBtn" class="btn">Select page</button>
