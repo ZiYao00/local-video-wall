@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.8.0 - Unreleased
+## 1.8.0 - 2026-07-13
 
 - Added a recoverable project-level recycle folder: media first moves to `_video_wall_trash` inside the scanned folder, where it can be restored or moved to the Windows Recycle Bin.
 - Replaced recycle-folder rows with static media cards. Recycled images render directly; recycled videos stay paused on a static frame without generating preview caches.

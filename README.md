@@ -96,16 +96,16 @@ The app runs as a local Python service and stores settings and review data local
 
 | Area | Status |
 | --- | --- |
-| GitHub Release | The latest released tag is `v1.7.1`; packaged releases may be older than the `main` branch. |
-| Current development version | `v1.8.0 - Unreleased`. |
-| Main branch | Contains the latest development features and documentation. |
+| GitHub Release | The latest released tag is `v1.8.0`; packaged releases may be older than the `main` branch. |
+| Current documented version | `v1.8.0`, released on 2026-07-13. |
+| Main branch | Matches the current release documentation. |
 | Current metadata features | PNG metadata preview and optional `ffprobe` video/container metadata reading are available on the current main branch. |
 | Current focus | Metadata stabilization, recoverable recycle workflow, and responsive media-wall polish. |
 | Planned work | Tags, notes, ratings, SQLite indexing, metadata search, and optional preview cache. |
 
 ## Current Validation
 
-The current `v1.8.0` development work was verified locally with a 63-file mixed-media test folder: media scanning, All / Videos / Images filtering, responsive card actions, recycle-folder selection, restore, and static video-frame behavior all passed. The local test folder is ignored by Git and is not part of releases.
+The `v1.8.0` release was verified locally with a 63-file mixed-media test folder: media scanning, All / Videos / Images filtering, responsive card actions, recycle-folder selection, restore, and static video-frame behavior all passed. The local test folder is ignored by Git and is not part of releases.
 
 ## Requirements
 
@@ -314,7 +314,7 @@ The app has moved beyond the baseline media wall into AI metadata preview and st
 
 Recommended order:
 
-1. Finish `v1.8.0 - Metadata Stabilization`: test more ComfyUI node formats, keep metadata UI readable, and validate more real-world video metadata samples.
+1. Continue metadata stabilization in a future maintenance release: test more ComfyUI node formats, keep metadata UI readable, and validate more real-world video metadata samples.
 2. Build `v1.9.0 - Tags & Review Workflow`: add local tags, ratings, notes, and batch tag editing.
 3. Build `v2.0.0 - Local Index`: add a lightweight SQLite index for repeated scans and metadata lookup.
 4. Build `v2.1.0 - Metadata Search`: search and filter by prompt, model, LoRA, tags, source URL, and review state.

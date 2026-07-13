@@ -255,11 +255,11 @@ Completed:
 - Did not split `static/app.js`, add a frontend framework, or change the script loading model.
 - Verified imports, source compilation, local service startup, `/api/config`, and `/api/review`.
 
-## Current Phase - v1.8.0 Metadata Stabilization And Recycle Workflow
+## Released Phase - v1.8.0 Metadata Stabilization And Recycle Workflow
 
 Recommended version: `v1.8.0 - AI Metadata Preview / Metadata Stabilization`
 
-Status: core image metadata preview is implemented; optional `ffprobe` video/container metadata reading is implemented when `ffprobe` is available; the recoverable recycle workflow and responsive media-wall fixes are implemented. Remaining work is metadata stabilization against more real-world samples.
+Release status: `v1.8.0` was released on 2026-07-13. Core image metadata preview is implemented; optional `ffprobe` video/container metadata reading is implemented when `ffprobe` is available; the recoverable recycle workflow and responsive media-wall fixes are implemented. Remaining work is metadata stabilization against more real-world samples in a future maintenance release.
 
 Completed in the current phase:
 
