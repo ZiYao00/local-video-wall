@@ -255,11 +255,19 @@ Completed:
 - Did not split `static/app.js`, add a frontend framework, or change the script loading model.
 - Verified imports, source compilation, local service startup, `/api/config`, and `/api/review`.
 
-## Current Phase - v1.8.x Metadata Stabilization
+## Current Phase - v1.8.0 Metadata Stabilization And Recycle Workflow
 
-Recommended version: `v1.8.x - AI Metadata Preview / Metadata Stabilization`
+Recommended version: `v1.8.0 - AI Metadata Preview / Metadata Stabilization`
 
-Status: core image metadata preview is implemented; optional `ffprobe` video/container metadata reading is implemented when `ffprobe` is available; remaining work is stabilization against more real-world samples.
+Status: core image metadata preview is implemented; optional `ffprobe` video/container metadata reading is implemented when `ffprobe` is available; the recoverable recycle workflow and responsive media-wall fixes are implemented. Remaining work is metadata stabilization against more real-world samples.
+
+Completed in the current phase:
+
+- Recoverable `_video_wall_trash` workflow with restore and optional handoff to the Windows Recycle Bin.
+- Static recycle media cards, video/image filtering, card-click multi-selection, and per-card restore or system-recycle actions.
+- Stable top filter-toolbar geometry when filtering changes scrollbar visibility.
+- Responsive media-card footer actions, including a narrow-card More menu.
+- Local verification with a 63-file mixed-media test folder; the test folder is ignored by Git.
 
 Goal: show AI generation information inside image and video previews without turning the grid into a crowded database UI.
 
@@ -590,7 +598,7 @@ External code can be copied or adapted only when:
 The next feature step should be:
 
 ```text
-v1.8.x - Metadata Stabilization
+v1.8.0 - Metadata Stabilization
 ```
 
 Recommended stabilization batch:

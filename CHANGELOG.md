@@ -1,6 +1,13 @@
 # Changelog
 
-## 1.7.1 - Unreleased
+## 1.8.0 - Unreleased
+
+- Added a recoverable project-level recycle folder: media first moves to `_video_wall_trash` inside the scanned folder, where it can be restored or moved to the Windows Recycle Bin.
+- Replaced recycle-folder rows with static media cards. Recycled images render directly; recycled videos stay paused on a static frame without generating preview caches.
+- Added media-type filtering and card-click multi-selection to the recycle folder, with per-card restore and Windows Recycle Bin actions.
+- Stabilized the top media-filter toolbar when a filter changes page scrollbar visibility.
+- Made media-card footer actions respond to the actual card width, keeping the action bar unclipped and moving secondary actions into a compact More menu on narrow cards.
+- Verified the recycle, restore, filtering, and responsive-card flows with a local 63-file test dataset. The local test folder is ignored by Git.
 
 - Updated the roadmap into a staged AI media asset management plan covering metadata preview, tags, SQLite indexing, metadata search, optional preview cache, and packaging.
 - Inserted `v1.7.5 - Architecture Guardrails` before AI metadata work, documenting the small backend module boundaries needed before deeper feature development.
@@ -13,7 +20,7 @@
 - Added a safe UTF-8 JSON store helper and routed config/review JSON persistence through it using same-directory temporary files before replacing the target file.
 - Added a review-data compatibility layer with schema-version normalization while preserving the current favorite/selected UI behavior.
 - Added metadata schema and normalizer boundaries for future AI metadata preview work, plus safe embedded, sidecar, and ffprobe reader entry points without making external tools mandatory.
-- Started `v1.8.0 - AI Metadata Preview` with dependency-free PNG embedded metadata parsing, sidecar JSON metadata reading, metadata merging, and a scan-root-validated `/api/metadata` endpoint.
+- Implemented `v1.8.0 - AI Metadata Preview` with dependency-free PNG embedded metadata parsing, sidecar JSON metadata reading, metadata merging, and a scan-root-validated `/api/metadata` endpoint.
 - Connected the image/video preview metadata panel to `/api/metadata`, including loading/error states, Prompt, Negative Prompt, Model, LoRA, Source, file info, Raw metadata, and copy actions.
 - Improved the metadata panel UX with collapsible Negative Prompt, Source, File Info, and Raw metadata sections; isolated metadata-panel wheel scrolling from image navigation; expanded modal control hover zones; and removed the hidden-toolbar dark gradient residue.
 - Improved AI metadata status text and LoRA detection for ComfyUI/custom-node workflows and sidecar JSON variants, while keeping dynamic wildcard prompt reconstruction as a later parser task.
