@@ -159,20 +159,28 @@
           <div class="trash-view-actions">
             <button id="trashSelectAllBtn" class="btn ghost" type="button">Select all</button>
             <button id="trashRestoreBtn" class="btn" type="button">Restore</button>
-            <button id="trashSystemBtn" class="btn ghost" type="button">Move to system recycle bin</button>
+            <button id="trashSystemBtn" class="btn ghost danger" type="button">Move to system recycle bin</button>
           </div>
         </div>
         <div id="trashList" class="trash-list"></div>
       </section>
       <div id="batchBar" class="batch-bar hidden">
         <span id="batchInfo">0 selected</span>
-        <button id="batchSelectPageBtn" class="btn">Select page</button>
-        <button id="batchClearBtn" class="btn ghost">Clear</button>
-        <button id="batchFavoriteBtn" class="btn">Favorite</button>
-        <button id="batchUnfavoriteBtn" class="btn ghost">Unfavorite</button>
-        <button id="batchTrashBtn" class="btn ghost">Move to Recycle Bin</button>
-        <button id="batchExportBtn" class="btn ghost">Export CSV</button>
-        <button id="batchExitBtn" class="btn ghost">Exit</button>
+        <div class="batch-group batch-selection-actions">
+          <button id="batchSelectPageBtn" class="btn">Select all</button>
+          <button id="batchClearBtn" class="btn ghost">Clear</button>
+        </div>
+        <div class="batch-group batch-review-actions">
+          <button id="batchFavoriteBtn" class="btn">Favorite</button>
+          <button id="batchUnfavoriteBtn" class="btn ghost">Unfavorite</button>
+          <button id="batchExportBtn" class="btn ghost">Export CSV</button>
+        </div>
+        <div class="batch-group batch-file-actions">
+          <button id="batchTrashBtn" class="btn ghost danger">Move to Recycle Bin</button>
+        </div>
+        <div class="batch-group batch-exit-actions">
+          <button id="batchExitBtn" class="btn ghost">Exit</button>
+        </div>
       </div>
       <div id="subInfo" class="status-bar hidden"></div>
       <section id="grid" class="video-grid" aria-live="polite"></section>
@@ -219,7 +227,7 @@
       <label class="check settings-dialog-toggle"><input id="trashConfirmDontAsk" type="checkbox"><span id="trashConfirmDontAskLabel">Don't ask again</span></label>
       <div class="settings-dialog-actions">
         <button id="trashConfirmCancel" class="btn ghost" type="button">Cancel</button>
-        <button id="trashConfirmOk" class="btn primary" type="button">Move</button>
+        <button id="trashConfirmOk" class="btn danger" type="button">Move</button>
       </div>
     </div>
   </div>  <div id="modal" class="modal hidden" role="dialog" aria-modal="true">
@@ -227,7 +235,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <div class="modal-title"><strong id="modalName"></strong><span id="modalMeta"></span></div>
-        <div class="modal-actions"><div id="modalContentAlignSeg" class="seg modal-align-seg" title="Layout position"><button type="button" data-content-align="left">Left</button><button type="button" data-content-align="center">Center</button><button type="button" data-content-align="right">Right</button></div><button id="modalSlideshow" class="btn hidden">Slideshow</button><button id="modalSlideshowFullscreen" class="btn hidden">Fullscreen</button><button id="modalMoveReview" class="btn">Move to Review</button><button id="modalMoveTrash" class="btn">Move to Trash</button><button id="modalOpenDefault" class="btn">Open in Default App</button><button id="modalOpenFolder" class="btn">Show in Folder</button><div id="modalVideoControls" class="modal-video-controls hidden"><div id="modalVideoModeSeg" class="seg"><button data-video-mode="loop">Loop</button><button data-video-mode="sequence">Seq</button><button data-video-mode="random">Random</button></div><button id="modalFullscreen" class="btn">Fullscreen</button><button id="modalVideoUiToggle" class="btn ghost hidden">Hide UI</button></div><button id="modalImageUiToggle" class="btn ghost hidden">Hide UI</button><button id="modalClose" class="btn ghost">Close</button></div>
+        <div class="modal-actions"><div id="modalContentAlignSeg" class="seg modal-align-seg" title="Layout position"><button type="button" data-content-align="left">Left</button><button type="button" data-content-align="center">Center</button><button type="button" data-content-align="right">Right</button></div><button id="modalSlideshow" class="btn hidden">Slideshow</button><button id="modalSlideshowFullscreen" class="btn hidden">Fullscreen</button><button id="modalFavorite" class="btn">Favorite</button><button id="modalMoveTrash" class="btn danger">Move to Trash</button><button id="modalOpenDefault" class="btn">Open in Default App</button><button id="modalOpenFolder" class="btn">Show in Folder</button><div id="modalVideoControls" class="modal-video-controls hidden"><div id="modalVideoModeSeg" class="seg"><button data-video-mode="loop">Loop</button><button data-video-mode="sequence">Seq</button><button data-video-mode="random">Random</button></div><button id="modalFullscreen" class="btn">Fullscreen</button><button id="modalVideoUiToggle" class="btn ghost hidden">Hide UI</button></div><button id="modalImageUiToggle" class="btn ghost hidden">Hide UI</button><button id="modalClose" class="btn ghost">Close</button></div>
       </div>
       <button id="modalPrev" class="modal-nav modal-nav-prev hidden" aria-label="Previous item">&#8249;</button>
       <button id="modalNext" class="modal-nav modal-nav-next hidden" aria-label="Next item">&#8250;</button>
@@ -257,7 +265,7 @@
         <button id="slideshowPrev" class="btn">Prev</button>
         <button id="slideshowPlay" class="btn primary">Pause</button>
         <button id="slideshowNext" class="btn">Next</button>
-        <button id="slideshowMoveTrash" class="btn ghost">Move to Recycle Bin</button>
+        <button id="slideshowMoveTrash" class="btn ghost danger">Move to Recycle Bin</button>
         <select id="slideshowInterval" class="select small">
           <option value="1">1s</option>
           <option value="2">2s</option>

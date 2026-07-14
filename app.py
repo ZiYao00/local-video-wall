@@ -565,7 +565,7 @@ def suggest_child_folders(partial_path: str, limit: int = 20) -> tuple[list[dict
     suggestions.sort(key=lambda item: item["name"].casefold())
     return suggestions, None
 
-def list_child_folders(path: str, limit: int = 300) -> tuple[list[dict], str | None]:
+def list_child_folders(path: str, limit: int = 300, include_path: str = "") -> tuple[list[dict], str | None]:
     folder = Path(normalize_path(path))
     if not folder.exists() or not folder.is_dir():
         return [], "Folder does not exist."
@@ -584,7 +584,14 @@ def list_child_folders(path: str, limit: int = 300) -> tuple[list[dict], str | N
         except Exception:
             continue
     dirs.sort(key=lambda p: p.name.lower())
-    for child in dirs[:limit]:
+    selected_dirs = dirs[:limit]
+    included = Path(normalize_path(include_path)) if include_path else None
+    if included and included.exists() and included.is_dir():
+        same_parent = os.path.normcase(str(included.parent)) == os.path.normcase(str(folder))
+        if same_parent and all(os.path.normcase(str(child)) != os.path.normcase(str(included)) for child in selected_dirs):
+            selected_dirs.append(included)
+            selected_dirs.sort(key=lambda p: p.name.lower())
+    for child in selected_dirs:
         entries.append({"name": child.name, "path": str(child), "type": "folder"})
     return entries, None
 
@@ -1362,7 +1369,8 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/fs/list":
             folder_path = qs.get("path", [""])[0]
-            folders, error = list_child_folders(unquote(folder_path))
+            include_path = qs.get("include", [""])[0]
+            folders, error = list_child_folders(unquote(folder_path), include_path=unquote(include_path))
             if error:
                 self.send_json({"ok": False, "error": error, "folders": []}, 400)
             else:

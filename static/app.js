@@ -289,7 +289,8 @@ const i18n = {
     batch: "Batch actions",
     batchExit: "Exit batch",
     batchInfo: n => `${n} selected`,
-    batchSelectPage: "Select page",
+    batchSelectPage: "Select all",
+    batchSelectPageTitle: "Select all items on the current page",
     batchClear: "Clear",
     batchFavorite: "Favorite",
     batchUnfavorite: "Unfavorite",
@@ -549,7 +550,8 @@ const i18n = {
     batch: "批量操作",
     batchExit: "退出批量",
     batchInfo: n => `已选择 ${n} 个`,
-    batchSelectPage: "全选本页",
+    batchSelectPage: "全选",
+    batchSelectPageTitle: "全选当前页的项目",
     batchClear: "清空",
     batchFavorite: "收藏",
     batchUnfavorite: "取消收藏",
@@ -770,7 +772,7 @@ const modalMeta = $("#modalMeta");
 const modalClose = $("#modalClose");
 const modalOpenDefault = $("#modalOpenDefault");
 const modalOpenFolder = $("#modalOpenFolder");
-const modalMoveReview = $("#modalMoveReview");
+const modalFavorite = $("#modalFavorite");
 const modalMoveTrash = $("#modalMoveTrash");
 const modalSlideshow = $("#modalSlideshow");
 const modalSlideshowFullscreen = $("#modalSlideshowFullscreen");
@@ -878,13 +880,18 @@ function updateContentAlignLabels() {
 
 function applyContentAlign() {
   const align = ["left", "center", "right"].includes(state.contentAlign) ? state.contentAlign : "center";
+  const sidebarWidth = document.body.classList.contains("sidebar-open") ? folderPanel.getBoundingClientRect().width : 0;
+  const modalSideLayoutAvailable = window.innerWidth >= 1400;
+  document.documentElement.style.setProperty("--sidebar-panel-width", `${Math.round(sidebarWidth)}px`);
   document.body.classList.remove("content-align-left", "content-align-center", "content-align-right");
   document.body.classList.add(`content-align-${align}`);
   contentAlignSeg.querySelectorAll("button[data-content-align]").forEach(button => {
     button.classList.toggle("active", button.dataset.contentAlign === align);
   });
   modalContentAlignSeg?.querySelectorAll("button[data-content-align]").forEach(button => {
-    button.classList.toggle("active", button.dataset.contentAlign === align);
+    const sideButton = button.dataset.contentAlign !== "center";
+    button.disabled = sideButton && !modalSideLayoutAvailable;
+    button.classList.toggle("active", button.dataset.contentAlign === (modalSideLayoutAvailable ? align : "center"));
   });
 }
 
@@ -934,10 +941,10 @@ function applyActionButtons() {
   setButtonLabel(mediaFilterSeg.querySelector('[data-media-filter="all"]'), tx.allMedia, "grid", { iconOnly: true });
   setButtonLabel(mediaFilterSeg.querySelector('[data-media-filter="video"]'), tx.videosOnly, "film", { iconOnly: true });
   setButtonLabel(mediaFilterSeg.querySelector('[data-media-filter="image"]'), tx.imagesOnly, "image", { iconOnly: true });
-  setButtonLabel(mediaFilterSeg.querySelector('[data-media-filter="favorites"]'), tx.favorites, "star", { iconOnly: true });
+  setButtonLabel(mediaFilterSeg.querySelector('[data-media-filter="favorites"]'), tx.favorites, state.mediaType === "favorites" ? "starFilled" : "star", { iconOnly: true });
   setButtonLabel(batchToggleBtn, state.batchMode ? tx.batchExit : tx.batch, "multiSelect", { iconOnly: true });
-  setButtonLabel(batchSelectPageBtn, tx.batchSelectPage, "check", { iconOnly: true });
-  setButtonLabel(batchClearBtn, tx.batchClear, "close", { iconOnly: true });
+  setButtonLabel(batchSelectPageBtn, tx.batchSelectPage, "check", { iconOnly: false, title: tx.batchSelectPageTitle });
+  setButtonLabel(batchClearBtn, tx.batchClear, "close", { iconOnly: false });
   setButtonLabel(batchFavoriteBtn, tx.batchFavorite, "starFilled", { iconOnly: true });
   setButtonLabel(batchUnfavoriteBtn, tx.batchUnfavorite, "star", { iconOnly: true });
   setButtonLabel(batchTrashBtn, tx.batchTrash, "trash", { iconOnly: true });
@@ -950,7 +957,8 @@ function applyActionButtons() {
   setButtonLabel(modalSlideshow, state.modalSlideshowPlaying ? tx.pause : tx.slideshow, state.modalSlideshowPlaying ? "pause" : "slideshow", { iconOnly: true });
   modalSlideshow.classList.toggle("primary", state.modalSlideshowPlaying);
   setButtonLabel(modalSlideshowFullscreen, tx.fullscreen, "fullscreen", { iconOnly: true });
-  setButtonLabel(modalMoveReview, tx.moveReview, "star", { iconOnly: true });
+  const modalItemFavorite = !!state.currentModalItem?.favorite;
+  setButtonLabel(modalFavorite, modalItemFavorite ? tx.favorited : tx.favorite, modalItemFavorite ? "starFilled" : "star", { iconOnly: true });
   setButtonLabel(modalMoveTrash, tx.moveTrash, "trash", { iconOnly: true });
   setButtonLabel(modalOpenDefault, tx.openDefaultApp, "externalOpen", { iconOnly: true });
   setButtonLabel(modalOpenFolder, tx.showInFolder, "folder", { iconOnly: true });
@@ -1106,7 +1114,7 @@ function applyLanguage() {
   modalSlideshow.textContent = state.modalSlideshowPlaying ? tx.pause : tx.slideshow;
   modalSlideshow.classList.toggle("primary", state.modalSlideshowPlaying);
   modalSlideshowFullscreen.textContent = tx.fullscreen;
-  modalMoveReview.textContent = tx.moveReview;
+  modalFavorite.textContent = tx.favorite;
   modalMoveTrash.textContent = tx.moveTrash;
   modalOpenDefault.textContent = tx.openDefaultApp;
   modalOpenFolder.textContent = tx.showInFolder;
@@ -1663,6 +1671,12 @@ function updateMediaFilterUI() {
   mediaFilterSeg.querySelectorAll("button[data-media-filter]").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.mediaFilter === state.mediaType);
   });
+  setButtonLabel(
+    mediaFilterSeg.querySelector('[data-media-filter="favorites"]'),
+    t().favorites,
+    state.mediaType === "favorites" ? "starFilled" : "star",
+    { iconOnly: true },
+  );
 }
 
 function currentPageItems() {
@@ -2781,6 +2795,7 @@ function renderModalItem(item) {
   renderModalMetadata(item, null, { loading: true });
   loadModalMetadata(item);
   updateModalNav();
+  applyActionButtons();
 }
 
 function openModal(item) {
@@ -3522,7 +3537,7 @@ function renderSavedPathList(container, paths) {
     return;
   }
   for (const path of paths) {
-    container.appendChild(createPathRow(pathLabel(path), path, { removableFavorite: true }));
+    container.appendChild(createPathRow(pathLabel(path), path, { removableFavorite: true, revealInTree: true }));
   }
 }
 
@@ -3530,6 +3545,9 @@ function createPathRow(label, path, options = {}) {
   const row = document.createElement("div");
   row.className = "folder-row";
   row.dataset.path = path;
+  const head = document.createElement("div");
+  head.className = "folder-row-head";
+  row.appendChild(head);
   if (options.expandable) {
     const expand = document.createElement("button");
     expand.className = "folder-expand";
@@ -3540,19 +3558,34 @@ function createPathRow(label, path, options = {}) {
       e.stopPropagation();
       toggleFolderNode(row, path, expand);
     });
-    row.appendChild(expand);
+    head.appendChild(expand);
   } else {
     const spacer = document.createElement("span");
     spacer.className = "folder-expand-spacer";
-    row.appendChild(spacer);
+    head.appendChild(spacer);
   }
   const select = document.createElement("button");
   select.className = "folder-path";
   select.type = "button";
   select.textContent = label;
   select.title = path;
-  select.addEventListener("click", () => selectFolderPath(path));
-  row.appendChild(select);
+  select.addEventListener("click", () => {
+    if (options.revealInTree) void revealPathInFolderTree(path);
+    void selectFolderPath(path);
+  });
+  head.appendChild(select);
+  if (options.favoriteToggle) {
+    const favoriteToggle = document.createElement("button");
+    favoriteToggle.className = "folder-favorite-toggle";
+    favoriteToggle.type = "button";
+    favoriteToggle.addEventListener("click", async e => {
+      e.preventDefault();
+      e.stopPropagation();
+      await toggleFavoritePath(path);
+    });
+    row.classList.add("has-favorite-toggle");
+    head.appendChild(favoriteToggle);
+  }
   if (options.removableFavorite) {
     const remove = document.createElement("button");
     remove.className = "folder-row-remove";
@@ -3565,7 +3598,7 @@ function createPathRow(label, path, options = {}) {
       toggleFavoritePath(path);
     });
     row.classList.add("has-remove");
-    row.appendChild(remove);
+    head.appendChild(remove);
   }
   if (options.expandable) {
     const children = document.createElement("div");
@@ -3583,6 +3616,12 @@ function renderPathPanel() {
 }
 
 function updateFolderStars() {
+  folderTree.querySelectorAll(".folder-row.has-favorite-toggle").forEach(row => {
+    const favorite = isFavoritePath(row.dataset.path);
+    const button = row.querySelector(":scope > .folder-row-head > .folder-favorite-toggle");
+    row.classList.toggle("is-favorite", favorite);
+    setButtonLabel(button, favorite ? t().removeFavorite : t().addFavorite, favorite ? "starFilled" : "star", { iconOnly: true });
+  });
   updateFavoritePathButton();
 }
 
@@ -3732,7 +3771,7 @@ function updateFavoritePathButton() {
   const path = pathInput.value.trim();
   const favorite = path && isFavoritePath(path);
   favoritePathBtn.classList.toggle("active", !!favorite);
-  setButtonLabel(favoritePathBtn, favorite ? t().removeFavorite : t().addFavorite, "star", { iconOnly: true });
+  setButtonLabel(favoritePathBtn, favorite ? t().removeFavorite : t().addFavorite, favorite ? "starFilled" : "star", { iconOnly: true });
 }
 
 async function openFolderPanel() {
@@ -3761,9 +3800,10 @@ async function loadFolderRoots(force = false) {
     if (!data.ok) throw new Error(data.error || t().folderLoadFail);
     folderTree.innerHTML = "";
     for (const root of data.roots || []) {
-      folderTree.appendChild(createPathRow(root.name || root.path, root.path, { expandable: true }));
+      folderTree.appendChild(createPathRow(root.name || root.path, root.path, { expandable: true, favoriteToggle: true }));
     }
     state.folderRootsLoaded = true;
+    updateFolderStars();
   } catch (err) {
     console.error(err);
     folderTree.innerHTML = `<div class="folder-empty">${t().folderLoadFail}</div>`;
@@ -3777,8 +3817,47 @@ function renderFolderChildren(container, folders) {
     return;
   }
   for (const folder of folders) {
-    container.appendChild(createPathRow(folder.name, folder.path, { expandable: true }));
+    container.appendChild(createPathRow(folder.name, folder.path, { expandable: true, favoriteToggle: true }));
   }
+  updateFolderStars();
+}
+
+function findFolderRow(container, path) {
+  return [...container.children].find(node => node.classList?.contains("folder-row") && pathKey(node.dataset.path) === pathKey(path)) || null;
+}
+
+function joinFolderPath(parent, name) {
+  return `${String(parent).replace(/[\\/]+$/, "")}\\${name}`;
+}
+
+async function loadFolderNode(row, path, expandButton, includePath = "") {
+  const children = row.querySelector(":scope > .folder-children");
+  if (!children) return null;
+  expandButton.textContent = "...";
+  children.classList.remove("hidden");
+  children.innerHTML = `<div class="folder-empty">${t().scanProgress}</div>`;
+  const cacheKey = pathKey(path);
+  let folders = state.folderCache.get(cacheKey);
+  if (!folders || (includePath && !folders.some(folder => pathKey(folder.path) === pathKey(includePath)))) {
+    try {
+      const query = new URLSearchParams({ path });
+      if (includePath) query.set("include", includePath);
+      const res = await fetch(`/api/fs/list?${query}`);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || t().folderLoadFail);
+      folders = data.folders || [];
+      state.folderCache.set(cacheKey, folders);
+    } catch (err) {
+      console.error(err);
+      children.innerHTML = `<div class="folder-empty">${t().folderLoadFail}</div>`;
+      expandButton.textContent = ">";
+      return null;
+    }
+  }
+  renderFolderChildren(children, folders);
+  children.dataset.loaded = "1";
+  expandButton.textContent = "v";
+  return children;
 }
 
 async function toggleFolderNode(row, path, expandButton) {
@@ -3789,30 +3868,57 @@ async function toggleFolderNode(row, path, expandButton) {
     expandButton.textContent = children.classList.contains("hidden") ? ">" : "v";
     return;
   }
-  expandButton.textContent = "...";
-  children.classList.remove("hidden");
-  children.innerHTML = `<div class="folder-empty">${t().scanProgress}</div>`;
-  const cacheKey = pathKey(path);
-  if (state.folderCache.has(cacheKey)) {
-    renderFolderChildren(children, state.folderCache.get(cacheKey));
-    children.dataset.loaded = "1";
+  await loadFolderNode(row, path, expandButton);
+}
+
+async function ensureFolderNodeExpanded(row, path, includePath = "") {
+  const children = row.querySelector(":scope > .folder-children");
+  const expandButton = row.querySelector(":scope > .folder-row-head > .folder-expand");
+  if (!children || !expandButton) return null;
+  const targetPresent = !includePath || !!findFolderRow(children, includePath);
+  if (children.dataset.loaded === "1" && targetPresent) {
+    children.classList.remove("hidden");
     expandButton.textContent = "v";
-    return;
+    return children;
   }
-  try {
-    const res = await fetch(`/api/fs/list?path=${encodeURIComponent(path)}`);
-    const data = await res.json();
-    if (!data.ok) throw new Error(data.error || t().folderLoadFail);
-    const folders = data.folders || [];
-    state.folderCache.set(cacheKey, folders);
-    renderFolderChildren(children, folders);
-    children.dataset.loaded = "1";
-    expandButton.textContent = "v";
-  } catch (err) {
-    console.error(err);
-    children.innerHTML = `<div class="folder-empty">${t().folderLoadFail}</div>`;
-    expandButton.textContent = ">";
+  return loadFolderNode(row, path, expandButton, includePath);
+}
+
+function isPathWithinRoot(path, rootPath) {
+  const target = normalizePathText(path).replace(/[\\/]+$/, "").toLowerCase();
+  const root = normalizePathText(rootPath).replace(/[\\/]+$/, "").toLowerCase();
+  return target === root || target.startsWith(`${root}\\`);
+}
+
+function highlightFolderRow(row) {
+  row.classList.add("tree-target");
+  row.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+  window.setTimeout(() => row.classList.remove("tree-target"), 1800);
+}
+
+async function revealPathInFolderTree(path) {
+  const targetPath = normalizePathText(path);
+  if (!targetPath) return;
+  await openFolderPanel();
+  const rootRows = [...folderTree.children].filter(node => node.classList?.contains("folder-row"));
+  const rootRow = rootRows
+    .filter(row => isPathWithinRoot(targetPath, row.dataset.path))
+    .sort((a, b) => b.dataset.path.length - a.dataset.path.length)[0];
+  if (!rootRow) return;
+  let currentRow = rootRow;
+  let currentPath = rootRow.dataset.path;
+  const rootPrefix = normalizePathText(currentPath).replace(/[\\/]+$/, "");
+  const relativePath = targetPath.slice(rootPrefix.length).replace(/^[\\/]+/, "");
+  for (const segment of relativePath.split(/[\\/]+/).filter(Boolean)) {
+    const nextPath = joinFolderPath(currentPath, segment);
+    const children = await ensureFolderNodeExpanded(currentRow, currentPath, nextPath);
+    if (!children) return;
+    const nextRow = findFolderRow(children, nextPath);
+    if (!nextRow) return;
+    currentRow = nextRow;
+    currentPath = nextPath;
   }
+  highlightFolderRow(currentRow);
 }
 
 async function selectFolderPath(path) {
@@ -4519,7 +4625,11 @@ modalMetadata.addEventListener("click", async e => {
     showToast(btn.dataset.copyMeta || "", 1800);
   }
 });
-modalMoveReview.addEventListener("click", () => runFileAction("move_review"));
+modalFavorite.addEventListener("click", async () => {
+  if (!state.currentModalItem) return;
+  await toggleReview(state.currentModalItem, "favorite");
+  applyActionButtons();
+});
 modalMoveTrash.addEventListener("click", () => runFileAction("move_trash"));
 modalSlideshow.addEventListener("click", toggleModalSlideshow);
 modalSlideshowFullscreen.addEventListener("click", openFullscreenSlideshowFromCurrent);
@@ -4587,10 +4697,6 @@ window.addEventListener("keydown", e => {
   }
   if (e.key === "Escape" && !pathHistoryMenu.classList.contains("hidden")) {
     setHistoryMenuOpen(false);
-    return;
-  }
-  if (e.key === "Escape" && !folderPanel.classList.contains("hidden")) {
-    closeFolderPanel();
     return;
   }
   if (!slideshow.classList.contains("hidden")) {
