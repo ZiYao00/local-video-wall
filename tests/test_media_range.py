@@ -60,6 +60,7 @@ class MediaRangeTests(unittest.TestCase):
         self.assertEqual(response.status, 200)
         self.assertEqual(payload["port"], self.server.server_port)
         self.assertTrue(payload["token"])
+        self.assertEqual(payload["app_version"], "1.8.3")
 
     def test_choose_folder_get_request_is_rejected_without_opening_a_dialog(self) -> None:
         connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)

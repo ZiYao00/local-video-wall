@@ -55,6 +55,7 @@ from review.store import (
     normalize_review_item,
     review_for_key as normalized_review_for_key,
 )
+from version import APP_VERSION
 
 HOST = "127.0.0.1"
 PORT = 8787
@@ -222,8 +223,8 @@ def load_config() -> dict:
     cfg["filename_exclude_keywords"] = clean_exclude_keywords(cfg.get("filename_exclude_keywords"), 30)
     cfg["filename_exclude_scope"] = "all" if cfg.get("filename_exclude_scope") == "all" else "image"
     cfg["font_size"] = cfg.get("font_size") if cfg.get("font_size") in {"small", "standard", "large"} else "standard"
-    cfg["slideshow_interval"] = clamp_int(cfg.get("slideshow_interval"), 5, 3, 12)
-    if cfg.get("slideshow_effect") not in {"fade", "slide", "drift", "random"}:
+    cfg["slideshow_interval"] = clamp_int(cfg.get("slideshow_interval"), 5, 1, 15)
+    if cfg.get("slideshow_effect") not in {"none", "fade", "slide", "drift", "random"}:
         cfg["slideshow_effect"] = "drift"
     if cfg.get("slideshow_fit") not in {"contain", "cover"}:
         cfg["slideshow_fit"] = "contain"
@@ -995,7 +996,7 @@ def choose_folder_dialog() -> str:
 
 
 class AppHandler(BaseHTTPRequestHandler):
-    server_version = "LocalVideoWallV2/2.0"
+    server_version = f"LocalVideoWall/{APP_VERSION}"
 
     def log_message(self, fmt, *args):
         sys.stderr.write("[%s] %s\n" % (self.log_date_time_string(), fmt % args))
@@ -1437,7 +1438,13 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json({"ok": True, "action": action, "results": results})
 
     def _get_bootstrap(self, _qs: dict) -> None:
-        self.send_json({"ok": True, "token": SESSION_TOKEN, "port": PORT, "version": API_VERSION})
+        self.send_json({
+            "ok": True,
+            "token": SESSION_TOKEN,
+            "port": PORT,
+            "version": API_VERSION,
+            "app_version": APP_VERSION,
+        })
 
     def _get_config(self, _qs: dict) -> None:
         cfg = load_config()
@@ -1491,6 +1498,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json({
             "ok": True,
             "api_version": API_VERSION,
+            "app_version": APP_VERSION,
             "capabilities": API_CAPABILITIES,
             "config": cfg,
             "runtime_video_dir": str(get_current_video_dir() or ""),
@@ -1714,7 +1722,7 @@ def main():
     if cfg.get("remember_path") and cfg.get("last_video_dir"):
         set_current_video_dir(cfg["last_video_dir"])
     print("=" * 72)
-    print("Local Video Wall")
+    print(f"Local Video Wall v{APP_VERSION}")
     print("=" * 72)
     print("Path input is empty by default unless 'remember path' was enabled.")
     print(f"Remembered folder: {cfg.get('last_video_dir') or '(empty)'}")

@@ -4,6 +4,10 @@
 
 - Added a dependency-free `unittest` regression suite for path containment, local-trash move/restore transitions, name conflicts, Unicode paths, JSON persistence, PNG A1111/ComfyUI metadata extraction, metadata normalization, and HTTP byte-range media responses.
 - Added a Windows GitHub Actions workflow that runs the regression suite on pushes and pull requests using Python 3.12.
+- Added isolated HTTP coverage for scans and settings, including temporary-media scans, invalid scan roots, normalization, and persistence.
+- Fixed browser compatibility for local Origin headers that omit the port while preserving the Host, local Referer, and session-token checks for write requests.
+- Fixed slideshow settings so the full 1-15 second range and the no-effect option survive a reload.
+- Added `version.py` as the single source for the product release version, surfaced through startup output, `/api/bootstrap`, `/health`, and the HTTP server header.
 
 ## 1.8.2 - Unreleased
 

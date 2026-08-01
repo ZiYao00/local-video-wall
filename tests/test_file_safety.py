@@ -14,7 +14,7 @@ class PathSafetyTests(unittest.TestCase):
             root = Path(temp_dir)
             resolved = app.safe_rel_to_path(root, "nested/clip.mp4")
 
-            self.assertEqual(resolved, root / "nested" / "clip.mp4")
+            self.assertEqual(resolved, (root / "nested" / "clip.mp4").resolve())
 
     def test_safe_rel_to_path_rejects_paths_outside_root(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

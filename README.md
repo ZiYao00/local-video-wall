@@ -174,6 +174,7 @@ http://127.0.0.1:8787
 ## Local-first and Safety Notes
 
 - The app runs locally at `http://127.0.0.1:8787`.
+- Every request requires the local service Host header. Write and system-action `POST` requests additionally require a per-start session token and local-page Origin/Referer validation.
 - Media files are not uploaded to a cloud service.
 - Settings are stored locally in `config.json`.
 - Favorite and selection marks are stored locally in `review_data.json`.
