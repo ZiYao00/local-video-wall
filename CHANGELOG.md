@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.8.1 - 2026-07-30
+
+- Hardened the local HTTP server against cross-origin and cross-process abuse by adding a global request source guard on every endpoint. The `Host` header must be `127.0.0.1:PORT` or `localhost:PORT`, and any `Origin` / `Referer` header must point to the same local origin. Rejected requests are answered with 403 and one line is appended to `file_actions.log` for later inspection.
+- Introduced a per-process random session token (`SESSION_TOKEN`, generated via `secrets.token_urlsafe(32)` on every server start) and a new `GET /api/bootstrap` endpoint that hands it to the page. All write/dangerous `POST` endpoints (`/api/scan`, `/api/settings`, `/api/path-state`, `/api/review`, `/api/file-action`, `/api/file-actions/batch`, `/api/trash/action`, `/api/open`, `/api/open-file`, `/api/choose-folder`) now require the `X-App-Token` header; missing or wrong tokens are rejected with 403. Read-only endpoints (config, review, metadata, workflow-status, trash-list, fs, media, static, health, bootstrap) intentionally stay open so embedded previews keep working.
+- Promoted the three external-process endpoints to `POST` with JSON bodies: `/api/open` (reveal in Explorer), `/api/open-file` (open with default app), and `/api/choose-folder` (native folder picker). The old `GET` paths now answer 405. The frontend was updated to use the new methods, sends the `X-App-Token` header via a small `apiFetch` wrapper, and fetches the token once on startup through `/api/bootstrap` so subsequent requests carry it.
+- The pre-change working copy was captured as `.codex-backups/10-security-api/local-video-wall-before-v1.8.1-security-guard-20260730-224428.zip` (SHA-256 `d3b6e782a236290a29b325a0fc435c2905583da02316154bf1cb25d2ab290153`).
+- Verified the v1.8.1 guard with a curl test pass: bad origin → 403, bad host → 403, missing token → 403, wrong token → 403, `GET /api/open|open-file|choose-folder` → 405, and a legitimate `POST /api/scan` with the bootstrap token → 200. All four rejection reasons are recorded in `file_actions.log`.
+
 ## 1.8.0 - 2026-07-13
 
 - Added a recoverable project-level recycle folder: media first moves to `_video_wall_trash` inside the scanned folder, where it can be restored or moved to the Windows Recycle Bin.

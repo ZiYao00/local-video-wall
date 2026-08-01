@@ -47,6 +47,8 @@ const state = {
   modalSlideshowTimer: null,
   metadataRequestId: 0,
   workflowStatusCache: new Map(),
+  appToken: "",
+  appPort: 8787,
   workflowStatusQueue: [],
   workflowStatusActive: 0,
   workflowStatusQueued: new Set(),
@@ -96,6 +98,41 @@ const LARGE_VIDEO_MB = 500;
 const COMFYUI_URL = "http://127.0.0.1:8188/";
 const EXPECTED_API_VERSION = 3;
 const REQUIRED_TRASH_CAPABILITIES = ["local_trash", "batch_trash", "trash_restore", "system_trash"];
+
+async function fetchBootstrap() {
+  try {
+    const res = await fetch("/api/bootstrap", { cache: "no-store" });
+    if (!res.ok) throw new Error("bootstrap " + res.status);
+    const data = await res.json();
+    if (data && typeof data.token === "string") {
+      state.appToken = data.token;
+    }
+    if (data && Number(data.port)) {
+      state.appPort = Number(data.port);
+    }
+  } catch (err) {
+    state.appToken = "";
+    console.error("bootstrap failed", err);
+  }
+}
+
+// Wrapper that adds the X-App-Token header to write/dangerous requests.
+// Read-only endpoints (GET) and unauthenticated probes (/health) still work
+// because the server only requires the token on POST write/dangerous paths.
+async function apiFetch(url, options = {}) {
+  const opts = { ...options };
+  const method = String(opts.method || "GET").toUpperCase();
+  const needsToken = method === "POST" || method === "PUT" || method === "DELETE" || method === "PATCH";
+  const headers = { ...(opts.headers || {}) };
+  if (needsToken && state.appToken) {
+    headers["X-App-Token"] = state.appToken;
+  }
+  if (opts.body && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
+  opts.headers = headers;
+  return fetch(url, opts);
+}
 
 const ICONS = {
   back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/><path d="M9 12h11"/></svg>',
@@ -1764,7 +1801,7 @@ async function setBatchFavorite(value) {
   try {
     for (const item of items) {
       try {
-        const res = await fetch("/api/review", {
+        const res = await apiFetch("/api/review", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ key: item.key, favorite: value }),
@@ -1814,7 +1851,7 @@ async function moveBatchToTrash() {
   const batchStart = performance.now();
   try {
     const releaseTimings = await releaseMediaBeforeBatchAction(items);
-    const res = await fetch("/api/file-actions/batch", {
+    const res = await apiFetch("/api/file-actions/batch", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -2021,7 +2058,7 @@ async function runTrashAction(action, ids) {
   state.trashBusy = true;
   renderTrashView();
   try {
-    const res = await fetch("/api/trash/action", {
+    const res = await apiFetch("/api/trash/action", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, ids: selected, scan_id: state.scanId || "" }),
@@ -2052,7 +2089,7 @@ async function toggleReview(item, field) {
   const nextValue = !item[field];
   const payload = { key: item.key, [field]: nextValue };
   try {
-    const res = await fetch("/api/review", {
+    const res = await apiFetch("/api/review", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -3229,9 +3266,11 @@ async function openInExplorer(item) {
   const rel = typeof item === "string" ? item : item?.rel;
   const scanId = typeof item === "string" ? "" : (item?.scan_id || state.scanId || "");
   try {
-    const params = new URLSearchParams({ path: rel || "" });
-    if (scanId) params.set("scan_id", scanId);
-    const res = await fetch("/api/open?" + params.toString());
+    const res = await apiFetch("/api/open", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: rel || "", scan_id: scanId || "" }),
+    });
     const data = await res.json();
     if (!data.ok) showToast(data.error || t().openFail);
   } catch {
@@ -3285,9 +3324,11 @@ async function openInDefaultApp(item) {
   const scanId = item?.scan_id || state.scanId || "";
   if (!rel) return;
   try {
-    const params = new URLSearchParams({ path: rel });
-    if (scanId) params.set("scan_id", scanId);
-    const res = await fetch("/api/open-file?" + params.toString());
+    const res = await apiFetch("/api/open-file", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: rel, scan_id: scanId || "" }),
+    });
     const data = await res.json();
     if (!data.ok) {
       showToast(data.error || t().openDefaultFail, 3600);
@@ -3329,13 +3370,16 @@ function requestTrashConfirmation(count = 1, options = {}) {
 function removeItemsFromState(items) {
   const start = performance.now();
   const keys = new Set(items.map(item => item.key));
+  const expectedRemovedCardCount = currentPageItems().filter(item => keys.has(item.key)).length;
   const cards = [...grid.querySelectorAll(".video-card")].filter(card => keys.has(card.dataset.key));
   cards.forEach(card => card.classList.add("is-removing"));
+  // Schedule the DOM removal before follow-up UI work so a later UI error cannot leave a stale playable card behind.
+  window.setTimeout(() => cards.forEach(card => card.remove()), 140);
   state.all = state.all.filter(item => !keys.has(item.key));
   state.view = state.view.filter(item => !keys.has(item.key));
   keys.forEach(key => state.batchSelected.delete(key));
   const pages = gridPageCount();
-  if (state.view.length && state.gridPage >= pages) {
+  if (expectedRemovedCardCount !== cards.length || (state.view.length && state.gridPage >= pages)) {
     state.gridPage = pages - 1;
     renderGrid();
   } else {
@@ -3344,7 +3388,6 @@ function removeItemsFromState(items) {
     updateSubInfo();
     syncLoadedMediaStatNow();
     scheduleUpdatePlaying();
-    window.setTimeout(() => cards.forEach(card => card.remove()), 140);
   }
   return Math.round(performance.now() - start);
 }
@@ -3473,7 +3516,7 @@ async function runFileAction(action, item = state.currentModalItem, source = "mo
   try {
     const releaseTimings = await releaseMediaBeforeFileAction(item, source);
     const fetchStart = performance.now();
-    const res = await fetch("/api/file-action", {
+    const res = await apiFetch("/api/file-action", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action, rel: item.rel, scan_id: item.scan_id || state.scanId || "", confirm: true }),
@@ -3936,7 +3979,7 @@ async function toggleFavoritePath(path) {
     return;
   }
   try {
-    const res = await fetch("/api/path-state", {
+    const res = await apiFetch("/api/path-state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: favorite ? "unfavorite" : "favorite", path }),
@@ -3956,7 +3999,7 @@ async function toggleFavoritePath(path) {
 
 async function clearPathHistory() {
   try {
-    const res = await fetch("/api/path-state", {
+    const res = await apiFetch("/api/path-state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "clear_history" }),
@@ -3977,7 +4020,7 @@ async function clearPathHistory() {
 
 async function removePathHistory(path) {
   try {
-    const res = await fetch("/api/path-state", {
+    const res = await apiFetch("/api/path-state", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "remove_history", path }),
@@ -4000,7 +4043,7 @@ async function chooseFolder() {
   chooseFolderBtn.disabled = true;
   setButtonLabel(chooseFolderBtn, t().choosing, "folder", { iconOnly: true });
   try {
-    const res = await fetch("/api/choose-folder");
+    const res = await apiFetch("/api/choose-folder", { method: "POST" });
     const data = await res.json();
     if (data.ok && data.path) {
       pathInput.value = data.path;
@@ -4055,7 +4098,7 @@ async function scanNow() {
       content_align: state.contentAlign,
       button_style: state.buttonStyle,
     };
-    const res = await fetch("/api/scan", {
+    const res = await apiFetch("/api/scan", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -4109,7 +4152,7 @@ async function scanNow() {
 
 async function saveSettingsSoft() {
   try {
-    const response = await fetch("/api/settings", {
+    const response = await apiFetch("/api/settings", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -4263,6 +4306,7 @@ function setButtonStyle(style, save = true) {
 
 async function init() {
   try {
+    await fetchBootstrap();
     const res = await fetch("/api/config");
     const data = await res.json();
     const cfg = data.config || {};

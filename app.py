@@ -38,6 +38,7 @@ import threading
 import time
 import uuid
 import ctypes
+import secrets
 from datetime import datetime, timezone
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
@@ -74,6 +75,26 @@ TRASH_DIR_NAME = "_video_wall_trash"
 TRASH_ITEM_META_NAME = "item.json"
 API_VERSION = 3
 API_CAPABILITIES = ["local_trash", "batch_trash", "trash_restore", "system_trash"]
+
+# v1.8.1 security: per-process random token required on all write/dangerous endpoints.
+# Regenerated on every server start; the frontend fetches it from /api/bootstrap.
+SESSION_TOKEN = secrets.token_urlsafe(32)
+
+
+def _log_rejected(reason: str, headers, path: str) -> None:
+    """Append a one-line record to file_actions.log for rejected requests."""
+    try:
+        host = headers.get("Host", "-") if headers else "-"
+        origin = headers.get("Origin", "-") if headers else "-"
+        referer = headers.get("Referer", "-") if headers else "-"
+        line = (
+            f"[{datetime.now().isoformat(timespec='seconds')}] "
+            f"REJECTED {reason} {path} host={host} origin={origin} referer={referer}\n"
+        )
+        with open(ACTION_LOG_FILE, "a", encoding="utf-8") as fh:
+            fh.write(line)
+    except Exception:
+        pass
 
 DEFAULT_CONFIG = {
     "remember_path": False,
@@ -979,6 +1000,66 @@ class AppHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         sys.stderr.write("[%s] %s\n" % (self.log_date_time_string(), fmt % args))
 
+    # ---------- v1.8.1 security guards ----------
+
+    def _local_hosts(self):
+        return {f"127.0.0.1:{PORT}", f"localhost:{PORT}"}
+
+    def _is_local_host(self, host_header: str) -> bool:
+        if not host_header:
+            return False
+        # Strip optional bracketed IPv6 for future-proofing; the app only binds IPv4 loopback today.
+        h = host_header.strip()
+        return h in self._local_hosts()
+
+    def _is_local_origin(self, value: str) -> bool:
+        if not value:
+            return True  # no Origin header (e.g. same-origin GET in some browsers) is fine when Host is local
+        v = value.strip().lower()
+        if v.startswith("http://127.0.0.1:") or v.startswith("http://localhost:"):
+            return True
+        return False
+
+    def _check_origin(self) -> bool:
+        """Return True if the request comes from the local server itself.
+
+        - Host header must be 127.0.0.1:PORT or localhost:PORT.
+        - When Origin or Referer is present, it must point to the same local origin.
+        Anything else is rejected with 403 and logged.
+        """
+        path = self.path.split("?", 1)[0]
+        host = self.headers.get("Host", "")
+        if not self._is_local_host(host):
+            _log_rejected("bad_host", self.headers, path)
+            self.send_json({"ok": False, "error": "Forbidden: bad host."}, 403)
+            return False
+        origin = self.headers.get("Origin", "")
+        referer = self.headers.get("Referer", "")
+        if origin and not self._is_local_origin(origin):
+            _log_rejected("bad_origin", self.headers, path)
+            self.send_json({"ok": False, "error": "Forbidden: bad origin."}, 403)
+            return False
+        if referer:
+            # referer begins with scheme://host[:port][/...]; keep just the origin part.
+            ref = referer.strip()
+            parts = ref.split("/", 3)
+            ref_origin = "/".join(parts[:3]) if len(parts) >= 3 else ref
+            if not self._is_local_origin(ref_origin):
+                _log_rejected("bad_referer", self.headers, path)
+                self.send_json({"ok": False, "error": "Forbidden: bad referer."}, 403)
+                return False
+        return True
+
+    def _check_token(self) -> bool:
+        """Return True if the request carries the session token in X-App-Token."""
+        path = self.path.split("?", 1)[0]
+        token = self.headers.get("X-App-Token", "")
+        if not token or token != SESSION_TOKEN:
+            _log_rejected("bad_token", self.headers, path)
+            self.send_json({"ok": False, "error": "Forbidden: missing or invalid app token."}, 403)
+            return False
+        return True
+
     def read_json_body(self) -> dict:
         length = int(self.headers.get("Content-Length", "0") or "0")
         if length <= 0:
@@ -1346,6 +1427,16 @@ class AppHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         path, _, query = self.path.partition("?")
         qs = parse_qs(query)
+        if not self._check_origin():
+            return
+        if path == "/api/bootstrap":
+            self.send_json({
+                "ok": True,
+                "token": SESSION_TOKEN,
+                "port": PORT,
+                "version": API_VERSION,
+            })
+            return
         if path == "/api/config":
             cfg = load_config()
             if cfg.get("remember_path") and cfg.get("last_video_dir"):
@@ -1377,14 +1468,13 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.send_json({"ok": True, "path": normalize_path(unquote(folder_path)), "folders": folders})
             return
         if path == "/api/open":
-            rel = qs.get("path", [""])[0]
-            scan_id = qs.get("scan_id", [""])[0]
-            self.api_open_in_explorer(rel, scan_id)
+            self.send_json({"ok": False, "error": "Method not allowed; use POST."}, 405)
             return
         if path == "/api/open-file":
-            rel = qs.get("path", [""])[0]
-            scan_id = qs.get("scan_id", [""])[0]
-            self.api_open_file_default_app(rel, scan_id)
+            self.send_json({"ok": False, "error": "Method not allowed; use POST."}, 405)
+            return
+        if path == "/api/choose-folder":
+            self.send_json({"ok": False, "error": "Method not allowed; use POST."}, 405)
             return
         if path == "/api/file-path":
             rel = qs.get("path", [""])[0]
@@ -1431,6 +1521,11 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
+        if not self._check_origin():
+            return
+        # All POST endpoints below are write/dangerous; require the session token.
+        if not self._check_token():
+            return
         payload = self.read_json_body()
         if path == "/api/scan":
             video_dir = normalize_path(payload.get("video_dir", ""))
@@ -1579,6 +1674,20 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/trash/action":
             self.api_trash_action(payload)
+            return
+        if path == "/api/open":
+            rel = payload.get("path", "")
+            scan_id = payload.get("scan_id", "")
+            self.api_open_in_explorer(rel, scan_id)
+            return
+        if path == "/api/open-file":
+            rel = payload.get("path", "")
+            scan_id = payload.get("scan_id", "")
+            self.api_open_file_default_app(rel, scan_id)
+            return
+        if path == "/api/choose-folder":
+            selected = choose_folder_dialog()
+            self.send_json({"ok": True, "path": selected})
             return
         self.send_error(404)
 
