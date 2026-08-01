@@ -23,7 +23,7 @@
 | --- | --- | --- | --- |
 | v1.8.1 | 安全 | 补丁 | 已完成，待发布 |
 | v1.8.2 | 稳定性与命名 | 补丁 | 已完成，待发布 |
-| v1.8.3 | 测试与 CI | 补丁 | 未开始 |
+| v1.8.3 | 测试与 CI | 补丁 | 已完成，本地已验证，待推送 CI 验证 |
 | v1.9.0 | 内部结构重构 | 次版本 | 未开始 |
 | 之后 | 打包、贡献者文档等 | 视情况 | 未开始 |
 
@@ -76,8 +76,8 @@
 
 > 危险文件操作和元数据解析出错会直接丢文件或崩解析，最该有回归保护。
 
-- [ ] **T1 测试骨架**：建立 `tests/`，选定 `pytest`，准备样本数据。
-- [ ] **T2 高风险单元测试**
+- [x] **T1 测试骨架**：建立 `tests/`，选定 Python 内置 `unittest`，准备临时样本数据。
+- [x] **T2 高风险单元测试**
   - 路径穿越：`safe_rel_to_path` 拒绝 `../`、绝对路径、越界路径
   - 重名恢复：`unique_destination` / restore 冲突
   - 中文路径与特殊字符
@@ -85,10 +85,10 @@
   - PNG 元数据样本：A1111 `parameters`、ComfyUI `prompt`/`workflow`
   - 损坏 / 空 / 超大 JSON 容错
   - Range 请求（媒体流 206）
-- [ ] **T3 GitHub Actions**：Windows runner 上跑测试，PR 与 push 触发。
+- [x] **T3 GitHub Actions**：Windows runner 上跑测试，PR 与 push 触发。
   - 影响：`.github/workflows/`
 
-**验收**：`pytest` 全绿；CI 在 GitHub 跑通。
+**验收**：本地 `python -m unittest discover -s tests -v` 全绿；CI 在 GitHub 推送后跑通。
 **发布**：更新 CHANGELOG，打 v1.8.3。
 
 ---

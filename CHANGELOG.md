@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.3 - Unreleased
+
+- Added a dependency-free `unittest` regression suite for path containment, local-trash move/restore transitions, name conflicts, Unicode paths, JSON persistence, PNG A1111/ComfyUI metadata extraction, metadata normalization, and HTTP byte-range media responses.
+- Added a Windows GitHub Actions workflow that runs the regression suite on pushes and pull requests using Python 3.12.
+
 ## 1.8.2 - Unreleased
 
 - Made `service.bat` verify that a process listening on port 8787 was started from this repository's absolute `app.py` path before reporting it as running or ending it. An unrelated process on the same port is now left untouched.
