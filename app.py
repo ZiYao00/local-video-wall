@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 r"""
-Local Civitai-style Video Wall v2
+Local Video Wall
 
 Usage:
 1. Make sure Python 3.10+ is installed. Python 3.12 is recommended.
@@ -1697,7 +1697,7 @@ def main():
     if cfg.get("remember_path") and cfg.get("last_video_dir"):
         set_current_video_dir(cfg["last_video_dir"])
     print("=" * 72)
-    print("Local Civitai-style Video Wall v2")
+    print("Local Video Wall")
     print("=" * 72)
     print("Path input is empty by default unless 'remember path' was enabled.")
     print(f"Remembered folder: {cfg.get('last_video_dir') or '(empty)'}")

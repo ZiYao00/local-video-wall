@@ -1,5 +1,5 @@
 @echo off
-setlocal EnableExtensions
+setlocal EnableExtensions EnableDelayedExpansion
 chcp 65001 >nul
 cd /d "%~dp0"
 
@@ -243,17 +243,23 @@ if "%RUNNING%"=="1" exit /b 0
 exit /b 1
 
 :stop_service_once
-set "FOUND=0"
-for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":%APP_PORT% .*LISTENING"') do (
-  set "FOUND=1"
-  taskkill /PID %%P /F >nul 2>nul
+call :is_running
+if not "%RUNNING%"=="1" (
+  echo Local Video Wall service is not running. Nothing was stopped.
+  exit /b 0
 )
-if "%FOUND%"=="1" (
+call :is_our_process %SERVICE_PID%
+if not "%OWN_PROCESS%"=="1" (
+  echo Refusing to stop PID %SERVICE_PID%: it is not this Local Video Wall instance.
+  exit /b 1
+)
+taskkill /PID %SERVICE_PID% /F >nul 2>nul
+if "%errorlevel%"=="0" (
   echo Service stopped.
-) else (
-  echo Service is not running.
+  exit /b 0
 )
-exit /b 0
+echo Failed to stop service PID %SERVICE_PID%.
+exit /b 1
 
 :status_line
 call :is_running
@@ -288,9 +294,20 @@ exit /b 0
 set "RUNNING=0"
 set "SERVICE_PID="
 for /f "tokens=5" %%P in ('netstat -ano ^| findstr /R /C:":%APP_PORT% .*LISTENING"') do (
-  set "RUNNING=1"
-  set "SERVICE_PID=%%P"
+  call :is_our_process %%P
+  if "!OWN_PROCESS!"=="1" (
+    set "RUNNING=1"
+    set "SERVICE_PID=%%P"
+  )
 )
+exit /b 0
+
+:is_our_process
+set "OWN_PROCESS=0"
+set "CHECK_PID=%~1"
+if "%CHECK_PID%"=="" exit /b 0
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$p = Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $env:CHECK_PID) -ErrorAction SilentlyContinue; if ($null -ne $p -and -not [string]::IsNullOrWhiteSpace($p.CommandLine) -and $p.CommandLine.IndexOf($env:APP_PY, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) { exit 0 }; exit 1" >nul 2>nul
+if "%errorlevel%"=="0" set "OWN_PROCESS=1"
 exit /b 0
 
 :has_python

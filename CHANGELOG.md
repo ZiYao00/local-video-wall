@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.8.2 - Unreleased
+
+- Made `service.bat` verify that a process listening on port 8787 was started from this repository's absolute `app.py` path before reporting it as running or ending it. An unrelated process on the same port is now left untouched.
+- Renamed the remaining startup banner from `Local Civitai-style Video Wall v2` to `Local Video Wall`.
+
 ## 1.8.1 - 2026-07-30
 
 - Hardened the local HTTP server against cross-origin and cross-process abuse by adding a global request source guard on every endpoint. The `Host` header must be `127.0.0.1:PORT` or `localhost:PORT`, and any `Origin` / `Referer` header must point to the same local origin. Rejected requests are answered with 403 and one line is appended to `file_actions.log` for later inspection.
