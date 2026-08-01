@@ -1015,10 +1015,10 @@ class AppHandler(BaseHTTPRequestHandler):
     def _is_local_origin(self, value: str) -> bool:
         if not value:
             return True  # no Origin header (e.g. same-origin GET in some browsers) is fine when Host is local
-        v = value.strip().lower()
-        if v.startswith("http://127.0.0.1:") or v.startswith("http://localhost:"):
-            return True
-        return False
+        return value.strip().lower() in {
+            f"http://127.0.0.1:{PORT}",
+            f"http://localhost:{PORT}",
+        }
 
     def _check_origin(self) -> bool:
         """Return True if the request comes from the local server itself.
