@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import http.client
+import json
 import tempfile
 import threading
 import unittest
@@ -49,6 +50,17 @@ class MediaRangeTests(unittest.TestCase):
         self.assertEqual(response.getheader("Content-Range"), "bytes 2-5/10")
         self.assertEqual(body, b"2345")
 
+    def test_bootstrap_route_returns_the_active_test_server_port(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+        connection.request("GET", "/api/bootstrap")
+        response = connection.getresponse()
+        payload = json.loads(response.read())
+        connection.close()
+
+        self.assertEqual(response.status, 200)
+        self.assertEqual(payload["port"], self.server.server_port)
+        self.assertTrue(payload["token"])
+
     def test_choose_folder_get_request_is_rejected_without_opening_a_dialog(self) -> None:
         connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
         connection.request("GET", "/api/choose-folder")
@@ -58,3 +70,13 @@ class MediaRangeTests(unittest.TestCase):
 
         self.assertEqual(response.status, 405)
         self.assertIn("use POST", body)
+
+    def test_all_legacy_get_action_routes_are_rejected(self) -> None:
+        for path in ("/api/open", "/api/open-file", "/api/choose-folder"):
+            with self.subTest(path=path):
+                connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+                connection.request("GET", path)
+                response = connection.getresponse()
+                response.read()
+                connection.close()
+                self.assertEqual(response.status, 405)

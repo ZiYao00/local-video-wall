@@ -1424,89 +1424,91 @@ class AppHandler(BaseHTTPRequestHandler):
                 results.append({"ok": False, "id": str(trash_id), "error": str(exc)})
         self.send_json({"ok": True, "action": action, "results": results})
 
+    def _get_bootstrap(self, _qs: dict) -> None:
+        self.send_json({"ok": True, "token": SESSION_TOKEN, "port": PORT, "version": API_VERSION})
+
+    def _get_config(self, _qs: dict) -> None:
+        cfg = load_config()
+        if cfg.get("remember_path") and cfg.get("last_video_dir"):
+            set_current_video_dir(cfg.get("last_video_dir"))
+        self.send_json({"ok": True, "config": cfg})
+
+    def _get_fs_roots(self, _qs: dict) -> None:
+        self.send_json({"ok": True, "roots": list_drive_roots()})
+
+    def _get_fs_suggest(self, qs: dict) -> None:
+        partial_path = qs.get("path", [""])[0]
+        suggestions, error = suggest_child_folders(unquote(partial_path))
+        if error:
+            self.send_json({"ok": False, "error": error, "suggestions": []}, 400)
+        else:
+            self.send_json({"ok": True, "suggestions": suggestions})
+
+    def _get_fs_list(self, qs: dict) -> None:
+        folder_path = qs.get("path", [""])[0]
+        include_path = qs.get("include", [""])[0]
+        folders, error = list_child_folders(unquote(folder_path), include_path=unquote(include_path))
+        if error:
+            self.send_json({"ok": False, "error": error, "folders": []}, 400)
+        else:
+            self.send_json({"ok": True, "path": normalize_path(unquote(folder_path)), "folders": folders})
+
+    def _get_method_not_allowed(self, _qs: dict) -> None:
+        self.send_json({"ok": False, "error": "Method not allowed; use POST."}, 405)
+
+    def _get_file_path(self, qs: dict) -> None:
+        self.api_file_path(qs.get("path", [""])[0], qs.get("scan_id", [""])[0])
+
+    def _get_metadata(self, qs: dict) -> None:
+        self.api_metadata(qs.get("path", [""])[0], qs.get("scan_id", [""])[0])
+
+    def _get_workflow_status(self, qs: dict) -> None:
+        self.api_workflow_status(qs.get("path", [""])[0], qs.get("scan_id", [""])[0])
+
+    def _get_trash_list(self, qs: dict) -> None:
+        self.api_trash_list(qs.get("scan_id", [""])[0])
+
+    def _get_review(self, _qs: dict) -> None:
+        self.send_json({"ok": True, "review": load_review_data()})
+
+    def _get_media(self, qs: dict) -> None:
+        self.serve_media(qs.get("path", [""])[0], qs.get("scan_id", [""])[0])
+
+    def _get_health(self, _qs: dict) -> None:
+        cfg = load_config()
+        self.send_json({
+            "ok": True,
+            "api_version": API_VERSION,
+            "capabilities": API_CAPABILITIES,
+            "config": cfg,
+            "runtime_video_dir": str(get_current_video_dir() or ""),
+        })
+
     def do_GET(self):
         path, _, query = self.path.partition("?")
         qs = parse_qs(query)
         if not self._check_origin():
             return
-        if path == "/api/bootstrap":
-            self.send_json({
-                "ok": True,
-                "token": SESSION_TOKEN,
-                "port": PORT,
-                "version": API_VERSION,
-            })
-            return
-        if path == "/api/config":
-            cfg = load_config()
-            if cfg.get("remember_path") and cfg.get("last_video_dir"):
-                set_current_video_dir(cfg.get("last_video_dir"))
-            self.send_json({"ok": True, "config": cfg})
-            return
-        if path == "/api/fs/roots":
-            self.send_json({"ok": True, "roots": list_drive_roots()})
-            return
-        if path == "/api/fs/suggest":
-            partial_path = qs.get("path", [""])[0]
-            suggestions, error = suggest_child_folders(unquote(partial_path))
-            if error:
-                self.send_json({"ok": False, "error": error, "suggestions": []}, 400)
-            else:
-                self.send_json({"ok": True, "suggestions": suggestions})
-            return
-        if path == "/api/fs/list":
-            folder_path = qs.get("path", [""])[0]
-            include_path = qs.get("include", [""])[0]
-            folders, error = list_child_folders(unquote(folder_path), include_path=unquote(include_path))
-            if error:
-                self.send_json({"ok": False, "error": error, "folders": []}, 400)
-            else:
-                self.send_json({"ok": True, "path": normalize_path(unquote(folder_path)), "folders": folders})
-            return
-        if path == "/api/open":
-            self.send_json({"ok": False, "error": "Method not allowed; use POST."}, 405)
-            return
-        if path == "/api/open-file":
-            self.send_json({"ok": False, "error": "Method not allowed; use POST."}, 405)
-            return
-        if path == "/api/choose-folder":
-            self.send_json({"ok": False, "error": "Method not allowed; use POST."}, 405)
-            return
-        if path == "/api/file-path":
-            rel = qs.get("path", [""])[0]
-            scan_id = qs.get("scan_id", [""])[0]
-            self.api_file_path(rel, scan_id)
-            return
-        if path == "/api/metadata":
-            rel = qs.get("path", [""])[0]
-            scan_id = qs.get("scan_id", [""])[0]
-            self.api_metadata(rel, scan_id)
-            return
-        if path == "/api/workflow-status":
-            rel = qs.get("path", [""])[0]
-            scan_id = qs.get("scan_id", [""])[0]
-            self.api_workflow_status(rel, scan_id)
-            return
-        if path == "/api/trash/list":
-            self.api_trash_list(qs.get("scan_id", [""])[0])
-            return
-        if path == "/api/review":
-            self.send_json({"ok": True, "review": load_review_data()})
-            return
-        if path == "/media":
-            rel = qs.get("path", [""])[0]
-            scan_id = qs.get("scan_id", [""])[0]
-            self.serve_media(rel, scan_id)
-            return
-        if path == "/health":
-            cfg = load_config()
-            self.send_json({
-                "ok": True,
-                "api_version": API_VERSION,
-                "capabilities": API_CAPABILITIES,
-                "config": cfg,
-                "runtime_video_dir": str(get_current_video_dir() or ""),
-            })
+        routes = {
+            "/api/bootstrap": self._get_bootstrap,
+            "/api/config": self._get_config,
+            "/api/fs/roots": self._get_fs_roots,
+            "/api/fs/suggest": self._get_fs_suggest,
+            "/api/fs/list": self._get_fs_list,
+            "/api/open": self._get_method_not_allowed,
+            "/api/open-file": self._get_method_not_allowed,
+            "/api/choose-folder": self._get_method_not_allowed,
+            "/api/file-path": self._get_file_path,
+            "/api/metadata": self._get_metadata,
+            "/api/workflow-status": self._get_workflow_status,
+            "/api/trash/list": self._get_trash_list,
+            "/api/review": self._get_review,
+            "/media": self._get_media,
+            "/health": self._get_health,
+        }
+        handler = routes.get(path)
+        if handler:
+            handler(qs)
             return
         if path == "/":
             self.serve_static("index.html")
