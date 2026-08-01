@@ -1443,10 +1443,6 @@ class AppHandler(BaseHTTPRequestHandler):
                 set_current_video_dir(cfg.get("last_video_dir"))
             self.send_json({"ok": True, "config": cfg})
             return
-        if path == "/api/choose-folder":
-            selected = choose_folder_dialog()
-            self.send_json({"ok": True, "path": selected})
-            return
         if path == "/api/fs/roots":
             self.send_json({"ok": True, "roots": list_drive_roots()})
             return

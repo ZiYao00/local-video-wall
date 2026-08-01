@@ -48,3 +48,13 @@ class MediaRangeTests(unittest.TestCase):
         self.assertEqual(response.status, 206)
         self.assertEqual(response.getheader("Content-Range"), "bytes 2-5/10")
         self.assertEqual(body, b"2345")
+
+    def test_choose_folder_get_request_is_rejected_without_opening_a_dialog(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+        connection.request("GET", "/api/choose-folder")
+        response = connection.getresponse()
+        body = response.read().decode("utf-8")
+        connection.close()
+
+        self.assertEqual(response.status, 405)
+        self.assertIn("use POST", body)
