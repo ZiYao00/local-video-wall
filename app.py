@@ -1020,11 +1020,18 @@ class AppHandler(BaseHTTPRequestHandler):
             f"http://localhost:{PORT}",
         }
 
-    def _check_origin(self) -> bool:
+    def _is_portless_local_origin(self, value: str) -> bool:
+        return value.strip().lower() in {"http://127.0.0.1", "http://localhost"}
+
+    def _referer_origin(self, value: str) -> str:
+        parts = value.strip().split("/", 3)
+        return "/".join(parts[:3]) if len(parts) >= 3 else value
+
+    def _check_origin(self, require_same_origin: bool = True) -> bool:
         """Return True if the request comes from the local server itself.
 
         - Host header must be 127.0.0.1:PORT or localhost:PORT.
-        - When Origin or Referer is present, it must point to the same local origin.
+        - For write/dangerous requests, Origin or Referer must point to the same local origin.
         Anything else is rejected with 403 and logged.
         """
         path = self.path.split("?", 1)[0]
@@ -1033,18 +1040,23 @@ class AppHandler(BaseHTTPRequestHandler):
             _log_rejected("bad_host", self.headers, path)
             self.send_json({"ok": False, "error": "Forbidden: bad host."}, 403)
             return False
+        if not require_same_origin:
+            return True
         origin = self.headers.get("Origin", "")
         referer = self.headers.get("Referer", "")
+        referer_origin = self._referer_origin(referer) if referer else ""
         if origin and not self._is_local_origin(origin):
-            _log_rejected("bad_origin", self.headers, path)
-            self.send_json({"ok": False, "error": "Forbidden: bad origin."}, 403)
-            return False
+            portless_browser_origin = (
+                self._is_portless_local_origin(origin)
+                and referer_origin
+                and self._is_local_origin(referer_origin)
+            )
+            if not portless_browser_origin:
+                _log_rejected("bad_origin", self.headers, path)
+                self.send_json({"ok": False, "error": "Forbidden: bad origin."}, 403)
+                return False
         if referer:
-            # referer begins with scheme://host[:port][/...]; keep just the origin part.
-            ref = referer.strip()
-            parts = ref.split("/", 3)
-            ref_origin = "/".join(parts[:3]) if len(parts) >= 3 else ref
-            if not self._is_local_origin(ref_origin):
+            if not self._is_local_origin(referer_origin):
                 _log_rejected("bad_referer", self.headers, path)
                 self.send_json({"ok": False, "error": "Forbidden: bad referer."}, 403)
                 return False
@@ -1487,7 +1499,7 @@ class AppHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         path, _, query = self.path.partition("?")
         qs = parse_qs(query)
-        if not self._check_origin():
+        if not self._check_origin(require_same_origin=False):
             return
         routes = {
             "/api/bootstrap": self._get_bootstrap,
@@ -1516,6 +1528,70 @@ class AppHandler(BaseHTTPRequestHandler):
             self.serve_static(path[len("/static/"):])
         else:
             self.send_error(404)
+
+    def _post_path_state(self, payload: dict) -> None:
+        cfg = load_config()
+        action = str(payload.get("action", "")).strip()
+        folder_path = normalize_path(payload.get("path", ""))
+        if action == "favorite":
+            favorites = clean_path_list(cfg.get("path_favorites"), 30)
+            exists = any(os.path.normcase(x) == os.path.normcase(folder_path) for x in favorites)
+            if folder_path and not exists:
+                favorites.insert(0, folder_path)
+            cfg["path_favorites"] = clean_path_list(favorites, 30)
+        elif action == "unfavorite":
+            cfg["path_favorites"] = [
+                x for x in clean_path_list(cfg.get("path_favorites"), 30)
+                if os.path.normcase(x) != os.path.normcase(folder_path)
+            ]
+        elif action == "history":
+            cfg["path_history"] = add_recent_path(cfg.get("path_history", []), folder_path)
+        elif action == "remove_history":
+            cfg["path_history"] = [
+                x for x in clean_path_list(cfg.get("path_history"), 20)
+                if os.path.normcase(x) != os.path.normcase(folder_path)
+            ]
+        elif action == "clear_history":
+            cfg["path_history"] = []
+        else:
+            self.send_json({"ok": False, "error": "Unknown path-state action."}, 400)
+            return
+        cfg = save_config(cfg)
+        self.send_json({"ok": True, "config": cfg})
+
+    def _post_review(self, payload: dict) -> None:
+        try:
+            review = update_review_item(payload.get("key", ""), payload)
+        except ValueError as exc:
+            self.send_json({"ok": False, "error": str(exc)}, 400)
+            return
+        self.send_json({"ok": True, "review": review})
+
+    def _dispatch_post_state(self, path: str, payload: dict) -> bool:
+        routes = {
+            "/api/path-state": self._post_path_state,
+            "/api/review": self._post_review,
+        }
+        handler = routes.get(path)
+        if handler is None:
+            return False
+        handler(payload)
+        return True
+
+    def _dispatch_post_action(self, path: str, payload: dict) -> bool:
+        routes = {
+            "/api/file-action": self.api_file_action,
+            "/api/file-actions/batch": self.api_batch_file_action,
+            "/api/trash/action": self.api_trash_action,
+            "/api/open": lambda data: self.api_open_in_explorer(data.get("path", ""), data.get("scan_id", "")),
+            "/api/open-file": lambda data: self.api_open_file_default_app(data.get("path", ""), data.get("scan_id", "")),
+            "/api/choose-folder": lambda _data: self.send_json({"ok": True, "path": choose_folder_dialog()}),
+        }
+        handler = routes.get(path)
+        if handler is None:
+            return False
+        handler(payload)
+        return True
 
     def do_POST(self):
         path = self.path.split("?", 1)[0]
@@ -1626,66 +1702,9 @@ class AppHandler(BaseHTTPRequestHandler):
             cfg = save_config(cfg)
             self.send_json({"ok": True, "config": cfg})
             return
-        if path == "/api/path-state":
-            cfg = load_config()
-            action = str(payload.get("action", "")).strip()
-            folder_path = normalize_path(payload.get("path", ""))
-            if action == "favorite":
-                favorites = clean_path_list(cfg.get("path_favorites"), 30)
-                exists = any(os.path.normcase(x) == os.path.normcase(folder_path) for x in favorites)
-                if folder_path and not exists:
-                    favorites.insert(0, folder_path)
-                cfg["path_favorites"] = clean_path_list(favorites, 30)
-            elif action == "unfavorite":
-                cfg["path_favorites"] = [
-                    x for x in clean_path_list(cfg.get("path_favorites"), 30)
-                    if os.path.normcase(x) != os.path.normcase(folder_path)
-                ]
-            elif action == "history":
-                cfg["path_history"] = add_recent_path(cfg.get("path_history", []), folder_path)
-            elif action == "remove_history":
-                cfg["path_history"] = [
-                    x for x in clean_path_list(cfg.get("path_history"), 20)
-                    if os.path.normcase(x) != os.path.normcase(folder_path)
-                ]
-            elif action == "clear_history":
-                cfg["path_history"] = []
-            else:
-                self.send_json({"ok": False, "error": "Unknown path-state action."}, 400)
-                return
-            cfg = save_config(cfg)
-            self.send_json({"ok": True, "config": cfg})
+        if self._dispatch_post_state(path, payload):
             return
-        if path == "/api/review":
-            try:
-                review = update_review_item(payload.get("key", ""), payload)
-            except ValueError as exc:
-                self.send_json({"ok": False, "error": str(exc)}, 400)
-                return
-            self.send_json({"ok": True, "review": review})
-            return
-        if path == "/api/file-action":
-            self.api_file_action(payload)
-            return
-        if path == "/api/file-actions/batch":
-            self.api_batch_file_action(payload)
-            return
-        if path == "/api/trash/action":
-            self.api_trash_action(payload)
-            return
-        if path == "/api/open":
-            rel = payload.get("path", "")
-            scan_id = payload.get("scan_id", "")
-            self.api_open_in_explorer(rel, scan_id)
-            return
-        if path == "/api/open-file":
-            rel = payload.get("path", "")
-            scan_id = payload.get("scan_id", "")
-            self.api_open_file_default_app(rel, scan_id)
-            return
-        if path == "/api/choose-folder":
-            selected = choose_folder_dialog()
-            self.send_json({"ok": True, "path": selected})
+        if self._dispatch_post_action(path, payload):
             return
         self.send_error(404)
 

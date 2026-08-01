@@ -80,3 +80,102 @@ class MediaRangeTests(unittest.TestCase):
                 response.read()
                 connection.close()
                 self.assertEqual(response.status, 405)
+
+    def test_post_open_reaches_route_handler_with_valid_token(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+        connection.request("GET", "/api/bootstrap")
+        token = json.loads(connection.getresponse().read())["token"]
+        connection.request(
+            "POST",
+            "/api/open",
+            body=json.dumps({"path": "", "scan_id": ""}),
+            headers={
+                "Content-Type": "application/json",
+                "Origin": f"http://127.0.0.1:{self.server.server_port}",
+                "X-App-Token": token,
+            },
+        )
+        response = connection.getresponse()
+        payload = json.loads(response.read())
+        connection.close()
+
+        self.assertEqual(response.status, 400)
+        self.assertIn("choose and scan", payload["error"])
+
+    def test_static_assets_load_with_browser_origin_headers(self) -> None:
+        headers = {
+            "Origin": "http://127.0.0.1",
+            "Referer": f"http://127.0.0.1:{self.server.server_port}/",
+        }
+        for path in ("/static/style.css", "/static/app.js"):
+            with self.subTest(path=path):
+                connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+                connection.request("GET", path, headers=headers)
+                response = connection.getresponse()
+                body = response.read()
+                connection.close()
+
+                self.assertEqual(response.status, 200)
+                self.assertGreater(len(body), 0)
+
+    def test_post_with_foreign_origin_is_still_rejected(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+        connection.request("GET", "/api/bootstrap")
+        token = json.loads(connection.getresponse().read())["token"]
+        connection.request(
+            "POST",
+            "/api/open",
+            body=json.dumps({"path": "", "scan_id": ""}),
+            headers={
+                "Content-Type": "application/json",
+                "Origin": "http://127.0.0.1:9999",
+                "X-App-Token": token,
+            },
+        )
+        response = connection.getresponse()
+        response.read()
+        connection.close()
+
+        self.assertEqual(response.status, 403)
+
+    def test_post_accepts_portless_browser_origin_with_same_service_referer(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+        connection.request("GET", "/api/bootstrap")
+        token = json.loads(connection.getresponse().read())["token"]
+        connection.request(
+            "POST",
+            "/api/open",
+            body=json.dumps({"path": "", "scan_id": ""}),
+            headers={
+                "Content-Type": "application/json",
+                "Origin": "http://127.0.0.1",
+                "Referer": f"http://127.0.0.1:{self.server.server_port}/",
+                "X-App-Token": token,
+            },
+        )
+        response = connection.getresponse()
+        payload = json.loads(response.read())
+        connection.close()
+
+        self.assertEqual(response.status, 400)
+        self.assertIn("choose and scan", payload["error"])
+
+    def test_post_rejects_portless_origin_without_same_service_referer(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+        connection.request("GET", "/api/bootstrap")
+        token = json.loads(connection.getresponse().read())["token"]
+        connection.request(
+            "POST",
+            "/api/open",
+            body=json.dumps({"path": "", "scan_id": ""}),
+            headers={
+                "Content-Type": "application/json",
+                "Origin": "http://127.0.0.1",
+                "X-App-Token": token,
+            },
+        )
+        response = connection.getresponse()
+        response.read()
+        connection.close()
+
+        self.assertEqual(response.status, 403)

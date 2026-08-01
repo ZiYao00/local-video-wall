@@ -101,7 +101,9 @@
 
 - [ ] **T1 后端路由表化**：`do_GET`/`do_POST` 的 `if/elif` 链改成 `path -> handler` 字典。
   - [x] `do_GET` 固定 API 路径已改为路由表；媒体与静态资源保留专用回退。
-  - [ ] `do_POST` 路径待在下一小批改为路由表。
+  - [x] `do_POST` 的独立动作端点已改为路由表。
+  - [x] `do_POST` 的路径状态和评审端点已改为路由表。
+  - [ ] `do_POST` 的扫描和设置端点待在下一小批改为路由表。
 - [ ] **T2 后端模块拆分**：从 `app.py` 抽出 `scanner`、`trash`/`recycle`、`system_open`、`media_stream`。
 - [ ] **T3 前端 ES modules 拆分**：`static/app.js`（约 4790 行）拆为
   `api.js`、`state.js`、`i18n.js`、`media-wall.js`、`viewer.js`、`metadata-panel.js`、
