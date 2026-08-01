@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.8.3 - Unreleased
+## 1.8.3 - 2026-08-01
 
 - Added a dependency-free `unittest` regression suite for path containment, local-trash move/restore transitions, name conflicts, Unicode paths, JSON persistence, PNG A1111/ComfyUI metadata extraction, metadata normalization, and HTTP byte-range media responses.
 - Added a Windows GitHub Actions workflow that runs the regression suite on pushes and pull requests using Python 3.12.
