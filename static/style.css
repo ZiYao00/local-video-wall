@@ -1522,6 +1522,21 @@ body.sidebar-open .app-shell{
   color:var(--text);
 }
 
+.folder-row.scan-blocked > .folder-row-head > .folder-path{
+  color:var(--muted);
+  cursor:not-allowed;
+}
+
+.folder-row.scan-blocked > .folder-row-head > .folder-expand{
+  color:var(--muted);
+  cursor:not-allowed;
+}
+
+.folder-row.scan-blocked > .folder-row-head > .folder-expand:hover{
+  background:transparent;
+  color:var(--muted);
+}
+
 .folder-favorite-toggle{
   width:28px;
   height:28px;

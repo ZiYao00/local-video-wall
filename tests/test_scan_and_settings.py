@@ -111,6 +111,57 @@ class ScanAndSettingsTests(unittest.TestCase):
         self.assertFalse(data["ok"])
         self.assertFalse(self.config_file.exists())
 
+    def test_scan_rejects_a_blocked_path_before_recording_it(self) -> None:
+        self.assertTrue(app.is_path_within("H:\\folder", "H:\\"))
+        with patch.object(app.os, "name", "nt"):
+            self.assertEqual(app.normalize_path("h"), "H:\\")
+            self.assertEqual(app.normalize_path("H:"), "H:\\")
+        status, data = self._post(
+            "/api/settings",
+            {"blocked_scan_paths": [str(self.root)], "min_scan_volume_gb": 0},
+        )
+        self.assertEqual(status, 200)
+
+        status, data = self._post("/api/scan", {"video_dir": str(self.media_dir)})
+        self.assertEqual(status, 400)
+        self.assertFalse(data["ok"])
+        self.assertIn("Scanning is disabled", data["error"])
+        self.assertEqual(app.load_config()["path_history"], [])
+
+    def test_scan_rejects_a_volume_below_the_configured_capacity_limit(self) -> None:
+        usage = type("DiskUsage", (), {"total": 190 * 1024 * 1024})()
+        with patch.object(app.shutil, "disk_usage", return_value=usage):
+            status, data = self._post(
+                "/api/scan",
+                {"video_dir": str(self.media_dir), "min_scan_volume_gb": 1},
+            )
+
+        self.assertEqual(status, 400)
+        self.assertIn("below the 1 GB", data["error"])
+
+    def test_drive_list_skips_an_unreadable_volume_without_hiding_others(self) -> None:
+        class FakePath:
+            def __init__(self, value: str) -> None:
+                self.value = value
+
+            def exists(self) -> bool:
+                if self.value == "E:\\":
+                    raise OSError(1005, "Unrecognized file system")
+                return True
+
+            def __str__(self) -> str:
+                return self.value
+
+        with (
+            patch.object(app.os, "name", "nt"),
+            patch.object(app.os, "listdrives", return_value=["E:\\", "F:\\"], create=True),
+            patch.object(app, "Path", FakePath),
+            patch.object(app, "load_config", return_value={"blocked_scan_paths": [], "min_scan_volume_gb": 0}),
+        ):
+            roots = app.list_drive_roots()
+
+        self.assertEqual(roots, [{"name": "F:", "path": "F:\\", "type": "drive", "scan_blocked": False, "scan_block_reason": ""}])
+
     def test_settings_are_normalized_and_persisted_in_the_temporary_config(self) -> None:
         status, data = self._post(
             "/api/settings",
@@ -125,6 +176,8 @@ class ScanAndSettingsTests(unittest.TestCase):
                 "slideshow_interval": 99,
                 "slideshow_effect": "none",
                 "slideshow_fit": "cover",
+                "blocked_scan_paths": ["H:\\", "h:\\"],
+                "min_scan_volume_gb": 9999,
             },
         )
 
@@ -132,10 +185,12 @@ class ScanAndSettingsTests(unittest.TestCase):
         config = data["config"]
         self.assertEqual(config["columns"], 20)
         self.assertEqual(config["page_size"], 240)
-        self.assertEqual(config["play_limit"], 12)
+        self.assertEqual(config["play_limit"], 4)
         self.assertEqual(config["theme"], "light")
         self.assertEqual(config["font_size"], "large")
         self.assertEqual(config["content_align"], "left")
         self.assertEqual(config["button_style"], "icons")
         self.assertEqual(config["slideshow_interval"], 15)
+        self.assertEqual(config["blocked_scan_paths"], ["H:\\"])
+        self.assertEqual(config["min_scan_volume_gb"], 1024)
         self.assertEqual(app.load_config(), config)

@@ -6,7 +6,9 @@ from pathlib import Path
 import json
 import struct
 import zlib
+from unittest.mock import patch
 
+import app
 from core.json_store import read_json_file, write_json_file
 from metadata.embedded_reader import PNG_SIGNATURE, read_embedded_metadata
 from metadata.normalizer import metadata_to_dict, normalize_metadata
@@ -90,3 +92,19 @@ class EmbeddedMetadataTests(unittest.TestCase):
             self.assertEqual(metadata["source_app"], "ComfyUI")
             self.assertEqual(metadata["workflow"], workflow)
             self.assertEqual(metadata["model"], "model.safetensors")
+
+
+class WorkflowProbeTests(unittest.TestCase):
+    def test_video_card_probe_does_not_run_ffprobe(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "sample.mp4"
+            path.write_bytes(b"not-a-real-video")
+            app.WORKFLOW_STATUS_CACHE.clear()
+
+            with patch.object(app, "read_ffprobe_metadata") as ffprobe:
+                status = app.read_workflow_status(path, "video")
+
+            ffprobe.assert_not_called()
+            self.assertEqual(status["workflow_kind"], "unknown")
+            self.assertTrue(status["needs_full_probe"])
+            self.assertFalse(status["probe_complete"])

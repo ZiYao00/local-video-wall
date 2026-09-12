@@ -106,7 +106,7 @@ DEFAULT_CONFIG = {
     "filename_exclude_scope": "image",
     "columns": 6,
     "page_size": 120,
-    "play_limit": 36,
+    "play_limit": 8,
     "wall_autoplay": True,
     "preview_large_videos": False,
     "pause_when_inactive": False,
@@ -121,6 +121,8 @@ DEFAULT_CONFIG = {
     "floating_pager": False,
     "path_history": [],
     "path_favorites": [],
+    "blocked_scan_paths": [],
+    "min_scan_volume_gb": 1,
     "slideshow_interval": 5,
     "slideshow_effect": "drift",
     "slideshow_fit": "contain",
@@ -136,6 +138,8 @@ trash_lock = threading.RLock()
 
 def normalize_path(p: str) -> str:
     p = (p or "").strip().strip('"')
+    if os.name == "nt" and re.fullmatch(r"[A-Za-z]:?", p):
+        return f"{p[0].upper()}:\\"
     return str(Path(p).expanduser()) if p else ""
 
 
@@ -152,7 +156,7 @@ def clamp_int(value, default: int, low: int, high: int) -> int:
 
 
 def normalize_play_limit(value) -> int:
-    return clamp_int(value, 36, 12, 72)
+    return clamp_int(value, 8, 4, 72)
 
 
 def clean_path_list(value, max_items: int = 30) -> list[str]:
@@ -172,6 +176,37 @@ def clean_path_list(value, max_items: int = 30) -> list[str]:
         if len(paths) >= max_items:
             break
     return paths
+
+
+def is_path_within(path: str, root: str) -> bool:
+    target = os.path.normcase(os.path.normpath(normalize_path(path)))
+    boundary = os.path.normcase(os.path.normpath(normalize_path(root)))
+    if not target or not boundary:
+        return False
+    if target == boundary:
+        return True
+    prefix = boundary if boundary.endswith(os.sep) else boundary + os.sep
+    return target.startswith(prefix)
+
+
+def normalize_min_scan_volume_gb(value) -> int:
+    return clamp_int(value, 1, 0, 1024)
+
+
+def scan_protection_error(path: str, blocked_paths: list[str], min_volume_gb: int) -> str | None:
+    for blocked_path in clean_path_list(blocked_paths, 30):
+        if is_path_within(path, blocked_path):
+            return f"Scanning is disabled for this location: {blocked_path}"
+    if min_volume_gb <= 0:
+        return None
+    try:
+        total_bytes = shutil.disk_usage(path).total
+    except OSError:
+        return None
+    minimum_bytes = min_volume_gb * 1024 * 1024 * 1024
+    if total_bytes < minimum_bytes:
+        return f"This drive is below the {min_volume_gb} GB scan capacity limit."
+    return None
 
 
 def clean_exclude_keywords(value, max_items: int = 30) -> list[str]:
@@ -219,6 +254,8 @@ def load_config() -> dict:
     cfg["language"] = normalize_language(cfg.get("language", "en"))
     cfg["path_history"] = clean_path_list(cfg.get("path_history"), 20)
     cfg["path_favorites"] = clean_path_list(cfg.get("path_favorites"), 30)
+    cfg["blocked_scan_paths"] = clean_path_list(cfg.get("blocked_scan_paths"), 30)
+    cfg["min_scan_volume_gb"] = normalize_min_scan_volume_gb(cfg.get("min_scan_volume_gb"))
     cfg["filename_exclude_enabled"] = bool(cfg.get("filename_exclude_enabled", True))
     cfg["filename_exclude_keywords"] = clean_exclude_keywords(cfg.get("filename_exclude_keywords"), 30)
     cfg["filename_exclude_scope"] = "all" if cfg.get("filename_exclude_scope") == "all" else "image"
@@ -251,6 +288,8 @@ def save_config(cfg: dict) -> dict:
     merged["language"] = normalize_language(merged.get("language", "en"))
     merged["path_history"] = clean_path_list(merged.get("path_history"), 20)
     merged["path_favorites"] = clean_path_list(merged.get("path_favorites"), 30)
+    merged["blocked_scan_paths"] = clean_path_list(merged.get("blocked_scan_paths"), 30)
+    merged["min_scan_volume_gb"] = normalize_min_scan_volume_gb(merged.get("min_scan_volume_gb"))
     merged["filename_exclude_enabled"] = bool(merged.get("filename_exclude_enabled", True))
     merged["filename_exclude_keywords"] = clean_exclude_keywords(merged.get("filename_exclude_keywords"), 30)
     merged["filename_exclude_scope"] = "all" if merged.get("filename_exclude_scope") == "all" else "image"
@@ -513,6 +552,7 @@ def log_file_action(action: str, source: Path, destination: Path) -> None:
 def list_drive_roots() -> list[dict]:
     roots = []
     if os.name == "nt":
+        cfg = load_config()
         drives = []
         if hasattr(os, "listdrives"):
             try:
@@ -527,8 +567,17 @@ def list_drive_roots() -> list[dict]:
                 drives = [f"{chr(code)}:\\" for code in range(ord("A"), ord("Z") + 1)]
         for drive in drives:
             p = Path(drive)
-            if p.exists():
-                roots.append({"name": drive.rstrip("\\"), "path": str(p), "type": "drive"})
+            try:
+                if p.exists():
+                    protection_error = scan_protection_error(
+                        str(p), cfg.get("blocked_scan_paths", []), cfg.get("min_scan_volume_gb", 1)
+                    )
+                    roots.append({
+                        "name": drive.rstrip("\\"), "path": str(p), "type": "drive",
+                        "scan_blocked": bool(protection_error), "scan_block_reason": protection_error or "",
+                    })
+            except OSError:
+                continue
     else:
         roots.append({"name": "/", "path": "/", "type": "root"})
         home = str(Path.home())
@@ -674,6 +723,13 @@ def read_media_metadata(file_path: Path, media_type: str):
     return merge_metadata(*metadata_parts)
 
 
+def read_workflow_probe_metadata(file_path: Path, media_type: str):
+    return merge_metadata(
+        read_embedded_metadata(file_path, media_type),
+        read_sidecar_metadata(file_path),
+    )
+
+
 def workflow_status_cache_key(file_path: Path) -> str:
     stat = file_path.stat()
     return f"{str(file_path.resolve())}|{stat.st_mtime_ns}|{stat.st_size}"
@@ -686,7 +742,7 @@ def read_workflow_status(file_path: Path, media_type: str) -> dict:
     if cached is not None:
         return cached
 
-    metadata = metadata_to_dict(read_media_metadata(file_path, media_type))
+    metadata = metadata_to_dict(read_workflow_probe_metadata(file_path, media_type))
     sources = metadata.get("metadata_sources")
     if not isinstance(sources, list):
         sources = []
@@ -702,7 +758,8 @@ def read_workflow_status(file_path: Path, media_type: str) -> dict:
     elif has_workflow:
         workflow_kind = "workflow_only"
     else:
-        workflow_kind = "none"
+        workflow_kind = "unknown" if media_type == "video" else "none"
+    needs_full_probe = media_type == "video" and workflow_kind == "unknown"
     result = {
         "has_workflow": has_workflow,
         "has_generation": has_generation,
@@ -712,6 +769,8 @@ def read_workflow_status(file_path: Path, media_type: str) -> dict:
         "has_lora": bool(metadata.get("loras")),
         "metadata_status": metadata.get("metadata_status", "empty"),
         "metadata_sources": sources,
+        "probe_complete": not needs_full_probe,
+        "needs_full_probe": needs_full_probe,
     }
     with WORKFLOW_STATUS_LOCK:
         if len(WORKFLOW_STATUS_CACHE) > 4096:
@@ -726,6 +785,8 @@ def scan_videos(
     exclude_enabled: bool = True,
     exclude_keywords: list[str] | None = None,
     exclude_scope: str = "image",
+    blocked_paths: list[str] | None = None,
+    min_volume_gb: int = 1,
 ) -> tuple[list[dict], str | None, str, int]:
     root = Path(normalize_path(video_dir))
     if not str(root).strip():
@@ -734,6 +795,9 @@ def scan_videos(
         return [], f"Path does not exist: {root}", "", 0
     if not root.is_dir():
         return [], f"This is not a folder path: {root}", "", 0
+    protection_error = scan_protection_error(str(root), blocked_paths or [], min_volume_gb)
+    if protection_error:
+        return [], protection_error, "", 0
 
     files: list[Path] = []
     excluded_count = 0
@@ -1622,19 +1686,22 @@ class AppHandler(BaseHTTPRequestHandler):
             sort_mode = payload.get("sort_mode", "mtime_desc")
             immersive = bool(payload.get("immersive", False))
             language = normalize_language(payload.get("language", "en"))
+            current_cfg = load_config()
             videos, error, scan_id, excluded_count = scan_videos(
-                video_dir, recursive, exclude_enabled, exclude_keywords, exclude_scope
+                video_dir, recursive, exclude_enabled, exclude_keywords, exclude_scope,
+                current_cfg.get("blocked_scan_paths", []), current_cfg.get("min_scan_volume_gb", 1),
             )
             if error:
                 self.send_json({"ok": False, "error": error, "videos": []}, 400)
                 return
             set_current_video_dir(video_dir)
-            current_cfg = load_config()
             cfg = save_config({
                 "remember_path": remember_path,
                 "last_video_dir": video_dir if remember_path else "",
                 "path_history": add_recent_path(current_cfg.get("path_history", []), video_dir),
                 "path_favorites": current_cfg.get("path_favorites", []),
+                "blocked_scan_paths": current_cfg.get("blocked_scan_paths", []),
+                "min_scan_volume_gb": current_cfg.get("min_scan_volume_gb", 1),
                 "recursive": recursive,
                 "filename_exclude_enabled": exclude_enabled,
                 "filename_exclude_keywords": exclude_keywords,
@@ -1682,9 +1749,11 @@ class AppHandler(BaseHTTPRequestHandler):
                 "filename_exclude_scope": "all" if payload.get(
                     "filename_exclude_scope", cfg.get("filename_exclude_scope", "image")
                 ) == "all" else "image",
+                "blocked_scan_paths": clean_path_list(payload.get("blocked_scan_paths", cfg.get("blocked_scan_paths", [])), 30),
+                "min_scan_volume_gb": normalize_min_scan_volume_gb(payload.get("min_scan_volume_gb", cfg.get("min_scan_volume_gb", 1))),
                 "columns": clamp_int(payload.get("columns", cfg.get("columns", 6)), 6, 2, 20),
                 "page_size": clamp_int(payload.get("page_size", cfg.get("page_size", 120)), 120, 1, 240),
-                "play_limit": normalize_play_limit(payload.get("play_limit", cfg.get("play_limit", 36))),
+                "play_limit": normalize_play_limit(payload.get("play_limit", cfg.get("play_limit", DEFAULT_CONFIG["play_limit"]))),
                 "wall_autoplay": bool(payload.get("wall_autoplay", cfg.get("wall_autoplay", True))),
                 "preview_large_videos": bool(payload.get("preview_large_videos", cfg.get("preview_large_videos", False))),
                 "pause_when_inactive": bool(payload.get("pause_when_inactive", cfg.get("pause_when_inactive", False))),

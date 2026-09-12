@@ -12,13 +12,19 @@ const state = {
   currentModalMetadataLoading: false,
   currentModalMetadataError: "",
   visibleVideos: new Set(),
+  warmVideos: new Set(),
+  videoViewport: new Map(),
+  videoReleaseTimers: new Map(),
+  blockedMediaKeys: new Set(),
   columns: 6,
   pageSize: 120,
-  playLimit: 36,
+  playLimit: 8,
   recursive: false,
   filenameExcludeEnabled: true,
   filenameExcludeKeywords: ["fanart", "thumb"],
   filenameExcludeScope: "image",
+  blockedScanPaths: [],
+  minScanVolumeGb: 1,
   lastExcludedCount: 0,
   rememberPath: false,
   sortMode: "mtime_desc",
@@ -77,7 +83,7 @@ const state = {
   scanId: "",
   pathHistory: [],
   pathFavorites: [],
-  perf: { scanMs: 0, renderMs: 0, pageItems: 0, loadedMedia: 0 },
+  perf: { scanMs: 0, renderMs: 0, schedulerMs: 0, pageItems: 0, loadedMedia: 0, warmVideos: 0, activeVideos: 0 },
   loadedStatTimer: null,
   floatingPagerTimer: null,
   floatingPagerHover: false,
@@ -95,6 +101,8 @@ const COLUMN_WIDTHS = { 2: 420, 3: 350, 4: 300, 5: 260, 6: 220, 7: 190, 8: 165, 
 const COLUMN_GAPS = { 2: 18, 3: 18, 4: 18, 5: 18, 6: 18, 7: 16, 8: 14, 9: 12, 10: 10, 11: 9, 12: 8, 13: 7, 14: 7, 15: 6, 16: 6, 17: 5, 18: 5, 19: 5, 20: 5 };
 const COLUMN_OPTIONS = Object.keys(COLUMN_WIDTHS).map(Number);
 const LARGE_VIDEO_MB = 500;
+const VIDEO_WARM_MARGIN_PX = 720;
+const VIDEO_RELEASE_DELAY_MS = 1200;
 const COMFYUI_URL = "http://127.0.0.1:8188/";
 const EXPECTED_API_VERSION = 3;
 const REQUIRED_TRASH_CAPABILITIES = ["local_trash", "batch_trash", "trash_restore", "system_trash"];
@@ -206,6 +214,18 @@ const i18n = {
     excludeEmpty: "No exclusion keywords.",
     excludeDuplicate: "This keyword already exists.",
     excludeRemove: "Remove keyword",
+    scanProtection: "Scan protection",
+    scanProtectionPathPlaceholder: "Path, for example H:\\",
+    scanProtectionAdd: "Add",
+    scanProtectionCapacity: "Minimum drive capacity",
+    scanProtectionNoLimit: "No limit",
+    scanProtectionNote: "Blocked paths and drives below the capacity limit cannot be scanned.",
+    scanProtectionEmpty: "No blocked scan paths.",
+    scanProtectionDuplicate: "This path already exists.",
+    scanProtectionRemove: "Remove path",
+    scanProtectionSaved: "Scan protection saved.",
+    scanBlockedPath: "Scan blocked",
+    scanBlockedCapacity: "Below capacity limit",
     search: "Search filename...",
     reviewTitle: "Review filter",
     all: "All",
@@ -268,8 +288,9 @@ const i18n = {
     wallAutoplay: "Auto play wall",
     wallPlayLimit: "Wall play limit",
     playLimitOptions: {
-      12: "12 · Minimum load", 18: "18 · Low load", 24: "24 · Light",
-      36: "36 · Balanced", 48: "48 · High load", 72: "72 · Maximum load",
+      4: "4 · Ultra low", 6: "6 · Low-power", 8: "8 · Balanced low-power",
+      12: "12 · Balanced", 18: "18 · Performance", 24: "24 · High performance",
+      36: "36 · Legacy high", 48: "48 · Very high", 72: "72 · Maximum load",
     },
     columnsAutoplay: "Autoplay · 2-9 cols",
     columnsStatic: "Static preview · 10-20 cols",
@@ -426,7 +447,7 @@ const i18n = {
     recycleActionFailed: reason => `Recycle folder action failed: ${reason}`,
     recycleSystemConfirm: n => `Move ${n} item(s) to the Windows system recycle bin?`,
     fileActionFail: "File action failed.",
-    perfInfo: stats => `scan ${stats.scanMs}ms · render ${stats.renderMs}ms · page ${stats.pageItems} · loaded ${stats.loadedMedia}`,
+    perfInfo: stats => `scan ${stats.scanMs}ms · render ${stats.renderMs}ms · scheduler ${stats.schedulerMs}ms · active ${stats.activeVideos} · warm ${stats.warmVideos} · loaded ${stats.loadedMedia}`,
     scanDone: (n, excluded = 0) => excluded > 0
       ? `Scan complete: ${n} media items · ${excluded} excluded`
       : `Scan complete: ${n} media items`,
@@ -467,6 +488,18 @@ const i18n = {
     excludeEmpty: "暂无排除关键词。",
     excludeDuplicate: "这个关键词已经存在。",
     excludeRemove: "删除关键词",
+    scanProtection: "扫描保护",
+    scanProtectionPathPlaceholder: "输入路径，例如 H:\\",
+    scanProtectionAdd: "添加",
+    scanProtectionCapacity: "最低磁盘总容量",
+    scanProtectionNoLimit: "不限制",
+    scanProtectionNote: "禁止扫描的位置，以及总容量低于该阈值的磁盘，均无法扫描。",
+    scanProtectionEmpty: "暂无禁止扫描的位置。",
+    scanProtectionDuplicate: "这个路径已经存在。",
+    scanProtectionRemove: "删除路径",
+    scanProtectionSaved: "扫描保护已保存。",
+    scanBlockedPath: "已禁止扫描",
+    scanBlockedCapacity: "低于容量阈值",
     search: "搜索文件名...",
     reviewTitle: "审核筛选",
     all: "全部",
@@ -529,8 +562,9 @@ const i18n = {
     wallAutoplay: "墙内自动播放",
     wallPlayLimit: "墙内播放上限",
     playLimitOptions: {
-      12: "12 · 极省资源", 18: "18 · 省资源", 24: "24 · 轻量",
-      36: "36 · 均衡", 48: "48 · 高负载", 72: "72 · 极限负载",
+      4: "4 · 超低负载", 6: "6 · 低配", 8: "8 · 低配均衡",
+      12: "12 · 均衡", 18: "18 · 性能", 24: "24 · 高性能",
+      36: "36 · 旧版高负载", 48: "48 · 很高负载", 72: "72 · 极限负载",
     },
     columnsAutoplay: "自动播放 · 2-9 列",
     columnsStatic: "静态预览 · 10-20 列",
@@ -687,7 +721,7 @@ const i18n = {
     recycleActionFailed: reason => `回收文件夹操作失败：${reason}`,
     recycleSystemConfirm: n => `要把 ${n} 个项目移到 Windows 系统回收站吗？`,
     fileActionFail: "文件操作失败。",
-    perfInfo: stats => `扫描 ${stats.scanMs}ms · 渲染 ${stats.renderMs}ms · 本页 ${stats.pageItems} · 已加载 ${stats.loadedMedia}`,
+    perfInfo: stats => `扫描 ${stats.scanMs}ms · 渲染 ${stats.renderMs}ms · 调度 ${stats.schedulerMs}ms · 播放 ${stats.activeVideos} · 预热 ${stats.warmVideos} · 已加载 ${stats.loadedMedia}`,
     scanDone: (n, excluded = 0) => excluded > 0
       ? `扫描完成：显示 ${n} 项 · 已排除 ${excluded} 项`
       : `扫描完成：${n} 个媒体文件`,
@@ -743,6 +777,16 @@ const excludeKeywordInput = $("#excludeKeywordInput");
 const excludeKeywordAdd = $("#excludeKeywordAdd");
 const excludeKeywordList = $("#excludeKeywordList");
 const excludeScopeSeg = $("#excludeScopeSeg");
+const scanProtectionOpen = $("#scanProtectionOpen");
+const scanProtectionCount = $("#scanProtectionCount");
+const scanProtectionDialog = $("#scanProtectionDialog");
+const scanProtectionClose = $("#scanProtectionClose");
+const scanProtectionCancel = $("#scanProtectionCancel");
+const scanProtectionSave = $("#scanProtectionSave");
+const blockedScanPathInput = $("#blockedScanPathInput");
+const blockedScanPathAdd = $("#blockedScanPathAdd");
+const blockedScanPathList = $("#blockedScanPathList");
+const minScanVolumeSelect = $("#minScanVolumeSelect");
 const searchInput = $("#searchInput");
 const sizeFilterSelect = $("#sizeFilterSelect");
 const dateFilterSelect = $("#dateFilterSelect");
@@ -848,6 +892,7 @@ const slideshowUiShow = $("#slideshowUiShow");
 const slideshowExitFullscreen = $("#slideshowExitFullscreen");
 const slideshowBackToPreview = $("#slideshowBackToPreview");
 let excludeRulesDraft = null;
+let scanProtectionDraft = null;
 
 function t() {
   return i18n[state.language] || i18n.en;
@@ -1097,6 +1142,16 @@ function applyLanguage() {
   excludeRulesSave.textContent = tx.excludeSave;
   excludeRulesCancel.textContent = tx.excludeCancel;
   excludeRulesClose.textContent = tx.close;
+  $("#scanProtectionOpenLabel").textContent = tx.scanProtection;
+  $("#scanProtectionTitle").textContent = tx.scanProtection;
+  blockedScanPathInput.placeholder = tx.scanProtectionPathPlaceholder;
+  blockedScanPathAdd.textContent = tx.scanProtectionAdd;
+  $("#minScanVolumeLabel").textContent = tx.scanProtectionCapacity;
+  minScanVolumeSelect.querySelector('[value="0"]').textContent = tx.scanProtectionNoLimit;
+  $("#scanProtectionNote").textContent = tx.scanProtectionNote;
+  scanProtectionSave.textContent = tx.excludeSave;
+  scanProtectionCancel.textContent = tx.excludeCancel;
+  scanProtectionClose.textContent = tx.close;
   searchInput.placeholder = tx.search;
   sizeFilterSelect.title = tx.sizeFilterTitle;
   sizeFilterSelect.querySelector('[value="all"]').textContent = tx.anySize;
@@ -1204,6 +1259,7 @@ function applyLanguage() {
   updateSubInfo();
   updateGridPager();
   updateExcludeRulesSummary();
+  updateScanProtectionSummary();
   if (!excludeRulesDialog.classList.contains("hidden")) renderExcludeRulesDraft();
   if (state.currentModalItem) renderModalMetadata(state.currentModalItem);
 }
@@ -1354,6 +1410,105 @@ async function saveExcludeRules() {
   closeExcludeRulesDialog();
   updateExcludeRulesSummary();
   showToast(t().excludeSaved, 2200);
+}
+
+function cleanBlockedScanPaths(paths) {
+  const result = [];
+  const seen = new Set();
+  for (const value of Array.isArray(paths) ? paths : []) {
+    const path = normalizePathText(String(value || "")).trim().slice(0, 260);
+    const key = path.toLocaleLowerCase();
+    if (!path || seen.has(key)) continue;
+    seen.add(key);
+    result.push(path);
+    if (result.length >= 30) break;
+  }
+  return result;
+}
+
+function updateScanProtectionSummary() {
+  const pathCount = state.blockedScanPaths.length;
+  const capacity = state.minScanVolumeGb > 0 ? `${state.minScanVolumeGb} GB` : t().scanProtectionNoLimit;
+  scanProtectionCount.textContent = pathCount ? `${pathCount} · ${capacity}` : capacity;
+}
+
+function renderScanProtectionDraft() {
+  if (!scanProtectionDraft) return;
+  blockedScanPathList.innerHTML = "";
+  if (!scanProtectionDraft.paths.length) {
+    const empty = document.createElement("div");
+    empty.className = "exclude-keyword-empty";
+    empty.textContent = t().scanProtectionEmpty;
+    blockedScanPathList.appendChild(empty);
+  } else {
+    for (const path of scanProtectionDraft.paths) {
+      const chip = document.createElement("span");
+      chip.className = "exclude-keyword-chip";
+      const text = document.createElement("span");
+      text.textContent = path;
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.innerHTML = ICONS.close;
+      remove.title = t().scanProtectionRemove;
+      remove.setAttribute("aria-label", t().scanProtectionRemove);
+      remove.addEventListener("click", () => {
+        scanProtectionDraft.paths = scanProtectionDraft.paths.filter(item => item !== path);
+        renderScanProtectionDraft();
+      });
+      chip.append(text, remove);
+      blockedScanPathList.appendChild(chip);
+    }
+  }
+  minScanVolumeSelect.value = String(scanProtectionDraft.minVolumeGb);
+}
+
+function openScanProtectionDialog() {
+  scanProtectionDraft = {
+    paths: [...state.blockedScanPaths],
+    minVolumeGb: state.minScanVolumeGb,
+  };
+  blockedScanPathInput.value = "";
+  setSettingsMenuOpen(false);
+  scanProtectionDialog.classList.remove("hidden");
+  renderScanProtectionDraft();
+  setTimeout(() => blockedScanPathInput.focus(), 0);
+}
+
+function closeScanProtectionDialog() {
+  scanProtectionDialog.classList.add("hidden");
+  scanProtectionDraft = null;
+}
+
+function addBlockedScanPath() {
+  if (!scanProtectionDraft) return;
+  const path = normalizePathText(blockedScanPathInput.value).trim().slice(0, 260);
+  if (!path) return;
+  if (scanProtectionDraft.paths.some(item => item.toLocaleLowerCase() === path.toLocaleLowerCase())) {
+    showToast(t().scanProtectionDuplicate, 1800);
+    return;
+  }
+  if (scanProtectionDraft.paths.length >= 30) return;
+  scanProtectionDraft.paths.push(path);
+  blockedScanPathInput.value = "";
+  renderScanProtectionDraft();
+  blockedScanPathInput.focus();
+}
+
+async function saveScanProtection() {
+  if (!scanProtectionDraft) return;
+  const previousPaths = state.blockedScanPaths;
+  const previousCapacity = state.minScanVolumeGb;
+  state.blockedScanPaths = cleanBlockedScanPaths(scanProtectionDraft.paths);
+  state.minScanVolumeGb = Math.max(0, Math.min(1024, Number(scanProtectionDraft.minVolumeGb) || 0));
+  if (!await saveSettingsSoft()) {
+    state.blockedScanPaths = previousPaths;
+    state.minScanVolumeGb = previousCapacity;
+    showToast(t().configFail, 2600);
+    return;
+  }
+  closeScanProtectionDialog();
+  updateScanProtectionSummary();
+  showToast(t().scanProtectionSaved, 2200);
 }
 
 function updateSubInfo() {
@@ -1590,11 +1745,12 @@ function renderGrid() {
   const pageStart = state.gridPage * state.pageSize;
   const pageItems = state.view.slice(pageStart, pageStart + state.pageSize);
   state.perf.pageItems = pageItems.length;
-  for (const item of pageItems) {
+  for (const [pageIndex, item] of pageItems.entries()) {
     const card = document.createElement("article");
     card.className = "video-card";
     card.dataset.key = item.key;
     card.dataset.rel = item.rel;
+    card._mediaItem = item;
     const largeVideoPlaceholder = item.type === "video"
       && Number(item.size_mb) > LARGE_VIDEO_MB
       && !state.previewLargeVideos;
@@ -1603,7 +1759,7 @@ function renderGrid() {
       ? `<img class="media-image" data-src="${item.url}" alt="${escapeHtml(item.name)}" loading="lazy" decoding="async" />`
       : largeVideoPlaceholder
         ? `<div class="large-video-placeholder">${ICONS.play}<strong>${t().largeVideoTitle}</strong><span>${fmtBytes(item.size_mb)}</span><small>${t().largeVideoHint}</small></div>`
-      : `<video muted loop playsinline preload="none" data-src="${item.url}" data-rel="${escapeHtml(item.rel)}"></video>`;
+      : `<video muted loop playsinline preload="none" data-src="${item.url}" data-rel="${escapeHtml(item.rel)}" data-grid-index="${pageIndex}"></video>`;
     card.innerHTML = `
       <div class="video-wrap" title="${escapeHtml(item.name)}">
         ${mediaHtml}
@@ -1663,7 +1819,6 @@ function renderGrid() {
   grid.appendChild(frag);
   updateReviewButtons();
   setupObservers();
-  queueCurrentPageImageWorkflowStatus();
   updateGridPager();
   state.perf.renderMs = Math.round(performance.now() - renderStart);
   state.perf.loadedMedia = countLoadedMedia();
@@ -1673,7 +1828,7 @@ function renderGrid() {
 function updateReviewButtons() {
   const tx = t();
   document.querySelectorAll(".video-card").forEach(card => {
-    const item = state.all.find(v => v.key === card.dataset.key);
+    const item = card._mediaItem || state.all.find(v => v.key === card.dataset.key);
     if (!item) return;
     const favoriteBtn = card.querySelector('[data-card-action="favorite"]');
     const copyPathBtn = card.querySelector('[data-card-action="copy-path"]');
@@ -1771,8 +1926,6 @@ function clearBatchSelection() {
 function syncReviewItemState(item, review) {
   item.favorite = !!review.favorite;
   item.selected = !!review.selected;
-  state.all = state.all.map(v => v.key === item.key ? { ...v, favorite: item.favorite, selected: item.selected } : v);
-  state.view = state.view.map(v => v.key === item.key ? { ...v, favorite: item.favorite, selected: item.selected } : v);
 }
 
 function refreshAfterFavoriteChange(forceFilter = false) {
@@ -1794,7 +1947,6 @@ async function setBatchFavorite(value) {
   }
   let done = 0;
   const errors = [];
-  const reviewUpdates = new Map();
   state.batchBusy = true;
   updateBatchUI();
   showToast(t().batchWorking, 1800);
@@ -1814,7 +1966,6 @@ async function setBatchFavorite(value) {
         };
         item.favorite = nextReview.favorite;
         item.selected = nextReview.selected;
-        reviewUpdates.set(item.key, nextReview);
         done += 1;
       } catch (err) {
         console.error(err);
@@ -1823,10 +1974,6 @@ async function setBatchFavorite(value) {
     }
   } finally {
     state.batchBusy = false;
-  }
-  if (reviewUpdates.size) {
-    state.all = state.all.map(v => reviewUpdates.has(v.key) ? { ...v, ...reviewUpdates.get(v.key) } : v);
-    state.view = state.view.map(v => reviewUpdates.has(v.key) ? { ...v, ...reviewUpdates.get(v.key) } : v);
   }
   refreshAfterFavoriteChange();
   if (errors.length && done) showToast(t().batchPartial(done, errors.length, errors[0]), 6200);
@@ -1875,6 +2022,7 @@ async function moveBatchToTrash() {
     console.error(err);
     errors.push(err.message || t().fileActionFail);
   } finally {
+    setPlaybackBlocked(items, false);
     state.batchBusy = false;
   }
   console.info("[delete-perf] batch summary", {
@@ -2023,6 +2171,7 @@ function setTrashView(visible) {
   }
   state.showTrash = !!visible;
   if (state.showTrash) {
+    pauseAllInline();
     setBatchMode(false);
     batchBar.classList.add("hidden");
     [grid, gridPager, floatingPager, emptyState, subInfo].forEach(node => node.classList.add("hidden"));
@@ -2150,6 +2299,7 @@ function exportBatchCsv() {
 }
 
 let loadObserver = null;
+let warmObserver = null;
 let playObserver = null;
 let workflowObserver = null;
 
@@ -2199,7 +2349,7 @@ function queueWorkflowStatusForItem(item) {
 
 function queueWorkflowStatusForCard(card) {
   if (!card?.dataset?.key) return;
-  const item = state.all.find(entry => entry.key === card.dataset.key);
+  const item = card._mediaItem || state.all.find(entry => entry.key === card.dataset.key);
   queueWorkflowStatusForItem(item);
 }
 
@@ -2216,7 +2366,8 @@ async function pumpWorkflowStatusQueue() {
       const res = await fetch(`/api/workflow-status?${params.toString()}`);
       const data = await res.json();
       if (version === state.workflowStatusVersion) {
-        state.workflowStatusCache.set(cacheKey, data.ok ? { ...data, state: data.workflow_kind === "none" ? "empty" : "ok" } : { state: "error", workflow_kind: "none", has_workflow: false, error: data.error || "" });
+        const nextState = data.workflow_kind === "none" ? "empty" : data.workflow_kind === "unknown" ? "unknown" : "ok";
+        state.workflowStatusCache.set(cacheKey, data.ok ? { ...data, state: nextState } : { state: "error", workflow_kind: "none", has_workflow: false, error: data.error || "" });
       }
     } catch (err) {
       if (version === state.workflowStatusVersion) {
@@ -2231,17 +2382,51 @@ async function pumpWorkflowStatusQueue() {
   }
 }
 
-function queueCurrentPageImageWorkflowStatus() {
-  currentPageItems().filter(item => item.type === "image").forEach(queueWorkflowStatusForItem);
+function syncWorkflowStatusFromFullMetadata(item, metadata) {
+  if (!item || !metadata) return;
+  const hasWorkflow = !!metadata.workflow;
+  const hasGeneration = !!(
+    metadata.prompt
+    || metadata.negative_prompt
+    || metadata.model
+    || (Array.isArray(metadata.loras) ? metadata.loras.length : metadata.loras)
+  );
+  const workflowKind = hasGeneration ? "generation" : hasWorkflow ? "workflow_only" : "none";
+  state.workflowStatusCache.set(workflowStatusKey(item), {
+    state: workflowKind === "none" ? "empty" : "ok",
+    has_workflow: hasWorkflow,
+    has_generation: hasGeneration,
+    workflow_kind: workflowKind,
+    probe_complete: true,
+    needs_full_probe: false,
+  });
+  applyWorkflowStatusForItem(item);
 }
 
 function destroyObservers() {
   if (loadObserver) loadObserver.disconnect();
+  if (warmObserver) warmObserver.disconnect();
   if (playObserver) playObserver.disconnect();
   if (workflowObserver) workflowObserver.disconnect();
   loadObserver = null;
+  warmObserver = null;
   playObserver = null;
   workflowObserver = null;
+}
+
+function videoCardKey(video) {
+  return video?.closest?.(".video-card")?.dataset?.key || "";
+}
+
+function isVideoBlocked(video) {
+  const key = videoCardKey(video);
+  return !!key && state.blockedMediaKeys.has(key);
+}
+
+function clearVideoReleaseTimer(video) {
+  const timer = state.videoReleaseTimers.get(video);
+  if (timer) clearTimeout(timer);
+  state.videoReleaseTimers.delete(video);
 }
 
 function releaseMediaElement(media) {
@@ -2253,54 +2438,105 @@ function releaseMediaElement(media) {
   }
 }
 
+function releaseGridVideo(video) {
+  if (!video) return;
+  clearVideoReleaseTimer(video);
+  state.warmVideos.delete(video);
+  state.visibleVideos.delete(video);
+  state.videoViewport.delete(video);
+  video.closest(".video-card")?.classList.remove("paused-by-limit");
+  releaseMediaElement(video);
+}
+
+function scheduleGridVideoRelease(video) {
+  if (!video) return;
+  video.pause();
+  state.visibleVideos.delete(video);
+  state.videoViewport.delete(video);
+  video.closest(".video-card")?.classList.remove("paused-by-limit");
+  clearVideoReleaseTimer(video);
+  const timer = setTimeout(() => {
+    state.videoReleaseTimers.delete(video);
+    if (!video.isConnected || !state.warmVideos.has(video) || isVideoBlocked(video)) {
+      releaseGridVideo(video);
+      syncLoadedMediaStat();
+    }
+  }, VIDEO_RELEASE_DELAY_MS);
+  state.videoReleaseTimers.set(video, timer);
+}
+
 function releaseGridMedia() {
+  state.videoReleaseTimers.forEach(timer => clearTimeout(timer));
+  state.videoReleaseTimers.clear();
   document.querySelectorAll(".video-wrap video, .video-wrap img.media-image").forEach(releaseMediaElement);
   state.visibleVideos.clear();
+  state.warmVideos.clear();
+  state.videoViewport.clear();
   state.perf.loadedMedia = 0;
+  state.perf.warmVideos = 0;
+  state.perf.activeVideos = 0;
 }
 
 function setupObservers() {
   const images = [...document.querySelectorAll(".video-wrap img.media-image")];
   const videos = [...document.querySelectorAll(".video-wrap video")];
   const cards = [...document.querySelectorAll(".video-card")];
+
   workflowObserver = new IntersectionObserver(entries => {
     for (const entry of entries) {
       if (!entry.isIntersecting) continue;
       queueWorkflowStatusForCard(entry.target);
       workflowObserver.unobserve(entry.target);
     }
-  }, { root: null, rootMargin: "500px 0px", threshold: .01 });
+  }, { root: null, rootMargin: "420px 0px", threshold: .01 });
+
   loadObserver = new IntersectionObserver(entries => {
     for (const entry of entries) {
-      const media = entry.target;
-      if (entry.isIntersecting) ensureSrc(media);
-      else {
-        if (media.tagName === "VIDEO") {
-          state.visibleVideos.delete(media);
-          media.closest(".video-card")?.classList.remove("paused-by-limit");
-        }
-        pauseAndRelease(media);
+      const image = entry.target;
+      if (entry.isIntersecting) ensureSrc(image);
+      else pauseAndRelease(image);
+    }
+  }, { root: null, rootMargin: "320px 0px", threshold: .01 });
+
+  warmObserver = new IntersectionObserver(entries => {
+    for (const entry of entries) {
+      const video = entry.target;
+      if (entry.isIntersecting && !isVideoBlocked(video)) {
+        clearVideoReleaseTimer(video);
+        state.warmVideos.add(video);
+        ensureSrc(video);
+      } else {
+        state.warmVideos.delete(video);
+        scheduleGridVideoRelease(video);
       }
     }
-  }, { root: null, rootMargin: "300px 0px", threshold: .01 });
+    state.perf.warmVideos = state.warmVideos.size;
+    scheduleUpdatePlaying();
+  }, { root: null, rootMargin: `${VIDEO_WARM_MARGIN_PX}px 0px`, threshold: .01 });
+
   playObserver = new IntersectionObserver(entries => {
     for (const entry of entries) {
       const video = entry.target;
-      if (entry.isIntersecting) state.visibleVideos.add(video);
-      else {
+      if (entry.isIntersecting && entry.intersectionRatio > 0 && !isVideoBlocked(video)) {
+        state.visibleVideos.add(video);
+        state.videoViewport.set(video, {
+          ratio: entry.intersectionRatio,
+          index: Number(video.dataset.gridIndex) || 0,
+        });
+      } else {
         state.visibleVideos.delete(video);
+        state.videoViewport.delete(video);
         video.pause();
         video.closest(".video-card")?.classList.remove("paused-by-limit");
       }
     }
     scheduleUpdatePlaying();
-  }, { root: null, rootMargin: "160px 0px 220px 0px", threshold: [0, .1, .25, .5] });
+  }, { root: null, rootMargin: "0px", threshold: [0, .1, .25, .5, .75] });
+
   for (const image of images) loadObserver.observe(image);
-  for (const card of cards) {
-    const item = state.all.find(entry => entry.key === card.dataset.key);
-    if (item?.type === "video") workflowObserver.observe(card);
-  }
+  for (const card of cards) workflowObserver.observe(card);
   for (const video of videos) {
+    warmObserver.observe(video);
     playObserver.observe(video);
   }
   scheduleUpdatePlaying();
@@ -2329,6 +2565,7 @@ function syncLoadedMediaStatNow() {
 }
 
 function ensureSrc(media) {
+  if (media?.tagName === "VIDEO" && isVideoBlocked(media)) return;
   if (!media.getAttribute("src") && media.dataset.src) {
     media.src = media.dataset.src;
     if (media.tagName === "VIDEO") media.load();
@@ -2341,70 +2578,29 @@ function pauseAndRelease(media) {
   syncLoadedMediaStat();
 }
 
-function isActuallyVisible(el) {
-  const r = el.getBoundingClientRect();
-  return r.bottom > 0 && r.top < window.innerHeight && r.right > 0 && r.left < window.innerWidth;
-}
-
-function visibleAreaRatio(el) {
-  const r = el.getBoundingClientRect();
-  const width = Math.max(0, Math.min(r.right, window.innerWidth) - Math.max(r.left, 0));
-  const height = Math.max(0, Math.min(r.bottom, window.innerHeight) - Math.max(r.top, 0));
-  const area = Math.max(1, r.width * r.height);
-  return (width * height) / area;
-}
-
-function preloadMarginForVideo(video) {
-  const height = video.getBoundingClientRect().height || 0;
-  return Math.min(900, Math.max(400, height * 1.2));
-}
-
-function isWithinVideoPreloadRange(video) {
-  const r = video.getBoundingClientRect();
-  const margin = preloadMarginForVideo(video);
-  return r.bottom >= -margin && r.top <= window.innerHeight + margin && r.right > 0 && r.left < window.innerWidth;
-}
-
-function updateVideoPlayCandidate(video, ratio) {
-  const wasCandidate = video.dataset.playCandidate === "1";
-  if (ratio >= .25) {
-    video.dataset.playCandidate = "1";
-    return true;
-  }
-  if (ratio < .1) {
-    video.dataset.playCandidate = "0";
-    return false;
-  }
-  return wasCandidate;
-}
-
 function selectVideosByVisibleRows(candidates, playLimit) {
   if (playLimit <= 0) return [];
-  const rows = [];
-  const sorted = candidates
-    .map(video => ({ video, rect: video.getBoundingClientRect(), ratio: visibleAreaRatio(video) }))
-    .sort((a, b) => a.rect.top - b.rect.top || a.rect.left - b.rect.left);
-  for (const item of sorted) {
-    const row = rows.find(group => Math.abs(group.top - item.rect.top) <= Math.max(12, item.rect.height * .25));
-    if (row) {
-      row.items.push(item);
-      row.top = Math.min(row.top, item.rect.top);
-      row.ratioTotal += item.ratio;
-      row.maxRatio = Math.max(row.maxRatio, item.ratio);
-    } else {
-      rows.push({ top: item.rect.top, ratioTotal: item.ratio, maxRatio: item.ratio, items: [item] });
-    }
+  const rows = new Map();
+  for (const video of candidates) {
+    const metric = state.videoViewport.get(video);
+    if (!metric) continue;
+    const rowIndex = Math.floor(metric.index / Math.max(1, state.columns));
+    const row = rows.get(rowIndex) || { index: rowIndex, ratioTotal: 0, maxRatio: 0, items: [] };
+    row.items.push({ video, ...metric });
+    row.ratioTotal += metric.ratio;
+    row.maxRatio = Math.max(row.maxRatio, metric.ratio);
+    rows.set(rowIndex, row);
   }
-  rows.sort((a, b) => {
+  const orderedRows = [...rows.values()].sort((a, b) => {
     const avgA = a.ratioTotal / Math.max(1, a.items.length);
     const avgB = b.ratioTotal / Math.max(1, b.items.length);
     if (Math.abs(avgB - avgA) > .08) return avgB - avgA;
     if (Math.abs(b.maxRatio - a.maxRatio) > .08) return b.maxRatio - a.maxRatio;
-    return a.top - b.top;
+    return a.index - b.index;
   });
   const selected = [];
-  for (const row of rows) {
-    row.items.sort((a, b) => a.rect.left - b.rect.left);
+  for (const row of orderedRows) {
+    row.items.sort((a, b) => a.index - b.index);
     for (const item of row.items) {
       selected.push(item.video);
       if (selected.length >= playLimit) return selected;
@@ -2414,7 +2610,7 @@ function selectVideosByVisibleRows(candidates, playLimit) {
 }
 
 function effectiveWallPlayLimit() {
-  return state.columns >= 10 ? 0 : Math.max(12, Math.min(72, Number(state.playLimit) || 36));
+  return state.columns >= 10 ? 0 : Math.max(4, Math.min(72, Number(state.playLimit) || 8));
 }
 
 function isWallPreviewStatic() {
@@ -2430,39 +2626,41 @@ function scheduleUpdatePlaying() {
 }
 
 function updatePlaying() {
-  const allVideos = [...document.querySelectorAll(".video-wrap video")].filter(v => v.isConnected);
+  const started = performance.now();
   const playLimit = effectiveWallPlayLimit();
-  const preloadedVideos = [];
-  const candidates = [];
-  for (const video of allVideos) {
-    const card = video.closest(".video-card");
-    if (!isWithinVideoPreloadRange(video)) {
-      video.dataset.playCandidate = "0";
-      card?.classList.remove("paused-by-limit");
-      pauseAndRelease(video);
-      continue;
-    }
-    ensureSrc(video);
-    preloadedVideos.push(video);
-    const ratio = isActuallyVisible(video) ? visibleAreaRatio(video) : 0;
-    if (updateVideoPlayCandidate(video, ratio)) candidates.push(video);
-  }
+  const canPlayWall = (
+    state.playingEnabled
+    && !isWallPreviewStatic()
+    && !(state.pauseWhenInactive && document.hidden)
+    && modal.classList.contains("hidden")
+    && slideshow.classList.contains("hidden")
+    && !state.showTrash
+  );
+  const candidates = canPlayWall
+    ? [...state.visibleVideos].filter(video => (
+      video.isConnected
+      && state.warmVideos.has(video)
+      && !isVideoBlocked(video)
+      && (state.videoViewport.get(video)?.ratio || 0) >= .1
+    ))
+    : [];
   const selected = selectVideosByVisibleRows(candidates, playLimit);
   const selectedSet = new Set(selected);
   const candidateSet = new Set(candidates);
-  for (const video of preloadedVideos) {
-    const card = video.closest(".video-card");
-    if (isWallPreviewStatic() && state.playingEnabled && modal.classList.contains("hidden")) {
-      video.pause();
-      card?.classList.remove("paused-by-limit");
+
+  for (const video of [...state.warmVideos]) {
+    if (!video.isConnected) {
+      releaseGridVideo(video);
       continue;
     }
-    if (!state.playingEnabled || (state.pauseWhenInactive && document.hidden) || !modal.classList.contains("hidden")) {
+    const card = video.closest(".video-card");
+    if (isVideoBlocked(video)) {
       video.pause();
       card?.classList.remove("paused-by-limit");
       continue;
     }
     if (selectedSet.has(video)) {
+      ensureSrc(video);
       card?.classList.remove("paused-by-limit");
       video.muted = true;
       video.loop = true;
@@ -2470,9 +2668,13 @@ function updatePlaying() {
       video.play().catch(() => {});
     } else {
       video.pause();
-      card?.classList.toggle("paused-by-limit", candidateSet.has(video) && playLimit > 0);
+      card?.classList.toggle("paused-by-limit", canPlayWall && candidateSet.has(video) && playLimit > 0);
     }
   }
+
+  state.perf.warmVideos = state.warmVideos.size;
+  state.perf.activeVideos = canPlayWall ? selected.length : 0;
+  state.perf.schedulerMs = Math.round((performance.now() - started) * 10) / 10;
 }
 
 function pauseAllInline() {
@@ -2783,6 +2985,7 @@ async function loadModalMetadata(item) {
     state.currentModalMetadata = data.metadata || {};
     state.currentModalMetadataLoading = false;
     state.currentModalMetadataError = "";
+    syncWorkflowStatusFromFullMetadata(item, state.currentModalMetadata);
     renderModalMetadata(item, state.currentModalMetadata);
   } catch {
     if (requestId === state.metadataRequestId && state.currentModalItem?.key === item.key) {
@@ -3372,7 +3575,17 @@ function removeItemsFromState(items) {
   const keys = new Set(items.map(item => item.key));
   const expectedRemovedCardCount = currentPageItems().filter(item => keys.has(item.key)).length;
   const cards = [...grid.querySelectorAll(".video-card")].filter(card => keys.has(card.dataset.key));
-  cards.forEach(card => card.classList.add("is-removing"));
+  cards.forEach(card => {
+    const video = card.querySelector(".video-wrap video");
+    if (video) {
+      clearVideoReleaseTimer(video);
+      state.warmVideos.delete(video);
+      state.visibleVideos.delete(video);
+      state.videoViewport.delete(video);
+      video.pause();
+    }
+    card.classList.add("is-removing");
+  });
   // Schedule the DOM removal before follow-up UI work so a later UI error cannot leave a stale playable card behind.
   window.setTimeout(() => cards.forEach(card => card.remove()), 140);
   state.all = state.all.filter(item => !keys.has(item.key));
@@ -3396,6 +3609,15 @@ function removeItemFromState(item) {
   return removeItemsFromState([item]);
 }
 
+function setPlaybackBlocked(items, blocked) {
+  for (const item of Array.isArray(items) ? items : [items]) {
+    if (!item?.key) continue;
+    if (blocked) state.blockedMediaKeys.add(item.key);
+    else state.blockedMediaKeys.delete(item.key);
+  }
+  if (!blocked) scheduleUpdatePlaying();
+}
+
 function releaseActionPreviewMedia(source) {
   if (source === "slideshow") {
     releaseMediaElement(slideshowImageA);
@@ -3412,6 +3634,7 @@ function waitForMediaRelease(ms = 0) {
 
 async function releaseMediaBeforeFileAction(item, source) {
   const start = performance.now();
+  setPlaybackBlocked(item, true);
   let matchedGridMedia = 0;
   let videoWaitMs = 0;
   if (!item) return { total_ms: 0, matched_grid_media: 0, video_wait_ms: 0 };
@@ -3443,6 +3666,7 @@ async function releaseMediaBeforeFileAction(item, source) {
 
 async function releaseMediaBeforeBatchAction(items) {
   const start = performance.now();
+  setPlaybackBlocked(items, true);
   const rels = new Set(items.map(item => item.rel));
   const urls = new Set(items.map(item => item.url).filter(Boolean));
   let matchedGridMedia = 0;
@@ -3548,6 +3772,8 @@ async function runFileAction(action, item = state.currentModalItem, source = "mo
     console.error(err);
     restoreActionPreviewMedia(item, source);
     showToast(err.message || t().fileActionFail, 5200);
+  } finally {
+    setPlaybackBlocked(item, false);
   }
 }
 
@@ -3557,6 +3783,11 @@ function pathKey(path) {
 
 function normalizePathText(path) {
   return String(path || "").trim().replace(/^"+|"+$/g, "");
+}
+
+function normalizeDriveLetterInput(path) {
+  const value = normalizePathText(path);
+  return /^[a-z]:?$/i.test(value) ? `${value[0].toUpperCase()}:\\` : value;
 }
 
 function isFavoritePath(path) {
@@ -3596,7 +3827,8 @@ function createPathRow(label, path, options = {}) {
     expand.className = "folder-expand";
     expand.type = "button";
     expand.textContent = ">";
-    expand.title = labelText("expand", "Expand", "展开");
+    expand.title = options.scanBlocked ? (options.scanBlockReason || t().scanBlockedPath) : labelText("expand", "Expand", "展开");
+    expand.disabled = !!options.scanBlocked;
     expand.addEventListener("click", e => {
       e.stopPropagation();
       toggleFolderNode(row, path, expand);
@@ -3610,14 +3842,17 @@ function createPathRow(label, path, options = {}) {
   const select = document.createElement("button");
   select.className = "folder-path";
   select.type = "button";
-  select.textContent = label;
-  select.title = path;
+  const blockLabel = options.scanBlockReason?.startsWith("This drive") ? t().scanBlockedCapacity : t().scanBlockedPath;
+  select.textContent = options.scanBlocked ? `${label} · ${blockLabel}` : label;
+  select.title = options.scanBlocked ? `${path}\n${options.scanBlockReason}` : path;
+  select.disabled = !!options.scanBlocked;
   select.addEventListener("click", () => {
     if (options.revealInTree) void revealPathInFolderTree(path);
     void selectFolderPath(path);
   });
   head.appendChild(select);
-  if (options.favoriteToggle) {
+  if (options.scanBlocked) row.classList.add("scan-blocked");
+  if (options.favoriteToggle && !options.scanBlocked) {
     const favoriteToggle = document.createElement("button");
     favoriteToggle.className = "folder-favorite-toggle";
     favoriteToggle.type = "button";
@@ -3843,7 +4078,12 @@ async function loadFolderRoots(force = false) {
     if (!data.ok) throw new Error(data.error || t().folderLoadFail);
     folderTree.innerHTML = "";
     for (const root of data.roots || []) {
-      folderTree.appendChild(createPathRow(root.name || root.path, root.path, { expandable: true, favoriteToggle: true }));
+      folderTree.appendChild(createPathRow(root.name || root.path, root.path, {
+        expandable: true,
+        favoriteToggle: true,
+        scanBlocked: root.scan_blocked === true,
+        scanBlockReason: root.scan_block_reason || "",
+      }));
     }
     state.folderRootsLoaded = true;
     updateFolderStars();
@@ -4061,11 +4301,12 @@ async function chooseFolder() {
 }
 
 async function scanNow() {
-  const videoDir = pathInput.value.trim();
+  const videoDir = normalizeDriveLetterInput(pathInput.value);
   if (!videoDir) {
     showToast(t().needPath);
     return;
   }
+  pathInput.value = videoDir;
   const scanStart = performance.now();
   setBusy(true);
   emptyState.classList.add("hidden");
@@ -4082,6 +4323,8 @@ async function scanNow() {
       filename_exclude_enabled: state.filenameExcludeEnabled,
       filename_exclude_keywords: state.filenameExcludeKeywords,
       filename_exclude_scope: state.filenameExcludeScope,
+      blocked_scan_paths: state.blockedScanPaths,
+      min_scan_volume_gb: state.minScanVolumeGb,
       columns: state.columns,
       page_size: state.pageSize,
       play_limit: state.playLimit,
@@ -4126,6 +4369,8 @@ async function scanNow() {
     state.filenameExcludeEnabled = data.config?.filename_exclude_enabled !== false;
     state.filenameExcludeKeywords = cleanExcludeKeywords(data.config?.filename_exclude_keywords || []);
     state.filenameExcludeScope = data.config?.filename_exclude_scope === "all" ? "all" : "image";
+    state.blockedScanPaths = cleanBlockedScanPaths(data.config?.blocked_scan_paths || state.blockedScanPaths);
+    state.minScanVolumeGb = Math.max(0, Math.min(1024, Number(data.config?.min_scan_volume_gb ?? state.minScanVolumeGb) || 0));
     state.lastExcludedCount = Number(data.excluded_count || 0);
     state.rememberPath = rememberPath.checked;
     state.sizeFilter = "all";
@@ -4162,6 +4407,8 @@ async function saveSettingsSoft() {
         filename_exclude_enabled: state.filenameExcludeEnabled,
         filename_exclude_keywords: state.filenameExcludeKeywords,
         filename_exclude_scope: state.filenameExcludeScope,
+        blocked_scan_paths: state.blockedScanPaths,
+        min_scan_volume_gb: state.minScanVolumeGb,
         columns: state.columns,
         page_size: state.pageSize,
         play_limit: state.playLimit,
@@ -4214,9 +4461,9 @@ function setPageSize(size) {
 }
 
 function setPlayLimit(limit, save = true) {
-  const allowed = [12, 18, 24, 36, 48, 72];
-  const next = Number(limit) || 36;
-  state.playLimit = allowed.includes(next) ? next : 36;
+  const allowed = [4, 6, 8, 12, 18, 24, 36, 48, 72];
+  const next = Number(limit) || 8;
+  state.playLimit = allowed.includes(next) ? next : 8;
   playLimitSelect.value = String(state.playLimit);
   if (isWallPreviewStatic()) pauseAllInline();
   else resumeVisibleInline();
@@ -4313,7 +4560,9 @@ async function init() {
     const cfgColumns = Number(cfg.columns || 6);
     state.columns = COLUMN_OPTIONS.includes(cfgColumns) ? cfgColumns : 6;
     state.pageSize = normalizePageSize(cfg.page_size || 120);
-    state.playLimit = [12, 18, 24, 36, 48, 72].includes(Number(cfg.play_limit)) ? Number(cfg.play_limit) : 36;
+    const allowedPlayLimits = [4, 6, 8, 12, 18, 24, 36, 48, 72];
+    const cfgPlayLimit = Number(cfg.play_limit);
+    state.playLimit = allowedPlayLimits.includes(cfgPlayLimit) ? cfgPlayLimit : 8;
     state.wallAutoplay = cfg.wall_autoplay !== false;
     state.previewLargeVideos = cfg.preview_large_videos === true;
     state.pauseWhenInactive = cfg.pause_when_inactive === true;
@@ -4323,6 +4572,8 @@ async function init() {
     state.filenameExcludeEnabled = cfg.filename_exclude_enabled !== false;
     state.filenameExcludeKeywords = cleanExcludeKeywords(cfg.filename_exclude_keywords || ["fanart", "thumb"]);
     state.filenameExcludeScope = cfg.filename_exclude_scope === "all" ? "all" : "image";
+    state.blockedScanPaths = cleanBlockedScanPaths(cfg.blocked_scan_paths || []);
+    state.minScanVolumeGb = Math.max(0, Math.min(1024, Number(cfg.min_scan_volume_gb ?? 1) || 0));
     state.rememberPath = !!cfg.remember_path;
     state.sortMode = cfg.sort_mode || "mtime_desc";
     state.immersive = !!cfg.immersive;
@@ -4447,6 +4698,23 @@ excludeScopeSeg.addEventListener("click", e => {
   if (!button || !excludeRulesDraft?.enabled) return;
   excludeRulesDraft.scope = button.dataset.excludeScope === "all" ? "all" : "image";
   renderExcludeRulesDraft();
+});
+scanProtectionOpen.addEventListener("click", openScanProtectionDialog);
+scanProtectionClose.addEventListener("click", closeScanProtectionDialog);
+scanProtectionCancel.addEventListener("click", closeScanProtectionDialog);
+scanProtectionSave.addEventListener("click", saveScanProtection);
+scanProtectionDialog.addEventListener("click", e => {
+  if (e.target.dataset.scanProtectionClose === "1") closeScanProtectionDialog();
+});
+blockedScanPathAdd.addEventListener("click", addBlockedScanPath);
+blockedScanPathInput.addEventListener("keydown", e => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    addBlockedScanPath();
+  }
+});
+minScanVolumeSelect.addEventListener("change", () => {
+  if (scanProtectionDraft) scanProtectionDraft.minVolumeGb = Number(minScanVolumeSelect.value) || 0;
 });
 document.addEventListener("click", () => {
   setSettingsMenuOpen(false);
@@ -4735,6 +5003,10 @@ window.addEventListener("keydown", e => {
     closeExcludeRulesDialog();
     return;
   }
+  if (e.key === "Escape" && !scanProtectionDialog.classList.contains("hidden")) {
+    closeScanProtectionDialog();
+    return;
+  }
   if (e.key === "Escape" && !settingsMenu.classList.contains("hidden")) {
     setSettingsMenuOpen(false);
     return;
@@ -4807,7 +5079,6 @@ window.addEventListener("keydown", e => {
 });
 document.addEventListener("fullscreenchange", handleFullscreenChange);
 window.addEventListener("scroll", () => {
-  scheduleUpdatePlaying();
   showFloatingPagerTemporarily();
 }, { passive: true });
 window.addEventListener("resize", () => {

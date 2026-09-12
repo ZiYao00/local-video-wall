@@ -90,6 +90,7 @@
           <label class="check settings-check"><input id="rememberPath" type="checkbox" /><span id="rememberPathLabel">Remember path</span></label>
           <label class="check settings-check"><input id="recursiveScan" type="checkbox" /><span id="recursiveScanLabel">Scan subfolders (max 2 levels)</span></label>
           <button id="excludeRulesOpen" class="btn settings-btn settings-detail-btn" type="button"><span id="excludeRulesOpenLabel">Filename exclusion rules</span><span id="excludeRulesCount">2</span></button>
+          <button id="scanProtectionOpen" class="btn settings-btn settings-detail-btn" type="button"><span id="scanProtectionOpenLabel">Scan protection</span><span id="scanProtectionCount">1 GB</span></button>
         </div>
         <div class="settings-section">
           <div id="settingsPlaybackTitle" class="settings-title">Playback</div>
@@ -97,11 +98,14 @@
           <div class="settings-field">
             <span id="playLimitLabel" class="settings-field-label">Wall play limit</span>
             <select id="playLimitSelect" class="select settings-select" title="Wall play limit">
-              <option value="12">12 · Minimum load</option>
-              <option value="18">18 · Low load</option>
-              <option value="24">24 · Light</option>
-              <option value="36">36 · Balanced</option>
-              <option value="48">48 · High load</option>
+              <option value="4">4 · Ultra low</option>
+              <option value="6">6 · Low-power</option>
+              <option value="8">8 · Balanced low-power</option>
+              <option value="12">12 · Balanced</option>
+              <option value="18">18 · Performance</option>
+              <option value="24">24 · High performance</option>
+              <option value="36">36 · Legacy high</option>
+              <option value="48">48 · Very high</option>
               <option value="72">72 · Maximum load</option>
             </select>
           </div>
@@ -214,6 +218,34 @@
       <div class="settings-dialog-actions">
         <button id="excludeRulesCancel" class="btn ghost" type="button">Cancel</button>
         <button id="excludeRulesSave" class="btn primary" type="button">Save</button>
+      </div>
+    </div>
+  </div>
+  <div id="scanProtectionDialog" class="settings-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="scanProtectionTitle">
+    <div class="settings-dialog-backdrop" data-scan-protection-close="1"></div>
+    <div class="settings-dialog-panel">
+      <div class="settings-dialog-head">
+        <strong id="scanProtectionTitle">Scan protection</strong>
+        <button id="scanProtectionClose" class="btn ghost" type="button">Close</button>
+      </div>
+      <div class="exclude-keyword-entry">
+        <input id="blockedScanPathInput" class="path-input" type="text" maxlength="260" placeholder="Path, for example H:\\">
+        <button id="blockedScanPathAdd" class="btn primary" type="button">Add</button>
+      </div>
+      <div id="blockedScanPathList" class="exclude-keyword-list"></div>
+      <label class="settings-field">
+        <span id="minScanVolumeLabel" class="settings-field-label">Minimum drive capacity</span>
+        <select id="minScanVolumeSelect" class="select settings-select">
+          <option value="0">No limit</option>
+          <option value="1">1 GB</option>
+          <option value="4">4 GB</option>
+          <option value="8">8 GB</option>
+        </select>
+      </label>
+      <p id="scanProtectionNote" class="settings-dialog-note">Blocked paths and drives below the capacity limit cannot be scanned.</p>
+      <div class="settings-dialog-actions">
+        <button id="scanProtectionCancel" class="btn ghost" type="button">Cancel</button>
+        <button id="scanProtectionSave" class="btn primary" type="button">Save</button>
       </div>
     </div>
   </div>
