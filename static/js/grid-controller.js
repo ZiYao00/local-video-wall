@@ -15,6 +15,7 @@ export function createGridController({
   onOpenItem,
   onToggleBatchItem,
   onCardAction,
+  onDragItem,
 }) {
   const {
     grid,
@@ -162,6 +163,7 @@ export function createGridController({
     const tx = getText();
     const card = document.createElement("article");
     card.className = "video-card";
+    card.draggable = true;
     card.dataset.key = item.key;
     card.dataset.rel = item.rel;
     card._mediaItem = item;
@@ -172,10 +174,10 @@ export function createGridController({
     card.classList.toggle("large-video-card", largeVideoPlaceholder);
 
     const mediaHtml = item.type === "image"
-      ? `<img class="media-image" data-src="${item.url}" alt="${escapeHtml(item.name)}" loading="lazy" decoding="async" />`
+      ? `<img class="media-image" data-src="${item.url}" alt="${escapeHtml(item.name)}" loading="lazy" decoding="async" draggable="false" />`
       : largeVideoPlaceholder
         ? `<div class="large-video-placeholder">${icons.play}<strong>${tx.largeVideoTitle}</strong><span>${fmtBytes(item.size_mb)}</span><small>${tx.largeVideoHint}</small></div>`
-        : `<video muted loop playsinline preload="none" data-src="${item.url}" data-rel="${escapeHtml(item.rel)}" data-grid-index="${pageIndex}"></video>`;
+        : `<video muted loop playsinline preload="none" data-src="${item.url}" data-rel="${escapeHtml(item.rel)}" data-grid-index="${pageIndex}" draggable="false"></video>`;
 
     card.innerHTML = `
       <div class="video-wrap" title="${escapeHtml(item.name)}">
@@ -233,6 +235,22 @@ export function createGridController({
         moreToggle?.setAttribute("aria-expanded", "false");
         onCardAction(button.dataset.cardAction, item);
       });
+    });
+
+    card.addEventListener("dragstart", event => {
+      if (state.batchMode || event.target.closest("button, input, select, textarea, [contenteditable=\"true\"]")) {
+        event.preventDefault();
+        return;
+      }
+      const allowed = onDragItem?.(event, item, card) === true;
+      if (!allowed) {
+        event.preventDefault();
+        return;
+      }
+      card.classList.add("is-dragging");
+    });
+    card.addEventListener("dragend", () => {
+      card.classList.remove("is-dragging");
     });
 
     return card;

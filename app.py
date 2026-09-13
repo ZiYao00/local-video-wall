@@ -71,11 +71,14 @@ WORKFLOW_STATUS_LOCK = threading.Lock()
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v"}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
 MEDIA_EXTENSIONS = VIDEO_EXTENSIONS | IMAGE_EXTENSIONS
+# Drag-out root verification uses a small metadata sample, not a recursive rescan.
 INTERNAL_MEDIA_DIRS = {"_video_wall_trash", "_video_wall_review"}
 TRASH_DIR_NAME = "_video_wall_trash"
 TRASH_ITEM_META_NAME = "item.json"
 API_VERSION = 3
-API_CAPABILITIES = ["local_trash", "batch_trash", "trash_restore", "system_trash"]
+API_CAPABILITIES = ["local_trash", "batch_trash", "trash_restore", "system_trash", "drag_out_roots", "drag_root_verify"]
+DRAG_ROOT_VERIFY_MAX_SAMPLES = 5
+DRAG_ROOT_VERIFY_MTIME_TOLERANCE_MS = 3000
 
 # v1.8.1 security: per-process random token required on all write/dangerous endpoints.
 # Regenerated on every server start; the frontend fetches it from /api/bootstrap.
@@ -121,6 +124,7 @@ DEFAULT_CONFIG = {
     "floating_pager": False,
     "path_history": [],
     "path_favorites": [],
+    "drag_roots": [],
     "blocked_scan_paths": [],
     "min_scan_volume_gb": 1,
     "slideshow_interval": 5,
@@ -176,6 +180,19 @@ def clean_path_list(value, max_items: int = 30) -> list[str]:
         if len(paths) >= max_items:
             break
     return paths
+
+
+def clean_drag_roots(value, max_items: int = 12) -> list[str]:
+    candidates = clean_path_list(value, max_items * 4)
+    candidates.sort(key=lambda item: (len(os.path.normpath(item)), os.path.normcase(item)))
+    roots = []
+    for path in candidates:
+        if any(is_path_within(path, parent) for parent in roots):
+            continue
+        roots.append(path)
+        if len(roots) >= max_items:
+            break
+    return roots
 
 
 def is_path_within(path: str, root: str) -> bool:
@@ -254,6 +271,7 @@ def load_config() -> dict:
     cfg["language"] = normalize_language(cfg.get("language", "en"))
     cfg["path_history"] = clean_path_list(cfg.get("path_history"), 20)
     cfg["path_favorites"] = clean_path_list(cfg.get("path_favorites"), 30)
+    cfg["drag_roots"] = clean_drag_roots(cfg.get("drag_roots"), 12)
     cfg["blocked_scan_paths"] = clean_path_list(cfg.get("blocked_scan_paths"), 30)
     cfg["min_scan_volume_gb"] = normalize_min_scan_volume_gb(cfg.get("min_scan_volume_gb"))
     cfg["filename_exclude_enabled"] = bool(cfg.get("filename_exclude_enabled", True))
@@ -288,6 +306,7 @@ def save_config(cfg: dict) -> dict:
     merged["language"] = normalize_language(merged.get("language", "en"))
     merged["path_history"] = clean_path_list(merged.get("path_history"), 20)
     merged["path_favorites"] = clean_path_list(merged.get("path_favorites"), 30)
+    merged["drag_roots"] = clean_drag_roots(merged.get("drag_roots"), 12)
     merged["blocked_scan_paths"] = clean_path_list(merged.get("blocked_scan_paths"), 30)
     merged["min_scan_volume_gb"] = normalize_min_scan_volume_gb(merged.get("min_scan_volume_gb"))
     merged["filename_exclude_enabled"] = bool(merged.get("filename_exclude_enabled", True))
@@ -713,6 +732,51 @@ def safe_rel_to_path(root: Path, rel: str) -> Path:
     return full
 
 
+def verify_drag_root_samples(root_path: str, samples) -> dict:
+    started = time.perf_counter()
+    normalized_root = normalize_path(root_path)
+    if not normalized_root:
+        return {"ok": False, "reason": "missing-root", "error": "A drag root path is required."}
+    root = Path(normalized_root)
+    try:
+        if not root.exists() or not root.is_dir():
+            return {"ok": False, "reason": "root-not-found", "error": "Drag root folder does not exist."}
+    except OSError:
+        return {"ok": False, "reason": "root-unavailable", "error": "Drag root folder is not accessible."}
+    if not isinstance(samples, list) or not samples:
+        return {"ok": False, "reason": "missing-samples", "error": "No drag-root verification samples were provided."}
+    if len(samples) > DRAG_ROOT_VERIFY_MAX_SAMPLES:
+        return {"ok": False, "reason": "too-many-samples", "error": "Too many drag-root verification samples."}
+    for sample in samples:
+        if not isinstance(sample, dict):
+            return {"ok": False, "reason": "invalid-sample", "error": "Invalid drag-root verification sample."}
+        rel = str(sample.get("rel", ""))
+        if not rel or len(rel) > 2048:
+            return {"ok": False, "reason": "invalid-relative-path", "error": "Invalid drag-root relative path."}
+        try:
+            file_path = safe_rel_to_path(root, rel)
+            stat = file_path.stat()
+            if not file_path.is_file():
+                raise OSError("Not a file")
+        except ValueError:
+            return {"ok": False, "reason": "invalid-relative-path", "error": "Invalid drag-root relative path."}
+        except OSError:
+            return {"ok": False, "reason": "sample-not-found", "error": f"Verification file was not found under the expected drag root: {rel}"}
+        try:
+            expected_size = int(sample.get("size", -1))
+        except Exception:
+            expected_size = -1
+        if expected_size >= 0 and stat.st_size != expected_size:
+            return {"ok": False, "reason": "size-mismatch", "error": f"Verification file size does not match the expected drag root: {rel}"}
+        try:
+            expected_mtime_ms = float(sample.get("last_modified", 0) or 0)
+        except Exception:
+            expected_mtime_ms = 0
+        if expected_mtime_ms > 0 and abs(stat.st_mtime * 1000 - expected_mtime_ms) > DRAG_ROOT_VERIFY_MTIME_TOLERANCE_MS:
+            return {"ok": False, "reason": "mtime-mismatch", "error": f"Verification file modification time does not match the expected drag root: {rel}"}
+    return {"ok": True, "root": normalized_root, "checked": len(samples), "verify_ms": round((time.perf_counter() - started) * 1000)}
+
+
 def read_media_metadata(file_path: Path, media_type: str):
     metadata_parts = [
         read_embedded_metadata(file_path, media_type),
@@ -863,6 +927,7 @@ def scan_videos(
                 "scan_id": scan_id,
                 "url": f"/media?scan_id={quote(scan_id, safe='')}&path={quote(rel, safe='')}",
                 "size_mb": round(st.st_size / 1024 / 1024, 2),
+                "size_bytes": int(st.st_size),
                 "mtime": int(st.st_mtime),
                 "mtime_text": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(st.st_mtime)),
                 "favorite": review["favorite"],
@@ -1601,6 +1666,10 @@ class AppHandler(BaseHTTPRequestHandler):
         else:
             self.send_error(404)
 
+    def _post_drag_root_verify(self, payload: dict) -> None:
+        result = verify_drag_root_samples(payload.get("root", ""), payload.get("samples"))
+        self.send_json(result, 200 if result.get("ok") else 400)
+
     def _post_path_state(self, payload: dict) -> None:
         cfg = load_config()
         action = str(payload.get("action", "")).strip()
@@ -1625,6 +1694,20 @@ class AppHandler(BaseHTTPRequestHandler):
             ]
         elif action == "clear_history":
             cfg["path_history"] = []
+        elif action == "drag_root_add":
+            if not folder_path:
+                self.send_json({"ok": False, "error": "A drag root path is required."}, 400)
+                return
+            drag_root = Path(folder_path)
+            if not drag_root.exists() or not drag_root.is_dir():
+                self.send_json({"ok": False, "error": "Drag root folder does not exist."}, 400)
+                return
+            cfg["drag_roots"] = clean_drag_roots([*cfg.get("drag_roots", []), folder_path], 12)
+        elif action == "drag_root_remove":
+            cfg["drag_roots"] = [
+                x for x in clean_drag_roots(cfg.get("drag_roots", []), 12)
+                if os.path.normcase(os.path.normpath(x)) != os.path.normcase(os.path.normpath(folder_path))
+            ]
         else:
             self.send_json({"ok": False, "error": "Unknown path-state action."}, 400)
             return
@@ -1641,6 +1724,7 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def _dispatch_post_state(self, path: str, payload: dict) -> bool:
         routes = {
+            "/api/drag-root/verify": self._post_drag_root_verify,
             "/api/path-state": self._post_path_state,
             "/api/review": self._post_review,
         }
@@ -1700,6 +1784,7 @@ class AppHandler(BaseHTTPRequestHandler):
                 "last_video_dir": video_dir if remember_path else "",
                 "path_history": add_recent_path(current_cfg.get("path_history", []), video_dir),
                 "path_favorites": current_cfg.get("path_favorites", []),
+                "drag_roots": current_cfg.get("drag_roots", []),
                 "blocked_scan_paths": current_cfg.get("blocked_scan_paths", []),
                 "min_scan_volume_gb": current_cfg.get("min_scan_volume_gb", 1),
                 "recursive": recursive,
@@ -1750,6 +1835,7 @@ class AppHandler(BaseHTTPRequestHandler):
                     "filename_exclude_scope", cfg.get("filename_exclude_scope", "image")
                 ) == "all" else "image",
                 "blocked_scan_paths": clean_path_list(payload.get("blocked_scan_paths", cfg.get("blocked_scan_paths", [])), 30),
+                "drag_roots": clean_drag_roots(payload.get("drag_roots", cfg.get("drag_roots", [])), 12),
                 "min_scan_volume_gb": normalize_min_scan_volume_gb(payload.get("min_scan_volume_gb", cfg.get("min_scan_volume_gb", 1))),
                 "columns": clamp_int(payload.get("columns", cfg.get("columns", 6)), 6, 2, 20),
                 "page_size": clamp_int(payload.get("page_size", cfg.get("page_size", 120)), 120, 1, 240),

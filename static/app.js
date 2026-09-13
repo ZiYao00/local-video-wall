@@ -1,4 +1,5 @@
 import { createApiClient } from "./js/api-client.js";
+import { createDragOutController } from "./js/drag-out-controller.js";
 import { createGridController } from "./js/grid-controller.js";
 import { escapeCssIdent, escapeHtml, fmtBytes } from "./js/media-utils.js";
 import { createMetadataPanel } from "./js/metadata-panel.js";
@@ -80,6 +81,9 @@ const state = {
   scanId: "",
   pathHistory: [],
   pathFavorites: [],
+  dragRoots: [],
+  dragAuthBusy: false,
+  dragAuthRoot: "",
   perf: { scanMs: 0, renderMs: 0, schedulerMs: 0, pageItems: 0, loadedMedia: 0, warmVideos: 0, activeVideos: 0 },
   loadedStatTimer: null,
   floatingPagerTimer: null,
@@ -99,7 +103,7 @@ const COLUMN_OPTIONS = Object.keys(COLUMN_WIDTHS).map(Number);
 const LARGE_VIDEO_MB = 500;
 const COMFYUI_URL = "http://127.0.0.1:8188/";
 const EXPECTED_API_VERSION = 3;
-const REQUIRED_TRASH_CAPABILITIES = ["local_trash", "batch_trash", "trash_restore", "system_trash"];
+const REQUIRED_BACKEND_CAPABILITIES = ["local_trash", "batch_trash", "trash_restore", "system_trash", "drag_out_roots", "drag_root_verify"];
 
 async function fetchBootstrap() {
   if (!apiClient) throw new Error("API client not initialized");
@@ -129,6 +133,9 @@ const ICONS = {
   eye: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   eyeOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6A3 3 0 0 0 13.4 13.4"/><path d="M9.9 4.3A10.6 10.6 0 0 1 12 4c6 0 10 8 10 8a17.8 17.8 0 0 1-3.1 4.3"/><path d="M6.2 6.5C3.5 8.3 2 12 2 12s4 8 10 8a10 10 0 0 0 5-1.4"/></svg>',
   folder: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h5l2 2"/></svg>',
+  folderPlus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h5l2 2"/><path d="M14 13h5"/><path d="M16.5 10.5v5"/></svg>',
+  folderCheck: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h5l2 2"/><path d="M13.5 14.5l2 2 4-4"/></svg>',
+  folderSync: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h5l2 2"/><path d="M13 13a4 4 0 0 1 6.2-1.3"/><path d="M19 9.5v3h-3"/><path d="M20 15a4 4 0 0 1-6.2 1.3"/><path d="M14 18.5v-3h3"/></svg>',
   grid: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>',
   film: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9h4M3 15h4M17 9h4M17 15h4"/></svg>',
   fullscreen: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5"/><path d="M16 3h5v5"/><path d="M21 16v5h-5"/><path d="M8 21H3v-5"/></svg>',
@@ -280,6 +287,32 @@ const i18n = {
     folderRefresh: "Refresh",
     addFavorite: "Add favorite",
     removeFavorite: "Remove favorite",
+    dragOutSettings: "Drag out",
+    dragAuthorize: "Authorize drag-out",
+    dragReady: "Drag-out ready",
+    dragRefresh: "Refresh drag authorization",
+    dragCoveredBy: root => `Covered by ${root}`,
+    dragRootEmpty: "No drag roots configured.",
+    dragAuthorizeCurrent: "Authorize current path",
+    dragSettingsNote: "Authorize a high-level media folder once. Clicking authorize copies the target path first so you can paste it into Chrome's folder picker. Chrome may call this 'upload'; Local Video Wall does not upload these files to the network.",
+    dragAuthorizationCancelled: "Drag authorization cancelled.",
+    dragAuthorizationFailed: "Drag authorization did not complete.",
+    dragAuthorizing: "Authorizing drag root...",
+    dragAuthorizationBusy: "Another drag root authorization is already in progress.",
+    dragVerificationFailed: (root, error) => `The selected folder could not be verified against ${root}. ${error || "Please select the exact target folder."}`,
+    dragRootReadyMeta: (total, media, ms) => `${total} files · ${media} media · index ${ms}ms`,
+    dragRootRestoreMeta: "Configured root · authorization must be restored for this browser session",
+    dragRootStaleMeta: "New or changed files detected · refresh this root",
+    dragRefreshAction: "Refresh authorization",
+    dragRemoveAction: "Remove drag root",
+    dragChooseRoot: root => `Target path copied: ${root}. Paste it into the browser folder picker, then confirm that folder.`,
+    dragChooseRootCopyFail: root => `Confirm this drag root in the browser folder picker: ${root}`,
+    dragFolderMismatch: (expected, selected) => `The selected folder does not match this authorization target. Target: ${expected}. Selected folder: ${selected || "unknown"}. Please choose the target folder again.`,
+    dragAuthorized: (root, total, media, ms) => `Drag-out ready: ${root} · ${total} files · ${media} media · index ${ms}ms`,
+    dragRootRemoved: "Drag root removed.",
+    dragNeedsAuthorize: "This media is not covered by a drag root. Authorize a parent folder first.",
+    dragNeedsRefresh: "This drag root needs to be restored or refreshed before dragging.",
+    dragUnsupported: "This browser cannot authorize folders for drag-out.",
     pathHistory: "Path history",
     noHistory: "No path history.",
     noPathSuggestions: "No folder matches.",
@@ -554,6 +587,32 @@ const i18n = {
     folderRefresh: "刷新",
     addFavorite: "添加收藏",
     removeFavorite: "取消收藏",
+    dragOutSettings: "拖拽授权",
+    dragAuthorize: "授权拖拽",
+    dragReady: "拖拽已授权",
+    dragRefresh: "刷新拖拽授权",
+    dragCoveredBy: root => `已由 ${root} 覆盖`,
+    dragRootEmpty: "暂无拖拽根目录。",
+    dragAuthorizeCurrent: "授权当前路径",
+    dragSettingsNote: "只需授权高层素材目录一次。点击授权会先复制目标路径，可直接粘贴到 Chrome 的目录选择器中。Chrome 可能把目录授权显示为“上传文件”，但 Local Video Wall 不会把这些文件上传到网络。",
+    dragAuthorizationCancelled: "已取消拖拽授权。",
+    dragAuthorizationFailed: "拖拽授权未完成。",
+    dragAuthorizing: "正在授权拖拽根目录...",
+    dragAuthorizationBusy: "已有另一个拖拽根目录正在授权，请稍候。",
+    dragVerificationFailed: (root, error) => `所选文件夹无法验证为目标根目录：${root}。${error || "请确认选择的是这个准确目录。"}`,
+    dragRootReadyMeta: (total, media, ms) => `${total} 个文件 · ${media} 个媒体 · 建索引 ${ms}ms`,
+    dragRootRestoreMeta: "已配置根目录 · 本次浏览器会话需要恢复授权",
+    dragRootStaleMeta: "检测到新增或变更文件 · 需要刷新该根目录",
+    dragRefreshAction: "刷新授权",
+    dragRemoveAction: "移除拖拽根目录",
+    dragChooseRoot: root => `目标路径已复制：${root}。请在 Chrome 目录选择器的地址栏粘贴该路径，并确认这个文件夹。`,
+    dragChooseRootCopyFail: root => `请在 Chrome 目录选择器中确认拖拽根目录：${root}`,
+    dragFolderMismatch: (expected, selected) => `选择的文件夹不是当前授权目标。目标：${expected}。当前选择：${selected || "未知"}。请重新选择目标文件夹。`,
+    dragAuthorized: (root, total, media, ms) => `拖拽授权成功：${root} · ${total} 个文件 · ${media} 个媒体 · 建索引 ${ms}ms`,
+    dragRootRemoved: "已移除拖拽根目录。",
+    dragNeedsAuthorize: "这个媒体不在任何拖拽根目录内，请先授权它的上级目录。",
+    dragNeedsRefresh: "这个拖拽根目录需要恢复或刷新授权后才能拖拽。",
+    dragUnsupported: "当前浏览器不支持目录拖拽授权。",
     pathHistory: "路径历史",
     noHistory: "暂无路径历史。",
     noPathSuggestions: "没有匹配的文件夹。",
@@ -726,6 +785,7 @@ const subInfo = $("#subInfo");
 const pathInput = $("#pathInput");
 const folderPanelToggle = $("#folderPanelToggle");
 const favoritePathBtn = $("#favoritePathBtn");
+const dragPathBtn = $("#dragPathBtn");
 const pathHistoryToggle = $("#pathHistoryToggle");
 const pathHistoryMenu = $("#pathHistoryMenu");
 const pathSuggestMenu = $("#pathSuggestMenu");
@@ -760,6 +820,12 @@ const blockedScanPathInput = $("#blockedScanPathInput");
 const blockedScanPathAdd = $("#blockedScanPathAdd");
 const blockedScanPathList = $("#blockedScanPathList");
 const minScanVolumeSelect = $("#minScanVolumeSelect");
+const dragSettingsSection = $("#dragSettingsSection");
+const dragRootList = $("#dragRootList");
+const dragAuthorizeCurrentBtn = $("#dragAuthorizeCurrentBtn");
+const dragAuthorizeCurrentLabel = $("#dragAuthorizeCurrentLabel");
+const dragRootCount = $("#dragRootCount");
+const dragSettingsNote = $("#dragSettingsNote");
 const searchInput = $("#searchInput");
 const sizeFilterSelect = $("#sizeFilterSelect");
 const dateFilterSelect = $("#dateFilterSelect");
@@ -867,6 +933,14 @@ const slideshowBackToPreview = $("#slideshowBackToPreview");
 let excludeRulesDraft = null;
 let scanProtectionDraft = null;
 
+const dragOutController = createDragOutController({
+  onChange: () => {
+    updateDragAuthorizationUi();
+    renderDragRootSettings();
+  },
+  verifySelection: verifyDragRootSelection,
+});
+
 const playbackController = createPlaybackController({
   state,
   modal,
@@ -913,6 +987,7 @@ const gridController = createGridController({
   onOpenItem: openModal,
   onToggleBatchItem: toggleBatchItem,
   onCardAction: handleCardAction,
+  onDragItem: handleMediaDragStart,
 });
 
 const metadataPanel = createMetadataPanel({
@@ -1171,6 +1246,7 @@ function applyActionButtons() {
   setButtonLabel(slideshowClose, tx.close, "close", { iconOnly: true });
   document.querySelectorAll(".tiny-btn").forEach(btn => setButtonLabel(btn, tx.location, "folder", { iconOnly: true }));
   updateFavoritePathButton();
+  updateDragAuthorizationUi();
   updateFullscreenLabels();
 }
 
@@ -1190,7 +1266,7 @@ async function checkBackendCompatibility(showError = false) {
     state.backendCompatible = response.ok
       && data.ok === true
       && state.backendVersion === EXPECTED_API_VERSION
-      && REQUIRED_TRASH_CAPABILITIES.every(capability => state.backendCapabilities.has(capability));
+      && REQUIRED_BACKEND_CAPABILITIES.every(capability => state.backendCapabilities.has(capability));
   } catch {
     state.backendCompatible = false;
   }
@@ -1291,6 +1367,9 @@ function applyLanguage() {
   contentAlignSeg.querySelector('[data-content-align="left"]').textContent = tx.contentAlignLeft;
   contentAlignSeg.querySelector('[data-content-align="right"]').textContent = tx.contentAlignRight;
   $("#settingsScanTitle").textContent = tx.scanSettings;
+  $("#settingsDragTitle").textContent = tx.dragOutSettings;
+  dragAuthorizeCurrentLabel.textContent = tx.dragAuthorizeCurrent;
+  dragSettingsNote.textContent = tx.dragSettingsNote;
   $("#settingsPlaybackTitle").textContent = tx.playbackSettings;
   $("#settingsFiltersTitle").textContent = tx.filterSettings;
   $("#settingsActionsTitle").textContent = tx.actionSettings;
@@ -1354,6 +1433,8 @@ function applyLanguage() {
   updateGridPager();
   updateExcludeRulesSummary();
   updateScanProtectionSummary();
+  renderDragRootSettings();
+  updateDragAuthorizationUi();
   if (!excludeRulesDialog.classList.contains("hidden")) renderExcludeRulesDraft();
   if (state.currentModalItem) refreshModalMetadataPanel();
 }
@@ -2955,6 +3036,19 @@ function createPathRow(label, path, options = {}) {
     row.classList.add("has-favorite-toggle");
     head.appendChild(favoriteToggle);
   }
+  if (options.dragToggle && !options.scanBlocked) {
+    const dragToggle = document.createElement("button");
+    dragToggle.className = "folder-drag-toggle drag-auth-toggle";
+    dragToggle.type = "button";
+    dragToggle.addEventListener("click", e => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleDragAuthorizationClick(path);
+    });
+    row.classList.add("has-drag-toggle");
+    head.appendChild(dragToggle);
+    applyDragButtonState(dragToggle, path, row);
+  }
   if (options.removableFavorite) {
     const remove = document.createElement("button");
     remove.className = "folder-row-remove";
@@ -2980,8 +3074,10 @@ function createPathRow(label, path, options = {}) {
 function renderPathPanel() {
   renderSavedPathList(folderFavorites, state.pathFavorites);
   updateFolderStars();
+  updateFolderDragStates();
   renderHistoryMenu();
   updateFavoritePathButton();
+  updateDragAuthorizationUi();
 }
 
 function updateFolderStars() {
@@ -3041,6 +3137,7 @@ function applyPathSuggestion(index = state.pathSuggestIndex, scan = false) {
   if (!item) return;
   pathInput.value = item.path;
   updateFavoritePathButton();
+  updateDragAuthorizationUi();
   closePathSuggestions();
   if (scan) scanNow();
 }
@@ -3143,6 +3240,367 @@ function updateFavoritePathButton() {
   setButtonLabel(favoritePathBtn, favorite ? t().removeFavorite : t().addFavorite, favorite ? "starFilled" : "star", { iconOnly: true });
 }
 
+function dragStatusForPath(path) {
+  const normalized = normalizePathText(path);
+  return normalized ? dragOutController.getStatus(normalized) : { state: "unconfigured", root: "", reason: "" };
+}
+
+function dragIconForState(status) {
+  if (status.state === "ready") return "folderCheck";
+  if (status.state === "refresh") return "folderSync";
+  return "folderPlus";
+}
+
+function dragTitleForPath(path, status = dragStatusForPath(path)) {
+  if (status.state === "ready") {
+    return pathKey(path) === pathKey(status.root) ? t().dragReady : t().dragCoveredBy(status.root);
+  }
+  if (status.state === "refresh") return t().dragRefresh;
+  return t().dragAuthorize;
+}
+
+function applyDragButtonState(button, path, row = null) {
+  if (!button) return;
+  const status = dragStatusForPath(path);
+  const authorizing = state.dragAuthBusy && pathKey(path) === pathKey(state.dragAuthRoot);
+  button.disabled = !!state.dragAuthBusy;
+  button.classList.remove("drag-ready", "drag-refresh", "drag-authorizing");
+  if (authorizing) {
+    button.classList.add("drag-authorizing");
+    setButtonLabel(button, t().dragAuthorizing, "folderSync", { iconOnly: true });
+  }
+  if (!authorizing) {
+    if (status.state === "ready") button.classList.add("drag-ready");
+    if (status.state === "refresh") button.classList.add("drag-refresh");
+    setButtonLabel(button, dragTitleForPath(path, status), dragIconForState(status), { iconOnly: true });
+  }
+  if (row) {
+    row.classList.toggle("drag-ready", !authorizing && status.state === "ready");
+    row.classList.toggle("drag-refresh", !authorizing && status.state === "refresh");
+    row.classList.toggle("drag-authorizing", authorizing);
+  }
+}
+
+function updateFolderDragStates() {
+  folderTree.querySelectorAll(".folder-row.has-drag-toggle").forEach(row => {
+    const button = row.querySelector(":scope > .folder-row-head > .folder-drag-toggle");
+    applyDragButtonState(button, row.dataset.path, row);
+  });
+}
+
+function updateDragAuthorizationUi() {
+  applyDragButtonState(dragPathBtn, pathInput.value);
+  updateFolderDragStates();
+}
+
+function renderDragRootSettings() {
+  if (!dragRootList) return;
+  dragRootList.innerHTML = "";
+  dragRootCount.textContent = String(state.dragRoots.length);
+  dragAuthorizeCurrentLabel.textContent = t().dragAuthorizeCurrent;
+  dragAuthorizeCurrentBtn.disabled = !!state.dragAuthBusy;
+  dragSettingsNote.textContent = t().dragSettingsNote;
+  if (!state.dragRoots.length) {
+    const empty = document.createElement("div");
+    empty.className = "drag-root-empty";
+    empty.textContent = t().dragRootEmpty;
+    dragRootList.appendChild(empty);
+    return;
+  }
+  for (const root of state.dragRoots) {
+    const info = dragOutController.getRootInfo(root);
+    const row = document.createElement("div");
+    const authorizing = state.dragAuthBusy && pathKey(root) === pathKey(state.dragAuthRoot);
+    row.className = `drag-root-row ${authorizing ? "drag-authorizing" : (info.state === "ready" ? "drag-ready" : "drag-refresh")}`;
+
+    const stateIcon = document.createElement("span");
+    stateIcon.className = "drag-root-state";
+    stateIcon.innerHTML = iconSvg(authorizing ? "folderSync" : (info.state === "ready" ? "folderCheck" : "folderSync"));
+    stateIcon.title = authorizing ? t().dragAuthorizing : (info.state === "ready" ? t().dragReady : t().dragRefresh);
+
+    const copy = document.createElement("div");
+    copy.className = "drag-root-copy";
+    const path = document.createElement("div");
+    path.className = "drag-root-path";
+    path.textContent = root;
+    path.title = root;
+    const meta = document.createElement("div");
+    meta.className = "drag-root-meta";
+    meta.textContent = authorizing ? t().dragAuthorizing : (info.state === "ready"
+      ? t().dragRootReadyMeta(info.totalFiles, info.mediaFiles, info.buildMs)
+      : (info.reason && info.reason !== "restore" ? t().dragRootStaleMeta : t().dragRootRestoreMeta));
+    copy.append(path, meta);
+
+    const actions = document.createElement("div");
+    actions.className = "drag-root-actions";
+    const refresh = document.createElement("button");
+    refresh.type = "button";
+    refresh.className = "drag-root-action";
+    refresh.disabled = !!state.dragAuthBusy;
+    if (authorizing) refresh.classList.add("drag-authorizing");
+    refresh.innerHTML = iconSvg("folderSync");
+    refresh.title = t().dragRefreshAction;
+    refresh.setAttribute("aria-label", t().dragRefreshAction);
+    refresh.addEventListener("click", event => {
+      event.stopPropagation();
+      authorizeDragRoot(root, { persist: false });
+    });
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "drag-root-action";
+    remove.disabled = !!state.dragAuthBusy;
+    remove.innerHTML = iconSvg("close");
+    remove.title = t().dragRemoveAction;
+    remove.setAttribute("aria-label", t().dragRemoveAction);
+    remove.addEventListener("click", event => {
+      event.stopPropagation();
+      void removeDragRoot(root);
+    });
+    actions.append(refresh, remove);
+    row.append(stateIcon, copy, actions);
+    dragRootList.appendChild(row);
+  }
+}
+
+function syncDragRootsFromConfig(config) {
+  state.dragRoots = Array.isArray(config?.drag_roots) ? config.drag_roots : [];
+  dragOutController.setConfiguredRoots(state.dragRoots);
+  renderDragRootSettings();
+  updateDragAuthorizationUi();
+}
+
+async function persistDragRoot(action, root) {
+  const res = await apiFetch("/api/path-state", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, path: root }),
+  });
+  const data = await res.json();
+  if (!data.ok) throw new Error(data.error || t().unknown);
+  syncDragRootsFromConfig(data.config || {});
+  return data;
+}
+
+async function verifyDragRootSelection({ root, selectedRootName, totalFiles, samples }) {
+  const started = performance.now();
+  console.debug("[drag-out] verify:start", {
+    requestedRoot: root,
+    selectedRootName,
+    totalFiles,
+    sampleCount: samples?.length || 0,
+  });
+  try {
+    const response = await apiFetch("/api/drag-root/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ root, samples: Array.isArray(samples) ? samples : [] }),
+    });
+    const data = await response.json();
+    const result = response.ok && data?.ok
+      ? data
+      : { ...data, ok: false, error: data?.error || `HTTP ${response.status}` };
+    console.debug("[drag-out] verify:result", {
+      requestedRoot: root,
+      selectedRootName,
+      ok: !!result.ok,
+      reason: result.reason || "",
+      checked: result.checked || 0,
+      verifyMs: result.verify_ms ?? Math.round(performance.now() - started),
+    });
+    return result;
+  } catch (error) {
+    const result = { ok: false, reason: "request-failed", error: error?.message || String(error) };
+    console.debug("[drag-out] verify:error", { requestedRoot: root, selectedRootName, error: result.error });
+    return result;
+  }
+}
+
+function copyDragTargetPath(root) {
+  const value = normalizePathText(root);
+  if (!value) return false;
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-10000px";
+  textarea.style.top = "0";
+  document.body.appendChild(textarea);
+  try {
+    textarea.focus();
+    textarea.select();
+    if (document.execCommand?.("copy") === true) return true;
+  } catch (error) {
+    console.debug("[drag-out] synchronous copy unavailable", error);
+  } finally {
+    textarea.remove();
+  }
+  try {
+    if (!navigator.clipboard?.writeText) return false;
+    void navigator.clipboard.writeText(value).catch(error => {
+      console.debug("[drag-out] could not copy target path", error);
+    });
+    return true;
+  } catch (error) {
+    console.debug("[drag-out] clipboard unavailable", error);
+    return false;
+  }
+}
+
+function authorizeDragRoot(rootPath, { persist = true } = {}) {
+  const root = normalizeDriveLetterInput(rootPath);
+  if (!root) {
+    showToast(t().needPath);
+    return Promise.resolve(false);
+  }
+  if (state.dragAuthBusy) {
+    showToast(t().dragAuthorizationBusy, 2600);
+    return Promise.resolve(false);
+  }
+  if (!state.backendCompatible) {
+    showToast(t().backendRestartRequired, 7000);
+    return Promise.resolve(false);
+  }
+  if (!("webkitdirectory" in document.createElement("input"))) {
+    showToast(t().dragUnsupported, 4200);
+    return Promise.resolve(false);
+  }
+
+  state.dragAuthBusy = true;
+  state.dragAuthRoot = root;
+  updateDragAuthorizationUi();
+  renderDragRootSettings();
+  console.debug("[drag-out] authorize:start", { requestedRoot: root, persist });
+
+  const copied = copyDragTargetPath(root);
+  showToast(copied ? t().dragChooseRoot(root) : t().dragChooseRootCopyFail(root), 5200);
+  const authorization = dragOutController.authorize(root);
+  return authorization.then(async result => {
+    console.debug("[drag-out] authorize:selection", {
+      requestedRoot: root,
+      ok: !!result.ok,
+      reason: result.reason || "",
+      selectedRootName: result.selectedRootName || "",
+      verified: !!result.verification?.ok,
+    });
+    if (!result.ok) {
+      if (result.reason === "folder-mismatch") {
+        showToast(t().dragFolderMismatch(root, result.selectedRootName || "?"), 6200);
+      } else if (result.reason === "verification-failed") {
+        showToast(t().dragVerificationFailed(root, result.verification?.error || ""), 7000);
+      } else if (result.reason === "cancelled") {
+        showToast(t().dragAuthorizationCancelled, 2200);
+      } else {
+        showToast(t().dragAuthorizationFailed, 3600);
+      }
+      console.debug("[drag-out] authorize:failed", { requestedRoot: root, reason: result.reason || "", verification: result.verification || null });
+      return false;
+    }
+    try {
+      if (persist && !state.dragRoots.some(item => pathKey(item) === pathKey(root))) {
+        await persistDragRoot("drag_root_add", root);
+      } else {
+        dragOutController.setConfiguredRoots(state.dragRoots.length ? state.dragRoots : [root]);
+      }
+      const info = dragOutController.getRootInfo(root);
+      console.debug("[drag-out] authorize:ready", {
+        requestedRoot: root,
+        configuredRoots: [...state.dragRoots],
+        totalFiles: info.totalFiles,
+        mediaFiles: info.mediaFiles,
+        buildMs: info.buildMs,
+      });
+      showToast(t().dragAuthorized(root, info.totalFiles, info.mediaFiles, info.buildMs), 5200);
+      renderDragRootSettings();
+      updateDragAuthorizationUi();
+      return true;
+    } catch (error) {
+      console.error(error);
+      dragOutController.discardGrant(root);
+      showToast(t().configFail, 3200);
+      return false;
+    }
+  }).finally(() => {
+    state.dragAuthBusy = false;
+    state.dragAuthRoot = "";
+    updateDragAuthorizationUi();
+    renderDragRootSettings();
+  });
+}
+
+function openDragSettings() {
+  setSettingsMenuOpen(true);
+  renderDragRootSettings();
+  window.setTimeout(() => dragSettingsSection?.scrollIntoView({ block: "nearest" }), 0);
+}
+
+function handleDragAuthorizationClick(path = pathInput.value) {
+  const target = normalizeDriveLetterInput(path);
+  if (!target) {
+    showToast(t().needPath);
+    return;
+  }
+  const status = dragStatusForPath(target);
+  if (status.state === "ready") {
+    openDragSettings();
+    return;
+  }
+  if (status.state === "refresh") {
+    authorizeDragRoot(status.root, { persist: false });
+    return;
+  }
+  authorizeDragRoot(target, { persist: true });
+}
+
+async function removeDragRoot(root) {
+  try {
+    await persistDragRoot("drag_root_remove", root);
+    dragOutController.discardGrant(root);
+    showToast(t().dragRootRemoved, 2200);
+  } catch (error) {
+    console.error(error);
+    showToast(t().configFail, 2600);
+  }
+}
+
+function fullPathForItem(item) {
+  if (item?.full_path) return normalizePathText(item.full_path);
+  if (!state.scannedPath || !item?.rel) return "";
+  return joinFolderPath(state.scannedPath, String(item.rel).replace(/\//g, "\\"));
+}
+
+function handleMediaDragStart(event, item) {
+  const fullPath = fullPathForItem(item);
+  const result = dragOutController.resolveFile(fullPath);
+  if (!result.ok) {
+    showToast(result.state === "refresh" ? t().dragNeedsRefresh : t().dragNeedsAuthorize, 3200);
+    updateDragAuthorizationUi();
+    renderDragRootSettings();
+    return false;
+  }
+  const expectedSize = Number(item?.size_bytes);
+  const expectedMtime = Number(item?.mtime);
+  const actualMtime = Math.floor(Number(result.file.lastModified || 0) / 1000);
+  const sizeChanged = Number.isFinite(expectedSize) && expectedSize >= 0 && result.file.size !== expectedSize;
+  const mtimeChanged = Number.isFinite(expectedMtime) && expectedMtime > 0 && actualMtime > 0 && Math.abs(actualMtime - expectedMtime) > 1;
+  if (sizeChanged || mtimeChanged) {
+    dragOutController.markStale(result.root, "changed-file");
+    showToast(t().dragNeedsRefresh, 3200);
+    updateDragAuthorizationUi();
+    renderDragRootSettings();
+    return false;
+  }
+  const dataTransfer = event.dataTransfer;
+  if (!dataTransfer?.items?.add) return false;
+  try {
+    dataTransfer.effectAllowed = "copy";
+    const added = dataTransfer.items.add(result.file);
+    return !!added;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+}
+
 async function openFolderPanel() {
   folderPanel.classList.remove("hidden");
   document.body.classList.add("sidebar-open");
@@ -3172,6 +3630,7 @@ async function loadFolderRoots(force = false) {
       folderTree.appendChild(createPathRow(root.name || root.path, root.path, {
         expandable: true,
         favoriteToggle: true,
+        dragToggle: true,
         scanBlocked: root.scan_blocked === true,
         scanBlockReason: root.scan_block_reason || "",
       }));
@@ -3191,9 +3650,10 @@ function renderFolderChildren(container, folders) {
     return;
   }
   for (const folder of folders) {
-    container.appendChild(createPathRow(folder.name, folder.path, { expandable: true, favoriteToggle: true }));
+    container.appendChild(createPathRow(folder.name, folder.path, { expandable: true, favoriteToggle: true, dragToggle: true }));
   }
   updateFolderStars();
+  updateFolderDragStates();
 }
 
 function findFolderRow(container, path) {
@@ -3298,6 +3758,7 @@ async function revealPathInFolderTree(path) {
 async function selectFolderPath(path) {
   pathInput.value = path;
   updateFavoritePathButton();
+  updateDragAuthorizationUi();
   showToast(t().pathSelectedScanning, 1600);
   await scanNow();
 }
@@ -3398,6 +3859,7 @@ async function scanNow() {
     return;
   }
   pathInput.value = videoDir;
+  updateDragAuthorizationUi();
   const scanStart = performance.now();
   setBusy(true);
   emptyState.classList.add("hidden");
@@ -3416,6 +3878,7 @@ async function scanNow() {
       filename_exclude_scope: state.filenameExcludeScope,
       blocked_scan_paths: state.blockedScanPaths,
       min_scan_volume_gb: state.minScanVolumeGb,
+      drag_roots: state.dragRoots,
       columns: state.columns,
       page_size: state.pageSize,
       play_limit: state.playLimit,
@@ -3456,6 +3919,7 @@ async function scanNow() {
     }
     state.pathHistory = data.config?.path_history || state.pathHistory;
     state.pathFavorites = data.config?.path_favorites || state.pathFavorites;
+    syncDragRootsFromConfig(data.config || { drag_roots: state.dragRoots });
     state.recursive = !!data.recursive;
     state.filenameExcludeEnabled = data.config?.filename_exclude_enabled !== false;
     state.filenameExcludeKeywords = cleanExcludeKeywords(data.config?.filename_exclude_keywords || []);
@@ -3500,6 +3964,7 @@ async function saveSettingsSoft() {
         filename_exclude_scope: state.filenameExcludeScope,
         blocked_scan_paths: state.blockedScanPaths,
         min_scan_volume_gb: state.minScanVolumeGb,
+        drag_roots: state.dragRoots,
         columns: state.columns,
         page_size: state.pageSize,
         play_limit: state.playLimit,
@@ -3695,6 +4160,8 @@ async function init() {
     state.language = cfg.language === "zh" ? "zh" : "en";
     state.pathHistory = Array.isArray(cfg.path_history) ? cfg.path_history : [];
     state.pathFavorites = Array.isArray(cfg.path_favorites) ? cfg.path_favorites : [];
+    state.dragRoots = Array.isArray(cfg.drag_roots) ? cfg.drag_roots : [];
+    dragOutController.setConfiguredRoots(state.dragRoots);
     let localTheme = "";
     let localButtonStyle = "";
     let localFontSize = "";
@@ -3756,6 +4223,14 @@ folderPanelRefresh.addEventListener("click", () => loadFolderRoots(true));
 favoritePathBtn.addEventListener("click", e => {
   e.stopPropagation();
   toggleFavoritePath(pathInput.value);
+});
+dragPathBtn.addEventListener("click", e => {
+  e.stopPropagation();
+  handleDragAuthorizationClick(pathInput.value);
+});
+dragAuthorizeCurrentBtn.addEventListener("click", e => {
+  e.stopPropagation();
+  handleDragAuthorizationClick(pathInput.value);
 });
 pathHistoryToggle.addEventListener("click", e => {
   e.stopPropagation();
@@ -3839,6 +4314,7 @@ document.addEventListener("click", () => {
 });
 pathInput.addEventListener("input", () => {
   updateFavoritePathButton();
+  updateDragAuthorizationUi();
   schedulePathSuggestions();
 });
 pathInput.addEventListener("focus", schedulePathSuggestions);

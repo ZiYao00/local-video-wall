@@ -14,6 +14,7 @@
         <div class="path-combo">
           <button id="favoritePathBtn" class="path-combo-btn" title="Favorite path" aria-label="Favorite path">Favorite</button>
           <input id="pathInput" class="path-input" type="text" placeholder="Enter a video folder path, for example C:\Users\YourName\Videos" spellcheck="false" />
+          <button id="dragPathBtn" class="path-combo-btn drag-auth-toggle" type="button" title="Authorize drag-out" aria-label="Authorize drag-out">Drag</button>
           <button id="pathHistoryToggle" class="path-combo-btn" title="Path history" aria-label="Path history">History</button>
           <div id="pathHistoryMenu" class="path-history-menu hidden"></div>
           <div id="pathSuggestMenu" class="path-suggest-menu hidden"></div>
@@ -91,6 +92,12 @@
           <label class="check settings-check"><input id="recursiveScan" type="checkbox" /><span id="recursiveScanLabel">Scan subfolders (max 2 levels)</span></label>
           <button id="excludeRulesOpen" class="btn settings-btn settings-detail-btn" type="button"><span id="excludeRulesOpenLabel">Filename exclusion rules</span><span id="excludeRulesCount">2</span></button>
           <button id="scanProtectionOpen" class="btn settings-btn settings-detail-btn" type="button"><span id="scanProtectionOpenLabel">Scan protection</span><span id="scanProtectionCount">1 GB</span></button>
+        </div>
+        <div id="dragSettingsSection" class="settings-section">
+          <div id="settingsDragTitle" class="settings-title">Drag Out</div>
+          <div id="dragRootList" class="drag-root-list"></div>
+          <button id="dragAuthorizeCurrentBtn" class="btn settings-btn settings-detail-btn" type="button"><span id="dragAuthorizeCurrentLabel">Authorize current path</span><span id="dragRootCount">0</span></button>
+          <p id="dragSettingsNote" class="settings-dialog-note">Authorize the current path as a high-level drag root. The target path is copied first so you can paste it into Chrome's folder picker. Chrome may call this “upload”; the files stay local.</p>
         </div>
         <div class="settings-section">
           <div id="settingsPlaybackTitle" class="settings-title">Playback</div>

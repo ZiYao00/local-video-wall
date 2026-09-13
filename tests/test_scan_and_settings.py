@@ -194,3 +194,111 @@ class ScanAndSettingsTests(unittest.TestCase):
         self.assertEqual(config["blocked_scan_paths"], ["H:\\"])
         self.assertEqual(config["min_scan_volume_gb"], 1024)
         self.assertEqual(app.load_config(), config)
+
+    def test_drag_roots_are_compacted_persisted_and_preserved_by_scan(self) -> None:
+        creator_dir = self.media_dir / "creator"
+        creator_dir.mkdir()
+
+        status, data = self._post(
+            "/api/settings",
+            {"drag_roots": [str(self.media_dir), str(creator_dir), str(self.media_dir)]},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(data["config"]["drag_roots"], [str(self.media_dir)])
+
+        status, data = self._post(
+            "/api/path-state",
+            {"action": "drag_root_add", "path": str(self.root)},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(data["config"]["drag_roots"], [str(self.root)])
+
+        status, data = self._post(
+            "/api/scan",
+            {
+                "video_dir": str(self.media_dir),
+                "recursive": False,
+                "filename_exclude_enabled": False,
+                "filename_exclude_keywords": [],
+            },
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(data["config"]["drag_roots"], [str(self.root)])
+
+        status, data = self._post(
+            "/api/path-state",
+            {"action": "drag_root_remove", "path": str(self.root)},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(data["config"]["drag_roots"], [])
+
+    def test_drag_root_verification_matches_browser_file_sample_without_persisting(self) -> None:
+        clip = self.media_dir / "clip.mp4"
+        stat = clip.stat()
+        status, data = self._post(
+            "/api/drag-root/verify",
+            {
+                "root": str(self.media_dir),
+                "samples": [{
+                    "rel": "clip.mp4",
+                    "size": stat.st_size,
+                    "last_modified": stat.st_mtime * 1000,
+                }],
+            },
+        )
+
+        self.assertEqual(status, 200)
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["checked"], 1)
+        self.assertEqual(data["root"], str(self.media_dir))
+        self.assertEqual(app.load_config()["drag_roots"], [])
+
+    def test_drag_root_verification_rejects_wrong_expected_root(self) -> None:
+        wrong_root = self.root / "wrong-root"
+        wrong_root.mkdir()
+        clip = self.media_dir / "clip.mp4"
+        stat = clip.stat()
+        status, data = self._post(
+            "/api/drag-root/verify",
+            {
+                "root": str(wrong_root),
+                "samples": [{
+                    "rel": "clip.mp4",
+                    "size": stat.st_size,
+                    "last_modified": stat.st_mtime * 1000,
+                }],
+            },
+        )
+
+        self.assertEqual(status, 400)
+        self.assertFalse(data["ok"])
+        self.assertEqual(data["reason"], "sample-not-found")
+        self.assertEqual(app.load_config()["drag_roots"], [])
+
+    def test_drag_root_add_rejects_missing_folder(self) -> None:
+        missing = self.root / "missing-drag-root"
+        status, data = self._post(
+            "/api/path-state",
+            {"action": "drag_root_add", "path": str(missing)},
+        )
+
+        self.assertEqual(status, 400)
+        self.assertFalse(data["ok"])
+        self.assertEqual(app.load_config()["drag_roots"], [])
+
+    def test_multiple_independent_drag_roots_can_coexist(self) -> None:
+        other_root = self.root / "other-media"
+        other_root.mkdir()
+
+        status, data = self._post(
+            "/api/path-state",
+            {"action": "drag_root_add", "path": str(self.media_dir)},
+        )
+        self.assertEqual(status, 200)
+        status, data = self._post(
+            "/api/path-state",
+            {"action": "drag_root_add", "path": str(other_root)},
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(set(data["config"]["drag_roots"]), {str(self.media_dir), str(other_root)})

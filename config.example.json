@@ -21,6 +21,7 @@
   "button_style": "text",
   "path_history": [],
   "path_favorites": [],
+  "drag_roots": [],
   "slideshow_interval": 5,
   "slideshow_effect": "drift",
   "slideshow_fit": "contain",

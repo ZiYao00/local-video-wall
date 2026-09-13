@@ -652,6 +652,28 @@ html{
   fill:currentColor;
 }
 
+.drag-auth-toggle.drag-ready{
+  color:var(--accent);
+}
+
+.drag-auth-toggle.drag-refresh{
+  color:var(--drag-warning);
+}
+
+.drag-auth-toggle.drag-ready svg,
+.drag-auth-toggle.drag-refresh svg{
+  fill:none;
+}
+
+.drag-directory-input{
+  position:fixed;
+  left:-9999px;
+  width:1px;
+  height:1px;
+  opacity:0;
+  pointer-events:none;
+}
+
 .path-history-menu,
 .path-suggest-menu{
   position:fixed;
@@ -1163,6 +1185,55 @@ body.theme-light .settings-menu{
 .exclude-scope-block .seg button{min-width:112px}
 .exclude-scope-block .seg.disabled{opacity:.42;pointer-events:none}
 .settings-dialog-note{margin:0 0 16px;color:var(--muted);font-size:12px;line-height:1.5}
+
+.drag-root-list{
+  display:grid;
+  gap:6px;
+}
+
+.drag-root-empty{
+  padding:8px 9px;
+  border:1px dashed var(--line);
+  border-radius:8px;
+  color:var(--muted);
+  font-size:12px;
+}
+
+.drag-root-row{
+  display:grid;
+  grid-template-columns:26px minmax(0,1fr) auto;
+  align-items:center;
+  gap:7px;
+  padding:7px 7px 7px 6px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:rgba(255,255,255,.025);
+}
+
+.drag-root-state{
+  width:26px;
+  height:26px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  color:var(--drag-warning);
+}
+
+.drag-root-row.drag-ready .drag-root-state{color:var(--accent)}
+.drag-root-state svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.drag-root-copy{min-width:0}
+.drag-root-path{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);font-size:11px}
+.drag-root-meta{margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:10px}
+.drag-root-actions{display:flex;align-items:center;gap:2px}
+.drag-root-action{width:26px;height:26px;padding:0;border:0;border-radius:7px;background:transparent;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.drag-root-action:hover{background:rgba(255,255,255,.08);color:var(--text)}
+.drag-root-action svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#dragSettingsNote{margin:0}
+
+.video-card[draggable="true"] .video-wrap{cursor:grab}
+.video-card.is-dragging{opacity:.72;transform:scale(.985);border-color:var(--accent)}
+.video-card.is-dragging .video-wrap{cursor:grabbing}
+
 .settings-dialog-actions{justify-content:flex-end;padding-top:12px;border-top:1px solid var(--line)}
 body.theme-light .settings-dialog-panel{background:#fff}
 
@@ -1488,6 +1559,14 @@ body.sidebar-open .app-shell{
   grid-template-columns:24px minmax(0,1fr) 28px;
 }
 
+.folder-row.has-drag-toggle .folder-row-head{
+  grid-template-columns:24px minmax(0,1fr) 28px;
+}
+
+.folder-row.has-favorite-toggle.has-drag-toggle .folder-row-head{
+  grid-template-columns:24px minmax(0,1fr) 28px 28px;
+}
+
 .folder-expand,
 .folder-path{
   height:28px;
@@ -1579,6 +1658,64 @@ body.sidebar-open .app-shell{
 .folder-row.is-favorite > .folder-row-head > .folder-favorite-toggle svg{
   fill:currentColor;
 }
+
+.folder-drag-toggle{
+  width:28px;
+  height:28px;
+  padding:0;
+  border:0;
+  border-radius:8px;
+  background:transparent;
+  color:var(--muted);
+  cursor:pointer;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .14s ease,background .14s ease,color .14s ease;
+}
+
+.folder-drag-toggle svg{
+  width:62%;
+  height:62%;
+  fill:none;
+  stroke:currentColor;
+  stroke-width:2.1;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+
+.folder-row-head:hover .folder-drag-toggle,
+.folder-row-head:focus-within .folder-drag-toggle,
+.folder-row.drag-ready > .folder-row-head .folder-drag-toggle,
+.folder-row.drag-refresh > .folder-row-head .folder-drag-toggle{
+  opacity:1;
+  pointer-events:auto;
+}
+
+.folder-drag-toggle:hover{
+  background:rgba(118,146,255,.12);
+}
+
+.folder-row.drag-ready > .folder-row-head > .folder-drag-toggle{
+  color:var(--accent);
+}
+
+.folder-row.drag-refresh > .folder-row-head > .folder-drag-toggle{
+  color:var(--drag-warning);
+}
+
+button.drag-authorizing svg,
+.drag-root-row.drag-authorizing > .drag-root-state svg,
+.folder-row.drag-authorizing > .folder-row-head > .folder-drag-toggle svg{
+  transform-origin:center;
+  animation:dragAuthSpin .9s linear infinite;
+}
+
+button.drag-authorizing:disabled{
+  cursor:wait;
+  opacity:.86;
+}
+
+@keyframes dragAuthSpin{to{transform:rotate(360deg)}}
 
 .folder-row.tree-target > .folder-row-head > .folder-path{
   background:rgba(118,146,255,.22);
@@ -1930,6 +2067,7 @@ body.dense-grid .card-footer{
   --favorite-idle:rgb(238,239,242);
   --favorite-active:rgb(255,210,86);
   --favorite:var(--favorite-active);
+  --drag-warning:rgb(231,173,70);
   --danger:rgb(231,84,84);
   --danger-hover:rgb(255,120,120);
   --batch-divider:rgba(255,255,255,.16);
@@ -1937,6 +2075,7 @@ body.dense-grid .card-footer{
 
 body.theme-light{
   --favorite-idle:rgb(33,43,62);
+  --drag-warning:rgb(184,119,20);
   --danger:rgb(201,58,58);
   --danger-hover:rgb(169,41,41);
   --batch-divider:rgba(33,43,62,.2);
