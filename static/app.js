@@ -84,6 +84,8 @@ const state = {
   dragRoots: [],
   dragAuthBusy: false,
   dragAuthRoot: "",
+  dragConfigBusy: false,
+  settingsTab: "interface",
   perf: { scanMs: 0, renderMs: 0, schedulerMs: 0, pageItems: 0, loadedMedia: 0, warmVideos: 0, activeVideos: 0 },
   loadedStatTimer: null,
   floatingPagerTimer: null,
@@ -134,6 +136,8 @@ const ICONS = {
   eyeOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6A3 3 0 0 0 13.4 13.4"/><path d="M9.9 4.3A10.6 10.6 0 0 1 12 4c6 0 10 8 10 8a17.8 17.8 0 0 1-3.1 4.3"/><path d="M6.2 6.5C3.5 8.3 2 12 2 12s4 8 10 8a10 10 0 0 0 5-1.4"/></svg>',
   folder: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h5l2 2"/></svg>',
   folderPlus: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h5l2 2"/><path d="M14 13h5"/><path d="M16.5 10.5v5"/></svg>',
+  folderKey: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h5l2 2"/><circle cx="14.5" cy="14" r="2"/><path d="M16.5 14H21"/><path d="M19 14v2"/></svg>',
+  folderTree: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h6l2 2h8v5H4z"/><path d="M8 12v3"/><path d="M8 15h8"/><path d="M12 15v4"/><path d="M16 15v4"/><path d="M10 19h4"/><path d="M14 19h4"/></svg>',
   folderCheck: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h5l2 2"/><path d="M13.5 14.5l2 2 4-4"/></svg>',
   folderSync: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h5l2 2"/><path d="M13 13a4 4 0 0 1 6.2-1.3"/><path d="M19 9.5v3h-3"/><path d="M20 15a4 4 0 0 1-6.2 1.3"/><path d="M14 18.5v-3h3"/></svg>',
   grid: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/></svg>',
@@ -142,6 +146,9 @@ const ICONS = {
   fullscreenExit: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3v6H3"/><path d="M15 3v6h6"/><path d="M15 21v-6h6"/><path d="M9 21v-6H3"/></svg>',
   globe: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a15 15 0 0 1 0 18"/><path d="M12 3a15 15 0 0 0 0 18"/></svg>',
   alignCenter: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="4" width="14" height="16" rx="2"/><path d="M12 4v16"/></svg>',
+  layoutLeft: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><rect x="6" y="7" width="6" height="10" rx="1"/></svg>',
+  layoutCenter: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><rect x="9" y="7" width="6" height="10" rx="1"/></svg>',
+  layoutRight: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><rect x="12" y="7" width="6" height="10" rx="1"/></svg>',
   iconMode: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="3"/><circle cx="9" cy="12" r="1.6"/><path d="M13 10h4"/><path d="M13 14h4"/></svg>',
   image: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8" cy="10" r="2"/><path d="M21 16l-5-5L5 19"/></svg>',
   language: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h9"/><path d="M9 3v2"/><path d="M6 5c.8 3 2.8 5.4 6 7"/><path d="M12 5c-.8 3-2.8 5.4-6 7"/><path d="M14 21l4-9 4 9"/><path d="M15.4 18h5.2"/></svg>',
@@ -151,6 +158,8 @@ const ICONS = {
   play: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>',
   scan: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7V4h3"/><path d="M17 4h3v3"/><path d="M20 17v3h-3"/><path d="M7 20H4v-3"/><path d="M7 12h10"/></svg>',
   searchIcon: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="M15 15l5 5"/></svg>',
+  filter: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.2 7.1v5.4l-3.6 1.8v-7.2z"/></svg>',
+  bolt: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 2L5 13h6l-.5 9L19 11h-6z"/></svg>',
   settings: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 0 1-4 0v-.1a1.7 1.7 0 0 0-1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.5-1H3a2 2 0 0 1 0-4h.1a1.7 1.7 0 0 0 1.5-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 0 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.5V3a2 2 0 0 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 0 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.5 1h.1a2 2 0 0 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   reset: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v6h6"/></svg>',
   sidebar: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path d="M6 8h.01"/><path d="M6 12h.01"/></svg>',
@@ -278,6 +287,8 @@ const i18n = {
     largeVideoHint: "Click to play on demand",
     pauseWhenInactive: "Pause inactive",
     settings: "Settings",
+    collapse: "Collapse",
+    settingsAutoSave: "Changes are saved automatically.",
     folders: "Folders",
     folderPanelTitle: "Folders",
     folderFavorites: "Favorites",
@@ -294,7 +305,13 @@ const i18n = {
     dragCoveredBy: root => `Covered by ${root}`,
     dragRootEmpty: "No drag roots configured.",
     dragAuthorizeCurrent: "Authorize current path",
-    dragSettingsNote: "Authorize a high-level media folder once. Clicking authorize copies the target path first so you can paste it into Chrome's folder picker. Chrome may call this 'upload'; Local Video Wall does not upload these files to the network.",
+    dragRootInputPlaceholder: "One folder path per line",
+    dragRootAdd: "Add directories",
+    dragRootAddEmpty: "Enter one or more folder paths, one per line.",
+    dragRootAddNone: "Those folders are already covered by configured drag roots.",
+    dragRootAddDone: n => `${n} drag root(s) configured. Authorize them from the list when needed.`,
+    dragRootAddPartial: (configured, failed) => `${configured} configured · ${failed} failed. Check the remaining paths.`,
+    dragSettingsNote: "Configure one or more high-level media folders here, then authorize each root when this browser session needs access. Chrome may call this 'upload'; Local Video Wall does not upload these files to the network.",
     dragAuthorizationCancelled: "Drag authorization cancelled.",
     dragAuthorizationFailed: "Drag authorization did not complete.",
     dragAuthorizing: "Authorizing drag root...",
@@ -578,6 +595,8 @@ const i18n = {
     largeVideoHint: "点击后按需播放",
     pauseWhenInactive: "后台暂停播放",
     settings: "设置",
+    collapse: "收起",
+    settingsAutoSave: "更改会自动保存。",
     folders: "文件夹",
     folderPanelTitle: "文件夹",
     folderFavorites: "收藏路径",
@@ -594,7 +613,13 @@ const i18n = {
     dragCoveredBy: root => `已由 ${root} 覆盖`,
     dragRootEmpty: "暂无拖拽根目录。",
     dragAuthorizeCurrent: "授权当前路径",
-    dragSettingsNote: "只需授权高层素材目录一次。点击授权会先复制目标路径，可直接粘贴到 Chrome 的目录选择器中。Chrome 可能把目录授权显示为“上传文件”，但 Local Video Wall 不会把这些文件上传到网络。",
+    dragRootInputPlaceholder: "每行输入一个文件夹路径",
+    dragRootAdd: "添加目录",
+    dragRootAddEmpty: "请输入一个或多个文件夹路径，每行一个。",
+    dragRootAddNone: "这些目录已经被现有拖拽根目录覆盖。",
+    dragRootAddDone: n => `已配置 ${n} 个拖拽根目录，需要时可在列表中逐个授权。`,
+    dragRootAddPartial: (configured, failed) => `已配置 ${configured} 个 · ${failed} 个失败，请检查剩余路径。`,
+    dragSettingsNote: "可以先在这里一次配置多个高层素材目录，再根据需要从列表中逐个完成浏览器授权。Chrome 可能把目录授权显示为“上传文件”，但 Local Video Wall 不会把这些文件上传到网络。",
     dragAuthorizationCancelled: "已取消拖拽授权。",
     dragAuthorizationFailed: "拖拽授权未完成。",
     dragAuthorizing: "正在授权拖拽根目录...",
@@ -797,6 +822,7 @@ const folderFavorites = $("#folderFavorites");
 const folderTree = $("#folderTree");
 const chooseFolderBtn = $("#chooseFolderBtn");
 const scanBtn = $("#scanBtn");
+const recursiveToggleBtn = $("#recursiveToggleBtn");
 const rememberPath = $("#rememberPath");
 const recursiveScan = $("#recursiveScan");
 const excludeRulesOpen = $("#excludeRulesOpen");
@@ -822,6 +848,8 @@ const blockedScanPathList = $("#blockedScanPathList");
 const minScanVolumeSelect = $("#minScanVolumeSelect");
 const dragSettingsSection = $("#dragSettingsSection");
 const dragRootList = $("#dragRootList");
+const dragRootInput = $("#dragRootInput");
+const dragRootAddBtn = $("#dragRootAddBtn");
 const dragAuthorizeCurrentBtn = $("#dragAuthorizeCurrentBtn");
 const dragAuthorizeCurrentLabel = $("#dragAuthorizeCurrentLabel");
 const dragRootCount = $("#dragRootCount");
@@ -865,10 +893,20 @@ const trashRestoreBtn = $("#trashRestoreBtn");
 const trashSystemBtn = $("#trashSystemBtn");
 const settingsToggle = $("#settingsToggle");
 const settingsMenu = $("#settingsMenu");
+const settingsBackdrop = $("#settingsBackdrop");
+const settingsPanel = $("#settingsPanel");
+const settingsClose = $("#settingsClose");
+const settingsTabs = $("#settingsTabs");
+const settingsContent = $("#settingsContent");
+const settingsModalTitle = $("#settingsModalTitle");
+const settingsAutoSave = $("#settingsAutoSave");
+document.body.appendChild(settingsMenu);
 const langToggle = $("#langToggle");
 const themeToggle = $("#themeToggle");
 const fontSizeSeg = $("#fontSizeSeg");
 const contentAlignSeg = $("#contentAlignSeg");
+const contentAlignToolbarBtn = $("#contentAlignToolbarBtn");
+const contentAlignToolbarMenu = $("#contentAlignToolbarMenu");
 const modalContentAlignSeg = $("#modalContentAlignSeg");
 const emptyState = $("#emptyState");
 const toast = $("#toast");
@@ -1119,6 +1157,32 @@ function setButtonLabel(button, text, iconName, options = {}) {
   }
 }
 
+function layoutIconForAlign(align) {
+  if (align === "left") return "layoutLeft";
+  if (align === "right") return "layoutRight";
+  return "layoutCenter";
+}
+
+function updateRecursiveToolbarButton() {
+  if (!recursiveToggleBtn) return;
+  recursiveToggleBtn.classList.toggle("active", !!state.recursive);
+  recursiveToggleBtn.setAttribute("aria-pressed", state.recursive ? "true" : "false");
+  setButtonLabel(recursiveToggleBtn, t().recursive, "folderTree", { iconOnly: true });
+}
+
+function updateContentAlignToolbarButton() {
+  if (!contentAlignToolbarBtn) return;
+  const tx = t();
+  const labels = { left: tx.contentAlignLeft, center: tx.contentAlignCenter, right: tx.contentAlignRight };
+  const align = ["left", "center", "right"].includes(state.contentAlign) ? state.contentAlign : "center";
+  setButtonLabel(contentAlignToolbarBtn, `${tx.contentAlign}: ${labels[align]}`, layoutIconForAlign(align), { iconOnly: true });
+  contentAlignToolbarMenu?.querySelectorAll("button[data-content-align]").forEach(button => {
+    const active = button.dataset.contentAlign === align;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-checked", active ? "true" : "false");
+  });
+}
+
 function applyTheme() {
   document.body.classList.toggle("theme-light", state.theme === "light");
 }
@@ -1140,10 +1204,11 @@ function updateContentAlignLabels() {
     center: [tx.contentAlignCenter, "alignCenter"],
     right: [tx.contentAlignRight, "right"],
   };
-  [contentAlignSeg, modalContentAlignSeg].forEach(seg => {
+  [contentAlignSeg, modalContentAlignSeg, contentAlignToolbarMenu].forEach(seg => {
     seg?.querySelectorAll("button[data-content-align]").forEach(button => {
-      const [label, icon] = labels[button.dataset.contentAlign] || [button.textContent, "alignCenter"];
-      setButtonLabel(button, label, icon, { iconOnly: seg === modalContentAlignSeg });
+      const [label, fallbackIcon] = labels[button.dataset.contentAlign] || [button.textContent, "alignCenter"];
+      const icon = seg === contentAlignToolbarMenu ? layoutIconForAlign(button.dataset.contentAlign) : fallbackIcon;
+      setButtonLabel(button, label, icon, { iconOnly: seg !== contentAlignSeg });
     });
   });
 }
@@ -1203,9 +1268,11 @@ function applyActionButtons() {
   setButtonLabel(themeToggle, themeText, state.theme === "dark" ? "sun" : "moon", { iconOnly: false, iconText: true });
   setButtonLabel(chooseFolderBtn, tx.chooseFolder, "folder", { iconOnly: true });
   setButtonLabel(scanBtn, tx.scan, "scan", { iconOnly: true });
+  updateRecursiveToolbarButton();
   setButtonLabel(expandBtn, tx.expand, "fullscreen");
   setButtonLabel(exportCsvBtn, tx.exportCsv, "download", { iconOnly: false, iconText: true });
   setButtonLabel(clearHistoryBtn, tx.clearHistory, "trash", { iconOnly: false, iconText: true });
+  setButtonLabel(dragRootAddBtn, tx.dragRootAdd, "folderPlus", { iconOnly: false, iconText: true });
   setButtonLabel(pauseBtn, state.playingEnabled ? tx.pauseAll : tx.resume, state.playingEnabled ? "pause" : "play", { iconOnly: true });
   setButtonLabel(resetFiltersBtn, tx.resetFilters, "reset", { iconOnly: true });
   setButtonLabel(mediaFilterSeg.querySelector('[data-media-filter="all"]'), tx.allMedia, "grid", { iconOnly: true });
@@ -1224,6 +1291,7 @@ function applyActionButtons() {
   setButtonLabel(topPageNext, tx.pageNext, "right", { iconOnly: true });
   setButtonLabel(immersiveBtn, state.immersive ? tx.exitImmersive : tx.immersive, state.immersive ? "close" : "fullscreen", { iconOnly: true });
   updateContentAlignLabels();
+  updateContentAlignToolbarButton();
   setButtonLabel(modalSlideshow, state.modalSlideshowPlaying ? tx.pause : tx.slideshow, state.modalSlideshowPlaying ? "pause" : "slideshow", { iconOnly: true });
   modalSlideshow.classList.toggle("primary", state.modalSlideshowPlaying);
   setButtonLabel(modalSlideshowFullscreen, tx.fullscreen, "fullscreen", { iconOnly: true });
@@ -1311,7 +1379,7 @@ function applyLanguage() {
   $("#excludeRulesNote").textContent = tx.excludeNote;
   excludeRulesSave.textContent = tx.excludeSave;
   excludeRulesCancel.textContent = tx.excludeCancel;
-  excludeRulesClose.textContent = tx.close;
+  excludeRulesClose.textContent = tx.collapse;
   $("#scanProtectionOpenLabel").textContent = tx.scanProtection;
   $("#scanProtectionTitle").textContent = tx.scanProtection;
   blockedScanPathInput.placeholder = tx.scanProtectionPathPlaceholder;
@@ -1321,7 +1389,7 @@ function applyLanguage() {
   $("#scanProtectionNote").textContent = tx.scanProtectionNote;
   scanProtectionSave.textContent = tx.excludeSave;
   scanProtectionCancel.textContent = tx.excludeCancel;
-  scanProtectionClose.textContent = tx.close;
+  scanProtectionClose.textContent = tx.collapse;
   searchInput.placeholder = tx.search;
   sizeFilterSelect.title = tx.sizeFilterTitle;
   sizeFilterSelect.querySelector('[value="all"]').textContent = tx.anySize;
@@ -1363,16 +1431,25 @@ function applyLanguage() {
   $("#contentAlignLabel").textContent = tx.contentAlign;
   contentAlignSeg.title = tx.contentAlign;
   modalContentAlignSeg.title = tx.contentAlign;
+  contentAlignToolbarMenu.setAttribute("aria-label", tx.contentAlign);
   contentAlignSeg.querySelector('[data-content-align="center"]').textContent = tx.contentAlignCenter;
   contentAlignSeg.querySelector('[data-content-align="left"]').textContent = tx.contentAlignLeft;
   contentAlignSeg.querySelector('[data-content-align="right"]').textContent = tx.contentAlignRight;
   $("#settingsScanTitle").textContent = tx.scanSettings;
   $("#settingsDragTitle").textContent = tx.dragOutSettings;
   dragAuthorizeCurrentLabel.textContent = tx.dragAuthorizeCurrent;
+  dragRootInput.placeholder = tx.dragRootInputPlaceholder;
+  dragRootInput.setAttribute("aria-label", tx.dragRootInputPlaceholder);
+  dragRootAddBtn.textContent = tx.dragRootAdd;
   dragSettingsNote.textContent = tx.dragSettingsNote;
   $("#settingsPlaybackTitle").textContent = tx.playbackSettings;
   $("#settingsFiltersTitle").textContent = tx.filterSettings;
   $("#settingsActionsTitle").textContent = tx.actionSettings;
+  settingsModalTitle.textContent = tx.settings;
+  settingsAutoSave.textContent = tx.settingsAutoSave;
+  settingsTabs.setAttribute("aria-label", tx.settings);
+  setButtonLabel(settingsClose, tx.close, "close", { iconOnly: true });
+  updateSettingsTabs();
   exportCsvBtn.textContent = tx.exportCsv;
   pauseBtn.textContent = state.playingEnabled ? tx.pauseAll : tx.resume;
   immersiveBtn.textContent = state.immersive ? tx.exitImmersive : tx.immersive;
@@ -1466,13 +1543,123 @@ function getContentWidthRule() {
   return "calc(100% - 24px)";
 }
 
-function setSettingsMenuOpen(open) {
+const SETTINGS_TABS = ["interface", "scan", "drag", "playback", "filters", "actions"];
+
+function updateSettingsTabs() {
+  const tx = t();
+  const config = {
+    interface: [tx.interfaceSettings, "iconMode"],
+    scan: [tx.scanSettings, "scan"],
+    drag: [tx.dragOutSettings, "folderKey"],
+    playback: [tx.playbackSettings, "play"],
+    filters: [tx.filterSettings, "filter"],
+    actions: [tx.actionSettings, "bolt"],
+  };
+  settingsModalTitle.textContent = tx.settings;
+  settingsAutoSave.textContent = tx.settingsAutoSave;
+  settingsTabs.setAttribute("aria-label", tx.settings);
+  settingsTabs.querySelectorAll("button[data-settings-tab]").forEach(button => {
+    const tab = button.dataset.settingsTab;
+    const [label, icon] = config[tab] || [tab, "settings"];
+    const active = tab === state.settingsTab;
+    setButtonLabel(button, label, icon, { iconOnly: false, iconText: true });
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-selected", active ? "true" : "false");
+    button.tabIndex = active ? 0 : -1;
+  });
+  settingsContent.querySelectorAll("[data-settings-section]").forEach(section => {
+    const active = section.dataset.settingsSection === state.settingsTab;
+    section.classList.toggle("hidden", !active);
+    section.setAttribute("aria-hidden", active ? "false" : "true");
+  });
+}
+
+function setSettingsTab(tab, { focus = false } = {}) {
+  const next = SETTINGS_TABS.includes(tab) ? tab : "interface";
+  const changed = state.settingsTab !== next;
+  state.settingsTab = next;
+  updateSettingsTabs();
+  if (changed) settingsContent.scrollTop = 0;
+  if (focus) settingsTabs.querySelector(`[data-settings-tab="${next}"]`)?.focus();
+}
+
+function trapSettingsFocus(event) {
+  if (event.key !== "Tab" || settingsMenu.classList.contains("hidden")) return;
+  const focusable = [...settingsPanel.querySelectorAll('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])')]
+    .filter(element => element.offsetParent !== null);
+  if (!focusable.length) {
+    event.preventDefault();
+    settingsPanel.focus();
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (document.activeElement === settingsPanel || !settingsPanel.contains(document.activeElement)) {
+    event.preventDefault();
+    (event.shiftKey ? last : first).focus();
+    return;
+  }
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+function setSettingsMenuOpen(open, { tab = null, restoreFocus = true } = {}) {
+  const wasOpen = !settingsMenu.classList.contains("hidden");
+  if (open) {
+    setContentAlignToolbarMenuOpen(false);
+    setHistoryMenuOpen(false);
+    closePathSuggestions();
+    if (tab) state.settingsTab = SETTINGS_TABS.includes(tab) ? tab : "interface";
+    updateSettingsTabs();
+  } else if (wasOpen) {
+    closeExcludeRulesDialog({ restoreFocus: false });
+    closeScanProtectionDialog({ restoreFocus: false });
+  }
   settingsMenu.classList.toggle("hidden", !open);
   settingsToggle.setAttribute("aria-expanded", open ? "true" : "false");
+  document.body.classList.toggle("settings-open", open);
+  if (open) {
+    window.setTimeout(() => {
+      const activeTab = settingsTabs.querySelector(`[data-settings-tab="${state.settingsTab}"]`);
+      if (activeTab) activeTab.focus();
+      else settingsPanel.focus();
+    }, 0);
+  } else if (wasOpen && restoreFocus) {
+    settingsToggle.focus();
+  }
 }
 
 function toggleSettingsMenu() {
   setSettingsMenuOpen(settingsMenu.classList.contains("hidden"));
+}
+
+function positionContentAlignToolbarMenu() {
+  if (!contentAlignToolbarBtn || !contentAlignToolbarMenu || contentAlignToolbarMenu.classList.contains("hidden")) return;
+  const rect = contentAlignToolbarBtn.getBoundingClientRect();
+  const width = contentAlignToolbarMenu.offsetWidth || 116;
+  const left = Math.max(12, Math.min(window.innerWidth - width - 12, rect.right - width));
+  contentAlignToolbarMenu.style.left = `${Math.round(left)}px`;
+  contentAlignToolbarMenu.style.top = `${Math.round(rect.bottom + 6)}px`;
+}
+
+function setContentAlignToolbarMenuOpen(open) {
+  if (!contentAlignToolbarMenu || !contentAlignToolbarBtn) return;
+  contentAlignToolbarMenu.classList.toggle("hidden", !open);
+  contentAlignToolbarBtn.setAttribute("aria-expanded", open ? "true" : "false");
+  if (open) {
+    setSettingsMenuOpen(false, { restoreFocus: false });
+    updateContentAlignToolbarButton();
+    positionContentAlignToolbarMenu();
+  }
+}
+
+function toggleContentAlignToolbarMenu() {
+  setContentAlignToolbarMenuOpen(contentAlignToolbarMenu.classList.contains("hidden"));
 }
 
 function cleanExcludeKeywords(keywords) {
@@ -1532,21 +1719,28 @@ function renderExcludeRulesDraft() {
 }
 
 function openExcludeRulesDialog() {
+  if (!excludeRulesDialog.classList.contains("hidden")) {
+    closeExcludeRulesDialog();
+    return;
+  }
+  closeScanProtectionDialog({ restoreFocus: false });
   excludeRulesDraft = {
     enabled: state.filenameExcludeEnabled,
     keywords: [...state.filenameExcludeKeywords],
     scope: state.filenameExcludeScope,
   };
   excludeKeywordInput.value = "";
-  setSettingsMenuOpen(false);
   excludeRulesDialog.classList.remove("hidden");
+  excludeRulesOpen.setAttribute("aria-expanded", "true");
   renderExcludeRulesDraft();
   setTimeout(() => excludeKeywordInput.focus(), 0);
 }
 
-function closeExcludeRulesDialog() {
+function closeExcludeRulesDialog({ restoreFocus = true } = {}) {
   excludeRulesDialog.classList.add("hidden");
+  excludeRulesOpen.setAttribute("aria-expanded", "false");
   excludeRulesDraft = null;
+  if (restoreFocus && !settingsMenu.classList.contains("hidden")) excludeRulesOpen.focus();
 }
 
 function addExcludeKeyword() {
@@ -1638,20 +1832,27 @@ function renderScanProtectionDraft() {
 }
 
 function openScanProtectionDialog() {
+  if (!scanProtectionDialog.classList.contains("hidden")) {
+    closeScanProtectionDialog();
+    return;
+  }
+  closeExcludeRulesDialog({ restoreFocus: false });
   scanProtectionDraft = {
     paths: [...state.blockedScanPaths],
     minVolumeGb: state.minScanVolumeGb,
   };
   blockedScanPathInput.value = "";
-  setSettingsMenuOpen(false);
   scanProtectionDialog.classList.remove("hidden");
+  scanProtectionOpen.setAttribute("aria-expanded", "true");
   renderScanProtectionDraft();
   setTimeout(() => blockedScanPathInput.focus(), 0);
 }
 
-function closeScanProtectionDialog() {
+function closeScanProtectionDialog({ restoreFocus = true } = {}) {
   scanProtectionDialog.classList.add("hidden");
+  scanProtectionOpen.setAttribute("aria-expanded", "false");
   scanProtectionDraft = null;
+  if (restoreFocus && !settingsMenu.classList.contains("hidden")) scanProtectionOpen.focus();
 }
 
 function addBlockedScanPath() {
@@ -3247,15 +3448,15 @@ function dragStatusForPath(path) {
 
 function dragIconForState(status) {
   if (status.state === "ready") return "folderCheck";
-  if (status.state === "refresh") return "folderSync";
-  return "folderPlus";
+  if (status.state === "refresh") return status.reason === "restore" ? "folderKey" : "folderSync";
+  return "folderKey";
 }
 
 function dragTitleForPath(path, status = dragStatusForPath(path)) {
   if (status.state === "ready") {
     return pathKey(path) === pathKey(status.root) ? t().dragReady : t().dragCoveredBy(status.root);
   }
-  if (status.state === "refresh") return t().dragRefresh;
+  if (status.state === "refresh") return status.reason === "restore" ? t().dragAuthorize : t().dragRefresh;
   return t().dragAuthorize;
 }
 
@@ -3263,7 +3464,7 @@ function applyDragButtonState(button, path, row = null) {
   if (!button) return;
   const status = dragStatusForPath(path);
   const authorizing = state.dragAuthBusy && pathKey(path) === pathKey(state.dragAuthRoot);
-  button.disabled = !!state.dragAuthBusy;
+  button.disabled = !!state.dragAuthBusy || !!state.dragConfigBusy;
   button.classList.remove("drag-ready", "drag-refresh", "drag-authorizing");
   if (authorizing) {
     button.classList.add("drag-authorizing");
@@ -3298,7 +3499,10 @@ function renderDragRootSettings() {
   dragRootList.innerHTML = "";
   dragRootCount.textContent = String(state.dragRoots.length);
   dragAuthorizeCurrentLabel.textContent = t().dragAuthorizeCurrent;
-  dragAuthorizeCurrentBtn.disabled = !!state.dragAuthBusy;
+  dragAuthorizeCurrentBtn.disabled = !!state.dragAuthBusy || !!state.dragConfigBusy;
+  dragRootInput.placeholder = t().dragRootInputPlaceholder;
+  dragRootAddBtn.disabled = !!state.dragAuthBusy || !!state.dragConfigBusy;
+  setButtonLabel(dragRootAddBtn, t().dragRootAdd, "folderPlus", { iconOnly: false, iconText: true });
   dragSettingsNote.textContent = t().dragSettingsNote;
   if (!state.dragRoots.length) {
     const empty = document.createElement("div");
@@ -3311,12 +3515,13 @@ function renderDragRootSettings() {
     const info = dragOutController.getRootInfo(root);
     const row = document.createElement("div");
     const authorizing = state.dragAuthBusy && pathKey(root) === pathKey(state.dragAuthRoot);
+    const needsAuthorization = info.state !== "ready" && (!info.reason || info.reason === "restore");
     row.className = `drag-root-row ${authorizing ? "drag-authorizing" : (info.state === "ready" ? "drag-ready" : "drag-refresh")}`;
 
     const stateIcon = document.createElement("span");
     stateIcon.className = "drag-root-state";
-    stateIcon.innerHTML = iconSvg(authorizing ? "folderSync" : (info.state === "ready" ? "folderCheck" : "folderSync"));
-    stateIcon.title = authorizing ? t().dragAuthorizing : (info.state === "ready" ? t().dragReady : t().dragRefresh);
+    stateIcon.innerHTML = iconSvg(authorizing ? "folderSync" : (info.state === "ready" ? "folderCheck" : (needsAuthorization ? "folderKey" : "folderSync")));
+    stateIcon.title = authorizing ? t().dragAuthorizing : (info.state === "ready" ? t().dragReady : (needsAuthorization ? t().dragAuthorize : t().dragRefresh));
 
     const copy = document.createElement("div");
     copy.className = "drag-root-copy";
@@ -3336,11 +3541,11 @@ function renderDragRootSettings() {
     const refresh = document.createElement("button");
     refresh.type = "button";
     refresh.className = "drag-root-action";
-    refresh.disabled = !!state.dragAuthBusy;
+    refresh.disabled = !!state.dragAuthBusy || !!state.dragConfigBusy;
     if (authorizing) refresh.classList.add("drag-authorizing");
-    refresh.innerHTML = iconSvg("folderSync");
-    refresh.title = t().dragRefreshAction;
-    refresh.setAttribute("aria-label", t().dragRefreshAction);
+    refresh.innerHTML = iconSvg(needsAuthorization ? "folderKey" : "folderSync");
+    refresh.title = needsAuthorization ? t().dragAuthorize : t().dragRefreshAction;
+    refresh.setAttribute("aria-label", refresh.title);
     refresh.addEventListener("click", event => {
       event.stopPropagation();
       authorizeDragRoot(root, { persist: false });
@@ -3348,7 +3553,7 @@ function renderDragRootSettings() {
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "drag-root-action";
-    remove.disabled = !!state.dragAuthBusy;
+    remove.disabled = !!state.dragAuthBusy || !!state.dragConfigBusy;
     remove.innerHTML = iconSvg("close");
     remove.title = t().dragRemoveAction;
     remove.setAttribute("aria-label", t().dragRemoveAction);
@@ -3379,6 +3584,61 @@ async function persistDragRoot(action, root) {
   if (!data.ok) throw new Error(data.error || t().unknown);
   syncDragRootsFromConfig(data.config || {});
   return data;
+}
+
+function parseDragRootInput(value) {
+  const roots = [];
+  const seen = new Set();
+  for (const raw of String(value || "").split(/\r?\n/)) {
+    const root = normalizeDriveLetterInput(raw);
+    const key = pathKey(root);
+    if (!root || !key || seen.has(key)) continue;
+    seen.add(key);
+    roots.push(root);
+  }
+  return roots;
+}
+
+async function addConfiguredDragRoots() {
+  const roots = parseDragRootInput(dragRootInput.value);
+  if (!roots.length) {
+    showToast(t().dragRootAddEmpty, 2600);
+    return;
+  }
+  if (state.dragAuthBusy || state.dragConfigBusy) {
+    showToast(t().dragAuthorizationBusy, 2600);
+    return;
+  }
+  if (!state.backendCompatible) {
+    showToast(t().backendRestartRequired, 7000);
+    return;
+  }
+  const pending = roots.filter(root => dragStatusForPath(root).state === "unconfigured");
+  if (!pending.length) {
+    showToast(t().dragRootAddNone, 2600);
+    return;
+  }
+
+  state.dragConfigBusy = true;
+  renderDragRootSettings();
+  updateDragAuthorizationUi();
+  let configured = 0;
+  const failed = [];
+  for (const root of pending) {
+    try {
+      await persistDragRoot("drag_root_add", root);
+      configured += 1;
+    } catch (error) {
+      console.error(error);
+      failed.push(root);
+    }
+  }
+  state.dragConfigBusy = false;
+  dragRootInput.value = failed.join("\n");
+  renderDragRootSettings();
+  updateDragAuthorizationUi();
+  if (failed.length) showToast(t().dragRootAddPartial(configured, failed.length), 4200);
+  else showToast(t().dragRootAddDone(configured), 3200);
 }
 
 async function verifyDragRootSelection({ root, selectedRootName, totalFiles, samples }) {
@@ -3452,7 +3712,7 @@ function authorizeDragRoot(rootPath, { persist = true } = {}) {
     showToast(t().needPath);
     return Promise.resolve(false);
   }
-  if (state.dragAuthBusy) {
+  if (state.dragAuthBusy || state.dragConfigBusy) {
     showToast(t().dragAuthorizationBusy, 2600);
     return Promise.resolve(false);
   }
@@ -3528,9 +3788,8 @@ function authorizeDragRoot(rootPath, { persist = true } = {}) {
 }
 
 function openDragSettings() {
-  setSettingsMenuOpen(true);
+  setSettingsMenuOpen(true, { tab: "drag" });
   renderDragRootSettings();
-  window.setTimeout(() => dragSettingsSection?.scrollIntoView({ block: "nearest" }), 0);
 }
 
 function handleDragAuthorizationClick(path = pathInput.value) {
@@ -3872,7 +4131,7 @@ async function scanNow() {
     const payload = {
       video_dir: videoDir,
       remember_path: rememberPath.checked,
-      recursive: recursiveScan.checked,
+      recursive: state.recursive,
       filename_exclude_enabled: state.filenameExcludeEnabled,
       filename_exclude_keywords: state.filenameExcludeKeywords,
       filename_exclude_scope: state.filenameExcludeScope,
@@ -3921,6 +4180,8 @@ async function scanNow() {
     state.pathFavorites = data.config?.path_favorites || state.pathFavorites;
     syncDragRootsFromConfig(data.config || { drag_roots: state.dragRoots });
     state.recursive = !!data.recursive;
+    recursiveScan.checked = state.recursive;
+    updateRecursiveToolbarButton();
     state.filenameExcludeEnabled = data.config?.filename_exclude_enabled !== false;
     state.filenameExcludeKeywords = cleanExcludeKeywords(data.config?.filename_exclude_keywords || []);
     state.filenameExcludeScope = data.config?.filename_exclude_scope === "all" ? "all" : "image";
@@ -3958,7 +4219,7 @@ async function saveSettingsSoft() {
       body: JSON.stringify({
         remember_path: rememberPath.checked,
         last_video_dir: pathInput.value.trim(),
-        recursive: recursiveScan.checked,
+        recursive: state.recursive,
         filename_exclude_enabled: state.filenameExcludeEnabled,
         filename_exclude_keywords: state.filenameExcludeKeywords,
         filename_exclude_scope: state.filenameExcludeScope,
@@ -4093,8 +4354,16 @@ function setFontSize(size, save = true) {
   if (save) saveSettingsSoft();
 }
 
+function setRecursiveScanEnabled(enabled, save = true) {
+  state.recursive = !!enabled;
+  recursiveScan.checked = state.recursive;
+  updateRecursiveToolbarButton();
+  if (save) saveSettingsSoft();
+}
+
 function setContentAlign(align, save = true) {
   state.contentAlign = ["left", "center", "right"].includes(align) ? align : "center";
+  updateContentAlignToolbarButton();
   applyLayout();
   if (save) saveSettingsSoft();
 }
@@ -4226,11 +4495,15 @@ favoritePathBtn.addEventListener("click", e => {
 });
 dragPathBtn.addEventListener("click", e => {
   e.stopPropagation();
-  handleDragAuthorizationClick(pathInput.value);
+  openDragSettings();
 });
 dragAuthorizeCurrentBtn.addEventListener("click", e => {
   e.stopPropagation();
   handleDragAuthorizationClick(pathInput.value);
+});
+dragRootAddBtn.addEventListener("click", event => {
+  event.stopPropagation();
+  void addConfiguredDragRoots();
 });
 pathHistoryToggle.addEventListener("click", e => {
   e.stopPropagation();
@@ -4247,6 +4520,10 @@ pathHistoryMenu.addEventListener("click", e => {
 pathSuggestMenu.addEventListener("click", e => e.stopPropagation());
 chooseFolderBtn.addEventListener("click", chooseFolder);
 scanBtn.addEventListener("click", scanNow);
+recursiveToggleBtn.addEventListener("click", event => {
+  event.stopPropagation();
+  setRecursiveScanEnabled(!state.recursive);
+});
 trashToggle.addEventListener("click", async e => {
   e.stopPropagation();
   if (!state.showTrash && !(await ensureTrashBackend())) return;
@@ -4263,6 +4540,44 @@ trashSystemBtn.addEventListener("click", () => runTrashAction("system_trash", [.
 settingsToggle.addEventListener("click", e => {
   e.stopPropagation();
   toggleSettingsMenu();
+});
+settingsClose.addEventListener("click", event => {
+  event.stopPropagation();
+  setSettingsMenuOpen(false);
+});
+settingsBackdrop.addEventListener("click", event => {
+  event.stopPropagation();
+  setSettingsMenuOpen(false);
+});
+settingsTabs.addEventListener("click", event => {
+  event.stopPropagation();
+  const button = event.target.closest("button[data-settings-tab]");
+  if (!button) return;
+  setSettingsTab(button.dataset.settingsTab, { focus: true });
+});
+settingsTabs.addEventListener("keydown", event => {
+  if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+  const buttons = [...settingsTabs.querySelectorAll("button[data-settings-tab]")];
+  if (!buttons.length) return;
+  const current = Math.max(0, buttons.indexOf(document.activeElement));
+  let next = current;
+  if (event.key === 'Home') next = 0;
+  else if (event.key === 'End') next = buttons.length - 1;
+  else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') next = (current - 1 + buttons.length) % buttons.length;
+  else next = (current + 1) % buttons.length;
+  event.preventDefault();
+  setSettingsTab(buttons[next].dataset.settingsTab, { focus: true });
+});
+contentAlignToolbarBtn.addEventListener("click", event => {
+  event.stopPropagation();
+  toggleContentAlignToolbarMenu();
+});
+contentAlignToolbarMenu.addEventListener("click", event => {
+  event.stopPropagation();
+  const button = event.target.closest("button[data-content-align]");
+  if (!button) return;
+  setContentAlign(button.dataset.contentAlign);
+  setContentAlignToolbarMenuOpen(false);
 });
 settingsMenu.addEventListener("click", e => e.stopPropagation());
 excludeRulesOpen.addEventListener("click", openExcludeRulesDialog);
@@ -4308,7 +4623,7 @@ minScanVolumeSelect.addEventListener("change", () => {
   if (scanProtectionDraft) scanProtectionDraft.minVolumeGb = Number(minScanVolumeSelect.value) || 0;
 });
 document.addEventListener("click", () => {
-  setSettingsMenuOpen(false);
+  setContentAlignToolbarMenuOpen(false);
   setHistoryMenuOpen(false);
   closePathSuggestions();
 });
@@ -4342,7 +4657,7 @@ pathInput.addEventListener("keydown", e => {
   }
 });
 rememberPath.addEventListener("change", saveSettingsSoft);
-recursiveScan.addEventListener("change", saveSettingsSoft);
+recursiveScan.addEventListener("change", () => setRecursiveScanEnabled(recursiveScan.checked));
 mediaFilterSeg.addEventListener("click", e => {
   const btn = e.target.closest("button[data-media-filter]");
   if (!btn) return;
@@ -4605,8 +4920,13 @@ window.addEventListener("keydown", e => {
     closeScanProtectionDialog();
     return;
   }
-  if (e.key === "Escape" && !settingsMenu.classList.contains("hidden")) {
-    setSettingsMenuOpen(false);
+  if (e.key === "Escape" && !contentAlignToolbarMenu.classList.contains("hidden")) {
+    setContentAlignToolbarMenuOpen(false);
+    return;
+  }
+  if (!settingsMenu.classList.contains("hidden")) {
+    if (e.key === "Escape") setSettingsMenuOpen(false);
+    else if (e.key === "Tab") trapSettingsFocus(e);
     return;
   }
   if (e.key === "Escape" && !pathHistoryMenu.classList.contains("hidden")) {
@@ -4680,6 +5000,7 @@ window.addEventListener("scroll", () => {
   showFloatingPagerTemporarily();
 }, { passive: true });
 window.addEventListener("resize", () => {
+  positionContentAlignToolbarMenu();
   applyLayout();
   positionFloatingPager();
   scheduleUpdatePlaying();

@@ -21,6 +21,7 @@
         </div>
         <button id="chooseFolderBtn" class="btn">Choose Folder</button>
         <button id="scanBtn" class="btn primary">Scan</button>
+        <button id="recursiveToggleBtn" class="btn icon-toggle toolbar-toggle" type="button" title="Scan subfolders (max 2 levels)" aria-label="Scan subfolders (max 2 levels)" aria-pressed="false"></button>
         <input id="searchInput" class="search" type="search" placeholder="Search filename..." autocomplete="off" />
         <div id="mediaFilterSeg" class="seg" title="Media type">
           <button type="button" data-media-filter="all">All</button>
@@ -52,6 +53,12 @@
             <option value="18">18 cols</option><option value="19">19 cols</option><option value="20">20 cols</option>
           </optgroup>
         </select>
+        <button id="contentAlignToolbarBtn" class="btn icon-toggle toolbar-toggle" type="button" title="Layout position" aria-label="Layout position" aria-haspopup="true" aria-expanded="false"></button>
+        <div id="contentAlignToolbarMenu" class="toolbar-popover hidden" role="menu" aria-label="Layout position">
+          <button type="button" data-content-align="left" role="menuitemradio" aria-checked="false"></button>
+          <button type="button" data-content-align="center" role="menuitemradio" aria-checked="true"></button>
+          <button type="button" data-content-align="right" role="menuitemradio" aria-checked="false"></button>
+        </div>
         <span id="pageSizeLabel" class="toolbar-label">Per page</span>
         <input id="pageSizeInput" class="page-size-input" type="number" min="1" max="240" step="1" value="120" title="Items per page" />
         <div id="topPager" class="top-pager hidden" aria-label="Media page controls">
@@ -62,85 +69,162 @@
         <button id="immersiveBtn" class="btn">Immersive</button>
         <span class="toolbar-divider" aria-hidden="true"></span>
         <button id="trashToggle" class="btn icon-toggle" title="Recycle Folder" aria-label="Recycle Folder"></button>
-        <button id="settingsToggle" class="btn icon-toggle" title="Settings" aria-label="Settings"></button>
-        <div id="settingsMenu" class="settings-menu hidden">
-        <div class="settings-section">
-          <div id="settingsInterfaceTitle" class="settings-title">Interface</div>
-          <button id="langToggle" class="btn settings-btn" title="Switch language" aria-label="Switch language"></button>
-          <button id="themeToggle" class="btn settings-btn" title="Toggle theme" aria-label="Toggle theme"></button>
-          <label class="check settings-check"><input id="floatingPagerEnabled" type="checkbox"><span id="floatingPagerLabel">Floating pager</span></label>
-          <div class="settings-field">
-            <span id="fontSizeLabel" class="settings-field-label">Text size</span>
-            <div id="fontSizeSeg" class="seg settings-seg" title="Text size">
-              <button type="button" data-font-size="small">Small</button>
-              <button type="button" data-font-size="standard">Standard</button>
-              <button type="button" data-font-size="large">Large</button>
+        <button id="settingsToggle" class="btn icon-toggle" title="Settings" aria-label="Settings" aria-haspopup="dialog" aria-expanded="false"></button>
+        <div id="settingsMenu" class="settings-menu hidden" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+          <div id="settingsBackdrop" class="settings-backdrop" data-settings-close="1"></div>
+          <div id="settingsPanel" class="settings-panel" tabindex="-1">
+            <div class="settings-modal-head">
+              <strong id="settingsModalTitle">Settings</strong>
+              <button id="settingsClose" class="btn icon-toggle" type="button" title="Close" aria-label="Close"></button>
             </div>
-          </div>
-          <div class="settings-field">
-            <span id="contentAlignLabel" class="settings-field-label">Layout position</span>
-            <div id="contentAlignSeg" class="seg settings-seg" title="Layout position">
-              <button type="button" data-content-align="left">Left</button>
-              <button type="button" data-content-align="center">Center</button>
-              <button type="button" data-content-align="right">Right</button>
+            <div class="settings-modal-body">
+              <nav id="settingsTabs" class="settings-tabs" role="tablist" aria-label="Settings sections">
+                <button class="settings-tab active" type="button" role="tab" data-settings-tab="interface" aria-selected="true" aria-controls="settingsSectionInterface"></button>
+                <button class="settings-tab" type="button" role="tab" data-settings-tab="scan" aria-selected="false" aria-controls="settingsSectionScan"></button>
+                <button class="settings-tab" type="button" role="tab" data-settings-tab="drag" aria-selected="false" aria-controls="dragSettingsSection"></button>
+                <button class="settings-tab" type="button" role="tab" data-settings-tab="playback" aria-selected="false" aria-controls="settingsSectionPlayback"></button>
+                <button class="settings-tab" type="button" role="tab" data-settings-tab="filters" aria-selected="false" aria-controls="settingsSectionFilters"></button>
+                <button class="settings-tab" type="button" role="tab" data-settings-tab="actions" aria-selected="false" aria-controls="settingsSectionActions"></button>
+              </nav>
+              <div id="settingsContent" class="settings-content">
+                <div id="settingsSectionInterface" class="settings-section" data-settings-section="interface" role="tabpanel">
+                  <div id="settingsInterfaceTitle" class="settings-title">Interface</div>
+                  <button id="langToggle" class="btn settings-btn" title="Switch language" aria-label="Switch language"></button>
+                  <button id="themeToggle" class="btn settings-btn" title="Toggle theme" aria-label="Toggle theme"></button>
+                  <label class="check settings-check"><input id="floatingPagerEnabled" type="checkbox"><span id="floatingPagerLabel">Floating pager</span></label>
+                  <div class="settings-field">
+                    <span id="fontSizeLabel" class="settings-field-label">Text size</span>
+                    <div id="fontSizeSeg" class="seg settings-seg" title="Text size">
+                      <button type="button" data-font-size="small">Small</button>
+                      <button type="button" data-font-size="standard">Standard</button>
+                      <button type="button" data-font-size="large">Large</button>
+                    </div>
+                  </div>
+                  <div class="settings-field">
+                    <span id="contentAlignLabel" class="settings-field-label">Layout position</span>
+                    <div id="contentAlignSeg" class="seg settings-seg" title="Layout position">
+                      <button type="button" data-content-align="left">Left</button>
+                      <button type="button" data-content-align="center">Center</button>
+                      <button type="button" data-content-align="right">Right</button>
+                    </div>
+                  </div>
+                </div>
+                <div id="settingsSectionScan" class="settings-section hidden" data-settings-section="scan" role="tabpanel">
+                  <div id="settingsScanTitle" class="settings-title">Scan</div>
+                  <label class="check settings-check"><input id="rememberPath" type="checkbox" /><span id="rememberPathLabel">Remember path</span></label>
+                  <label class="check settings-check"><input id="recursiveScan" type="checkbox" /><span id="recursiveScanLabel">Scan subfolders (max 2 levels)</span></label>
+                  <button id="excludeRulesOpen" class="btn settings-btn settings-detail-btn" type="button" aria-expanded="false" aria-controls="excludeRulesDialog"><span id="excludeRulesOpenLabel">Filename exclusion rules</span><span id="excludeRulesCount">2</span></button>
+                  <div id="excludeRulesDialog" class="settings-inline-detail hidden" role="region" aria-labelledby="excludeRulesTitle">
+                    <div class="settings-dialog-panel">
+                      <div class="settings-dialog-head">
+                        <strong id="excludeRulesTitle">Filename exclusion rules</strong>
+                        <button id="excludeRulesClose" class="btn ghost" type="button">Collapse</button>
+                      </div>
+                      <label class="check settings-dialog-toggle"><input id="excludeRulesEnabled" type="checkbox" checked><span id="excludeRulesEnabledLabel">Enable filename exclusion</span></label>
+                      <div class="exclude-keyword-entry">
+                        <input id="excludeKeywordInput" class="path-input" type="text" maxlength="80" placeholder="Keyword, for example fanart">
+                        <button id="excludeKeywordAdd" class="btn primary" type="button">Add</button>
+                      </div>
+                      <div id="excludeKeywordList" class="exclude-keyword-list"></div>
+                      <div class="exclude-scope-block">
+                        <span id="excludeScopeLabel">Apply to</span>
+                        <div id="excludeScopeSeg" class="seg">
+                          <button type="button" data-exclude-scope="image">Images only</button>
+                          <button type="button" data-exclude-scope="all">Images and videos</button>
+                        </div>
+                      </div>
+                      <p id="excludeRulesNote" class="settings-dialog-note">Rules match the filename only and apply on the next scan.</p>
+                      <div class="settings-dialog-actions">
+                        <button id="excludeRulesCancel" class="btn ghost" type="button">Cancel</button>
+                        <button id="excludeRulesSave" class="btn primary" type="button">Save</button>
+                      </div>
+                    </div>
+                  </div>
+                  <button id="scanProtectionOpen" class="btn settings-btn settings-detail-btn" type="button" aria-expanded="false" aria-controls="scanProtectionDialog"><span id="scanProtectionOpenLabel">Scan protection</span><span id="scanProtectionCount">1 GB</span></button>
+                  <div id="scanProtectionDialog" class="settings-inline-detail hidden" role="region" aria-labelledby="scanProtectionTitle">
+                    <div class="settings-dialog-panel">
+                      <div class="settings-dialog-head">
+                        <strong id="scanProtectionTitle">Scan protection</strong>
+                        <button id="scanProtectionClose" class="btn ghost" type="button">Collapse</button>
+                      </div>
+                      <div class="exclude-keyword-entry">
+                        <input id="blockedScanPathInput" class="path-input" type="text" maxlength="260" placeholder="Path, for example H:\\">
+                        <button id="blockedScanPathAdd" class="btn primary" type="button">Add</button>
+                      </div>
+                      <div id="blockedScanPathList" class="exclude-keyword-list"></div>
+                      <label class="settings-field">
+                        <span id="minScanVolumeLabel" class="settings-field-label">Minimum drive capacity</span>
+                        <select id="minScanVolumeSelect" class="select settings-select">
+                          <option value="0">No limit</option>
+                          <option value="1">1 GB</option>
+                          <option value="4">4 GB</option>
+                          <option value="8">8 GB</option>
+                        </select>
+                      </label>
+                      <p id="scanProtectionNote" class="settings-dialog-note">Blocked paths and drives below the capacity limit cannot be scanned.</p>
+                      <div class="settings-dialog-actions">
+                        <button id="scanProtectionCancel" class="btn ghost" type="button">Cancel</button>
+                        <button id="scanProtectionSave" class="btn primary" type="button">Save</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div id="dragSettingsSection" class="settings-section hidden" data-settings-section="drag" role="tabpanel">
+                  <div id="settingsDragTitle" class="settings-title">Drag Out</div>
+                  <div class="drag-root-entry">
+                    <textarea id="dragRootInput" class="drag-root-input" rows="3" spellcheck="false" placeholder="One folder path per line" aria-label="Drag root folder paths"></textarea>
+                    <button id="dragRootAddBtn" class="btn settings-btn drag-root-add-btn" type="button">Add directories</button>
+                  </div>
+                  <div id="dragRootList" class="drag-root-list"></div>
+                  <button id="dragAuthorizeCurrentBtn" class="btn settings-btn settings-detail-btn" type="button"><span id="dragAuthorizeCurrentLabel">Authorize current path</span><span id="dragRootCount">0</span></button>
+                  <p id="dragSettingsNote" class="settings-dialog-note">Configure multiple drag roots here, then authorize each root from the list when this browser session needs access. Chrome may call this “upload”; the files stay local.</p>
+                </div>
+                <div id="settingsSectionPlayback" class="settings-section hidden" data-settings-section="playback" role="tabpanel">
+                  <div id="settingsPlaybackTitle" class="settings-title">Playback</div>
+                  <label class="check settings-check"><input id="wallAutoplay" type="checkbox" checked><span id="wallAutoplayLabel">Auto play wall</span></label>
+                  <div class="settings-field">
+                    <span id="playLimitLabel" class="settings-field-label">Wall play limit</span>
+                    <select id="playLimitSelect" class="select settings-select" title="Wall play limit">
+                      <option value="4">4 · Ultra low</option>
+                      <option value="6">6 · Low-power</option>
+                      <option value="8">8 · Balanced low-power</option>
+                      <option value="12">12 · Balanced</option>
+                      <option value="18">18 · Performance</option>
+                      <option value="24">24 · High performance</option>
+                      <option value="36">36 · Legacy high</option>
+                      <option value="48">48 · Very high</option>
+                      <option value="72">72 · Maximum load</option>
+                    </select>
+                  </div>
+                  <label class="check settings-check"><input id="previewLargeVideos" type="checkbox"><span id="previewLargeVideosLabel">Preview large videos</span></label>
+                  <label class="check settings-check"><input id="pauseWhenInactive" type="checkbox"><span id="pauseWhenInactiveLabel">Pause inactive</span></label>
+                </div>
+                <div id="settingsSectionFilters" class="settings-section hidden" data-settings-section="filters" role="tabpanel">
+                  <div id="settingsFiltersTitle" class="settings-title">Filters</div>
+                  <select id="sizeFilterSelect" class="select settings-select" title="File size">
+                    <option value="all">Any size</option>
+                    <option value="small">Under 10 MB</option>
+                    <option value="medium">10-50 MB</option>
+                    <option value="large">Over 50 MB</option>
+                  </select>
+                  <select id="dateFilterSelect" class="select settings-select" title="Modified date">
+                    <option value="all">Any date</option>
+                    <option value="day">Last 24h</option>
+                    <option value="week">Last 7d</option>
+                    <option value="month">Last 30d</option>
+                  </select>
+                </div>
+                <div id="settingsSectionActions" class="settings-section hidden" data-settings-section="actions" role="tabpanel">
+                  <div id="settingsActionsTitle" class="settings-title">Actions</div>
+                  <label class="check settings-check"><input id="confirmTrash" type="checkbox" checked><span id="confirmTrashLabel">Confirm before moving media to Recycle Bin</span></label>
+                  <button id="clearHistoryBtn" class="btn settings-btn">Clear Path History</button>
+                  <button id="exportCsvBtn" class="btn settings-btn">Export CSV</button>
+                </div>
+              </div>
             </div>
+            <div class="settings-modal-foot"><span id="settingsAutoSave">Changes are saved automatically.</span></div>
           </div>
         </div>
-        <div class="settings-section">
-          <div id="settingsScanTitle" class="settings-title">Scan</div>
-          <label class="check settings-check"><input id="rememberPath" type="checkbox" /><span id="rememberPathLabel">Remember path</span></label>
-          <label class="check settings-check"><input id="recursiveScan" type="checkbox" /><span id="recursiveScanLabel">Scan subfolders (max 2 levels)</span></label>
-          <button id="excludeRulesOpen" class="btn settings-btn settings-detail-btn" type="button"><span id="excludeRulesOpenLabel">Filename exclusion rules</span><span id="excludeRulesCount">2</span></button>
-          <button id="scanProtectionOpen" class="btn settings-btn settings-detail-btn" type="button"><span id="scanProtectionOpenLabel">Scan protection</span><span id="scanProtectionCount">1 GB</span></button>
-        </div>
-        <div id="dragSettingsSection" class="settings-section">
-          <div id="settingsDragTitle" class="settings-title">Drag Out</div>
-          <div id="dragRootList" class="drag-root-list"></div>
-          <button id="dragAuthorizeCurrentBtn" class="btn settings-btn settings-detail-btn" type="button"><span id="dragAuthorizeCurrentLabel">Authorize current path</span><span id="dragRootCount">0</span></button>
-          <p id="dragSettingsNote" class="settings-dialog-note">Authorize the current path as a high-level drag root. The target path is copied first so you can paste it into Chrome's folder picker. Chrome may call this “upload”; the files stay local.</p>
-        </div>
-        <div class="settings-section">
-          <div id="settingsPlaybackTitle" class="settings-title">Playback</div>
-          <label class="check settings-check"><input id="wallAutoplay" type="checkbox" checked><span id="wallAutoplayLabel">Auto play wall</span></label>
-          <div class="settings-field">
-            <span id="playLimitLabel" class="settings-field-label">Wall play limit</span>
-            <select id="playLimitSelect" class="select settings-select" title="Wall play limit">
-              <option value="4">4 · Ultra low</option>
-              <option value="6">6 · Low-power</option>
-              <option value="8">8 · Balanced low-power</option>
-              <option value="12">12 · Balanced</option>
-              <option value="18">18 · Performance</option>
-              <option value="24">24 · High performance</option>
-              <option value="36">36 · Legacy high</option>
-              <option value="48">48 · Very high</option>
-              <option value="72">72 · Maximum load</option>
-            </select>
-          </div>
-          <label class="check settings-check"><input id="previewLargeVideos" type="checkbox"><span id="previewLargeVideosLabel">Preview large videos</span></label>
-          <label class="check settings-check"><input id="pauseWhenInactive" type="checkbox"><span id="pauseWhenInactiveLabel">Pause inactive</span></label>
-        </div>
-        <div class="settings-section">
-          <div id="settingsFiltersTitle" class="settings-title">Filters</div>
-          <select id="sizeFilterSelect" class="select settings-select" title="File size">
-            <option value="all">Any size</option>
-            <option value="small">Under 10 MB</option>
-            <option value="medium">10-50 MB</option>
-            <option value="large">Over 50 MB</option>
-          </select>
-          <select id="dateFilterSelect" class="select settings-select" title="Modified date">
-            <option value="all">Any date</option>
-            <option value="day">Last 24h</option>
-            <option value="week">Last 7d</option>
-            <option value="month">Last 30d</option>
-          </select>
-        </div>
-        <div class="settings-section">
-          <div id="settingsActionsTitle" class="settings-title">Actions</div>
-          <label class="check settings-check"><input id="confirmTrash" type="checkbox" checked><span id="confirmTrashLabel">Confirm before moving media to Recycle Bin</span></label>
-          <button id="clearHistoryBtn" class="btn settings-btn">Clear Path History</button>
-          <button id="exportCsvBtn" class="btn settings-btn">Export CSV</button>
-        </div>
-      </div>
         <button id="expandBtn" class="btn expand hidden">Expand</button>
       </div>
     </div>
@@ -201,61 +285,6 @@
     </main>
   </div>
   <div id="toast" class="toast hidden"></div>
-  <div id="excludeRulesDialog" class="settings-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="excludeRulesTitle">
-    <div class="settings-dialog-backdrop" data-exclude-close="1"></div>
-    <div class="settings-dialog-panel">
-      <div class="settings-dialog-head">
-        <strong id="excludeRulesTitle">Filename exclusion rules</strong>
-        <button id="excludeRulesClose" class="btn ghost" type="button">Close</button>
-      </div>
-      <label class="check settings-dialog-toggle"><input id="excludeRulesEnabled" type="checkbox" checked><span id="excludeRulesEnabledLabel">Enable filename exclusion</span></label>
-      <div class="exclude-keyword-entry">
-        <input id="excludeKeywordInput" class="path-input" type="text" maxlength="80" placeholder="Keyword, for example fanart">
-        <button id="excludeKeywordAdd" class="btn primary" type="button">Add</button>
-      </div>
-      <div id="excludeKeywordList" class="exclude-keyword-list"></div>
-      <div class="exclude-scope-block">
-        <span id="excludeScopeLabel">Apply to</span>
-        <div id="excludeScopeSeg" class="seg">
-          <button type="button" data-exclude-scope="image">Images only</button>
-          <button type="button" data-exclude-scope="all">Images and videos</button>
-        </div>
-      </div>
-      <p id="excludeRulesNote" class="settings-dialog-note">Rules match the filename only and apply on the next scan.</p>
-      <div class="settings-dialog-actions">
-        <button id="excludeRulesCancel" class="btn ghost" type="button">Cancel</button>
-        <button id="excludeRulesSave" class="btn primary" type="button">Save</button>
-      </div>
-    </div>
-  </div>
-  <div id="scanProtectionDialog" class="settings-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="scanProtectionTitle">
-    <div class="settings-dialog-backdrop" data-scan-protection-close="1"></div>
-    <div class="settings-dialog-panel">
-      <div class="settings-dialog-head">
-        <strong id="scanProtectionTitle">Scan protection</strong>
-        <button id="scanProtectionClose" class="btn ghost" type="button">Close</button>
-      </div>
-      <div class="exclude-keyword-entry">
-        <input id="blockedScanPathInput" class="path-input" type="text" maxlength="260" placeholder="Path, for example H:\\">
-        <button id="blockedScanPathAdd" class="btn primary" type="button">Add</button>
-      </div>
-      <div id="blockedScanPathList" class="exclude-keyword-list"></div>
-      <label class="settings-field">
-        <span id="minScanVolumeLabel" class="settings-field-label">Minimum drive capacity</span>
-        <select id="minScanVolumeSelect" class="select settings-select">
-          <option value="0">No limit</option>
-          <option value="1">1 GB</option>
-          <option value="4">4 GB</option>
-          <option value="8">8 GB</option>
-        </select>
-      </label>
-      <p id="scanProtectionNote" class="settings-dialog-note">Blocked paths and drives below the capacity limit cannot be scanned.</p>
-      <div class="settings-dialog-actions">
-        <button id="scanProtectionCancel" class="btn ghost" type="button">Cancel</button>
-        <button id="scanProtectionSave" class="btn primary" type="button">Save</button>
-      </div>
-    </div>
-  </div>
   <div id="trashConfirmDialog" class="settings-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="trashConfirmTitle">
     <div class="settings-dialog-backdrop" data-trash-confirm="cancel"></div>
     <div class="settings-dialog-panel trash-confirm-panel">
