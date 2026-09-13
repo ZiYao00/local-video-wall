@@ -108,7 +108,7 @@ class MediaRangeTests(unittest.TestCase):
             "Origin": "http://127.0.0.1",
             "Referer": f"http://127.0.0.1:{self.server.server_port}/",
         }
-        for path in ("/static/style.css", "/static/app.js"):
+        for path in ("/static/style.css", "/static/app.js", "/static/js/playback-controller.js", "/static/js/workflow-status.js", "/static/js/api-client.js", "/static/js/media-utils.js", "/static/js/grid-controller.js", "/static/js/metadata-panel.js", "/static/js/modal-viewer.js", "/static/js/slideshow-controller.js"):
             with self.subTest(path=path):
                 connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
                 connection.request("GET", path, headers=headers)
@@ -118,6 +118,18 @@ class MediaRangeTests(unittest.TestCase):
 
                 self.assertEqual(response.status, 200)
                 self.assertGreater(len(body), 0)
+                if path.endswith(".js"):
+                    self.assertIn("javascript", (response.getheader("Content-Type") or "").lower())
+
+    def test_index_bootstraps_app_as_es_module(self) -> None:
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+        connection.request("GET", "/")
+        response = connection.getresponse()
+        body = response.read().decode("utf-8")
+        connection.close()
+
+        self.assertEqual(response.status, 200)
+        self.assertIn('<script type="module" src="/static/app.js"></script>', body)
 
     def test_post_with_foreign_origin_is_still_rejected(self) -> None:
         connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)

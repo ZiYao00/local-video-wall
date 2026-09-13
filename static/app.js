@@ -1,3 +1,14 @@
+import { createApiClient } from "./js/api-client.js";
+import { createGridController } from "./js/grid-controller.js";
+import { escapeCssIdent, escapeHtml, fmtBytes } from "./js/media-utils.js";
+import { createMetadataPanel } from "./js/metadata-panel.js";
+import { createModalViewer } from "./js/modal-viewer.js";
+import { createPlaybackController } from "./js/playback-controller.js";
+import { createSlideshowController } from "./js/slideshow-controller.js";
+import { createWorkflowStatusController } from "./js/workflow-status.js";
+
+const apiClient = createApiClient();
+
 const state = {
   all: [],
   view: [],
@@ -8,14 +19,6 @@ const state = {
   floatingPagerEnabled: false,
   confirmTrash: true,
   currentModalItem: null,
-  currentModalMetadata: null,
-  currentModalMetadataLoading: false,
-  currentModalMetadataError: "",
-  visibleVideos: new Set(),
-  warmVideos: new Set(),
-  videoViewport: new Map(),
-  videoReleaseTimers: new Map(),
-  blockedMediaKeys: new Set(),
   columns: 6,
   pageSize: 120,
   playLimit: 8,
@@ -51,14 +54,6 @@ const state = {
   buttonStyle: "text",
   modalSlideshowPlaying: false,
   modalSlideshowTimer: null,
-  metadataRequestId: 0,
-  workflowStatusCache: new Map(),
-  appToken: "",
-  appPort: 8787,
-  workflowStatusQueue: [],
-  workflowStatusActive: 0,
-  workflowStatusQueued: new Set(),
-  workflowStatusVersion: 0,
   slideshowItems: [],
   slideshowIndex: 0,
   slideshowPlaying: true,
@@ -71,6 +66,8 @@ const state = {
   slideshowLoop: true,
   slideshowControlsHidden: false,
   videoMode: "loop",
+  modalMuted: false,
+  modalVolume: 1,
   modalControlsHidden: false,
   modalWheelTime: 0,
   modalWheelBurst: 0,
@@ -94,52 +91,27 @@ const state = {
   wasModalVideoPlayingBeforeHidden: false,
   wasSlideshowPlayingBeforeHidden: false,
   slideshowReturnAfterFullscreenExit: false,
-  updateTimer: null,
 };
 
 const COLUMN_WIDTHS = { 2: 420, 3: 350, 4: 300, 5: 260, 6: 220, 7: 190, 8: 165, 9: 145, 10: 120, 11: 108, 12: 94, 13: 86, 14: 80, 15: 72, 16: 66, 17: 62, 18: 58, 19: 54, 20: 50 };
 const COLUMN_GAPS = { 2: 18, 3: 18, 4: 18, 5: 18, 6: 18, 7: 16, 8: 14, 9: 12, 10: 10, 11: 9, 12: 8, 13: 7, 14: 7, 15: 6, 16: 6, 17: 5, 18: 5, 19: 5, 20: 5 };
 const COLUMN_OPTIONS = Object.keys(COLUMN_WIDTHS).map(Number);
 const LARGE_VIDEO_MB = 500;
-const VIDEO_WARM_MARGIN_PX = 720;
-const VIDEO_RELEASE_DELAY_MS = 1200;
 const COMFYUI_URL = "http://127.0.0.1:8188/";
 const EXPECTED_API_VERSION = 3;
 const REQUIRED_TRASH_CAPABILITIES = ["local_trash", "batch_trash", "trash_restore", "system_trash"];
 
 async function fetchBootstrap() {
-  try {
-    const res = await fetch("/api/bootstrap", { cache: "no-store" });
-    if (!res.ok) throw new Error("bootstrap " + res.status);
-    const data = await res.json();
-    if (data && typeof data.token === "string") {
-      state.appToken = data.token;
-    }
-    if (data && Number(data.port)) {
-      state.appPort = Number(data.port);
-    }
-  } catch (err) {
-    state.appToken = "";
-    console.error("bootstrap failed", err);
-  }
+  if (!apiClient) throw new Error("API client not initialized");
+  return apiClient.bootstrap();
 }
 
 // Wrapper that adds the X-App-Token header to write/dangerous requests.
 // Read-only endpoints (GET) and unauthenticated probes (/health) still work
 // because the server only requires the token on POST write/dangerous paths.
 async function apiFetch(url, options = {}) {
-  const opts = { ...options };
-  const method = String(opts.method || "GET").toUpperCase();
-  const needsToken = method === "POST" || method === "PUT" || method === "DELETE" || method === "PATCH";
-  const headers = { ...(opts.headers || {}) };
-  if (needsToken && state.appToken) {
-    headers["X-App-Token"] = state.appToken;
-  }
-  if (opts.body && !headers["Content-Type"]) {
-    headers["Content-Type"] = "application/json";
-  }
-  opts.headers = headers;
-  return fetch(url, opts);
+  if (!apiClient) throw new Error("API client not initialized");
+  return apiClient.request(url, options);
 }
 
 const ICONS = {
@@ -743,6 +715,7 @@ const i18n = {
 };
 
 const $ = s => document.querySelector(s);
+const mainArea = $("#mainArea");
 const grid = $("#grid");
 const gridPager = $("#gridPager");
 const topPager = $("#topPager");
@@ -894,6 +867,146 @@ const slideshowBackToPreview = $("#slideshowBackToPreview");
 let excludeRulesDraft = null;
 let scanProtectionDraft = null;
 
+const playbackController = createPlaybackController({
+  state,
+  modal,
+  slideshow,
+  onMediaLoadChanged: () => syncLoadedMediaStat(),
+});
+
+const workflowStatusController = createWorkflowStatusController({
+  getScanId: () => state.scanId,
+  getText: () => t(),
+  icons: { searchIcon: ICONS.searchIcon, workflow: ICONS.workflow },
+  escapeCssIdent,
+});
+
+const gridController = createGridController({
+  state,
+  elements: {
+    grid,
+    gridPager,
+    floatingPager,
+    topPager,
+    topPagePrev,
+    topPageNext,
+    emptyState,
+    mainArea,
+  },
+  getText: () => t(),
+  icons: { play: ICONS.play, workflow: ICONS.workflow },
+  largeVideoMb: LARGE_VIDEO_MB,
+  escapeHtml,
+  fmtBytes,
+  isModalOpen: modalIsOpen,
+  beforeRender: () => {
+    destroyObservers();
+    releaseGridMedia();
+  },
+  afterCardsRendered: () => {
+    updateReviewButtons();
+    setupObservers();
+  },
+  updateSubInfo,
+  applyActionButtons,
+  applyWorkflowStatusToCard,
+  onOpenItem: openModal,
+  onToggleBatchItem: toggleBatchItem,
+  onCardAction: handleCardAction,
+});
+
+const metadataPanel = createMetadataPanel({
+  state,
+  elements: {
+    modal,
+    modalImage,
+    modalVideo,
+    modalMetadata,
+  },
+  getText: () => t(),
+  escapeHtml,
+  fmtBytes,
+  syncWorkflowStatusFromFullMetadata,
+});
+
+const modalViewer = createModalViewer({
+  state,
+  elements: {
+    modal,
+    modalContent,
+    modalVideo,
+    modalImage,
+    modalMetadata,
+    modalName,
+    modalMeta,
+    modalPrev,
+    modalNext,
+    modalVideoControls,
+    modalVideoModeSeg,
+    modalSlideshow,
+    modalSlideshowFullscreen,
+    modalImageUiToggle,
+    modalVideoUiToggle,
+    modalHiddenActions,
+    modalHiddenExitFullscreen,
+  },
+  getText: () => t(),
+  fmtBytes,
+  setButtonLabel,
+  getImageItems: currentImageItems,
+  getVideoItems: currentVideoItems,
+  hideFloatingPager,
+  pauseInlinePlayback: pauseAllInline,
+  resumeInlinePlayback: resumeVisibleInline,
+  releaseMediaElement,
+  updateGridPager,
+  applyActionButtons,
+  setControlsHidden: setModalControlsHidden,
+  scheduleAutoHideControls,
+  stopModalSlideshow: () => setModalSlideshowPlaying(false),
+  loadMetadata: item => metadataPanel.load(item),
+  showToast,
+});
+
+const slideshowController = createSlideshowController({
+  state,
+  elements: {
+    modal,
+    modalContent,
+    modalImage,
+    slideshow,
+    slideshowImageA,
+    slideshowImageB,
+    slideshowName,
+    slideshowCounter,
+    slideshowInterval,
+    slideshowEffect,
+    slideshowFit,
+    slideshowLoop,
+    slideshowHiddenActions,
+    slideshowUiToggle,
+    slideshowUiShow,
+    slideshowExitFullscreen,
+  },
+  getText: () => t(),
+  getImageItems: currentImageItems,
+  showModalImage,
+  openModal,
+  closeModal,
+  hideFloatingPager,
+  pauseInlinePlayback: pauseAllInline,
+  resumeInlinePlayback: resumeVisibleInline,
+  releaseMediaElement,
+  updateGridPager,
+  applyActionButtons,
+  applyLanguage,
+  scheduleAutoHideControls,
+  compactText,
+  labelText,
+  showToast,
+  updateFullscreenLabels,
+});
+
 function t() {
   return i18n[state.language] || i18n.en;
 }
@@ -982,7 +1095,7 @@ function isModalFullscreen() {
 }
 
 function isSlideshowFullscreen() {
-  return document.fullscreenElement === slideshow;
+  return slideshowController.isFullscreen();
 }
 
 function updateFullscreenLabels() {
@@ -1059,25 +1172,6 @@ function applyActionButtons() {
   document.querySelectorAll(".tiny-btn").forEach(btn => setButtonLabel(btn, tx.location, "folder", { iconOnly: true }));
   updateFavoritePathButton();
   updateFullscreenLabels();
-}
-
-function fmtBytes(mb) {
-  return `${Number(mb).toFixed(2)} MB`;
-}
-
-function escapeHtml(str) {
-  return String(str).replace(/[&<>"']/g, s => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    '"': "&quot;",
-    "'": "&#39;",
-  }[s]));
-}
-
-function escapeCssIdent(str) {
-  if (window.CSS?.escape) return CSS.escape(String(str));
-  return String(str).replace(/["\\]/g, "\\$&");
 }
 
 function showToast(message, ms = 2600) {
@@ -1261,7 +1355,7 @@ function applyLanguage() {
   updateExcludeRulesSummary();
   updateScanProtectionSummary();
   if (!excludeRulesDialog.classList.contains("hidden")) renderExcludeRulesDraft();
-  if (state.currentModalItem) renderModalMetadata(state.currentModalItem);
+  if (state.currentModalItem) refreshModalMetadataPanel();
 }
 
 function applyLayout() {
@@ -1589,240 +1683,43 @@ function resetFilters() {
 }
 
 function gridPageCount() {
-  return Math.max(1, Math.ceil(state.view.length / state.pageSize));
+  return gridController.pageCount();
 }
 
 function shouldShowPager() {
-  return state.view.length > state.pageSize;
+  return gridController.shouldShowPager();
 }
 
 function modalIsOpen() {
   return !modal.classList.contains("hidden") || !slideshow.classList.contains("hidden");
 }
 
-function updatePagerButtonState(prevButton, nextButton, pages) {
-  if (!prevButton || !nextButton) return;
-  prevButton.disabled = state.gridPage <= 0;
-  nextButton.disabled = state.gridPage >= pages - 1;
-}
-
-function visiblePageNumbers(current, pages) {
-  const count = window.innerWidth < 760 ? 3 : 5;
-  let start = Math.max(1, current - Math.floor(count / 2));
-  let end = Math.min(pages, start + count - 1);
-  start = Math.max(1, end - count + 1);
-  const result = [];
-  for (let page = start; page <= end; page += 1) result.push(page);
-  return result;
-}
-
-function floatingPagerButton(label, page, options = {}) {
-  const disabled = options.disabled ? " disabled" : "";
-  const active = options.active ? " active" : "";
-  const title = escapeHtml(options.title || label);
-  return `<button class="floating-page-btn${active}" type="button" data-page="${page}" title="${title}" aria-label="${title}"${disabled}>${escapeHtml(label)}</button>`;
-}
-
-function renderPagerButtons(pages) {
-  const tx = t();
-  const current = state.gridPage + 1;
-  const numbers = visiblePageNumbers(current, pages);
-  const parts = [
-    floatingPagerButton(tx.pageFirst, 1, { title: tx.pageFirst, disabled: state.gridPage <= 0 }),
-    floatingPagerButton("‹", current - 1, { title: tx.pagePrevious, disabled: state.gridPage <= 0 }),
-  ];
-  if (numbers[0] > 1) parts.push('<span class="floating-page-ellipsis">...</span>');
-  for (const page of numbers) {
-    parts.push(floatingPagerButton(String(page), page, { active: page === current, title: tx.pageStatus(page, pages) }));
-  }
-  if (numbers[numbers.length - 1] < pages) parts.push('<span class="floating-page-ellipsis">...</span>');
-  parts.push(
-    floatingPagerButton("›", current + 1, { title: tx.pageNext, disabled: state.gridPage >= pages - 1 }),
-    floatingPagerButton(tx.pageLast, pages, { title: tx.pageLast, disabled: state.gridPage >= pages - 1 }),
-  );
-  return parts.join("");
-}
-
-function renderBottomPager(pages) {
-  const show = shouldShowPager() && !state.floatingPagerEnabled;
-  gridPager.classList.toggle("hidden", !show);
-  if (!show) {
-    gridPager.innerHTML = "";
-    return;
-  }
-  gridPager.innerHTML = `
-    <div class="grid-pager-buttons">${renderPagerButtons(pages)}</div>
-    <span class="grid-pager-info">${escapeHtml(t().pageInfo(state.gridPage + 1, pages, state.view.length))}</span>
-  `;
-}
-
-function renderFloatingPager(pages) {
-  const show = shouldShowPager() && state.floatingPagerEnabled && !modalIsOpen();
-  floatingPager.classList.toggle("hidden", !show);
-  if (!show) {
-    floatingPager.innerHTML = "";
-    return;
-  }
-  floatingPager.innerHTML = renderPagerButtons(pages);
-  positionFloatingPager();
-}
-
 function positionFloatingPager() {
-  if (!floatingPager || floatingPager.classList.contains("hidden")) return;
-  const anchor = grid.offsetParent ? grid : document.getElementById("mainArea");
-  const rect = anchor.getBoundingClientRect();
-  const viewport = window.innerWidth || document.documentElement.clientWidth || 0;
-  const left = Math.max(12, Math.min(rect.left + rect.width / 2, viewport - 12));
-  floatingPager.style.setProperty("--floating-pager-left", `${Math.round(left)}px`);
-  floatingPager.classList.toggle("compact", rect.width < 560);
+  gridController.positionFloatingPager();
 }
 
 function showFloatingPagerTemporarily(ms = 1700) {
-  if (!state.floatingPagerEnabled || !shouldShowPager() || modalIsOpen()) return;
-  positionFloatingPager();
-  floatingPager.classList.add("visible");
-  window.clearTimeout(state.floatingPagerTimer);
-  state.floatingPagerTimer = window.setTimeout(() => {
-    if (!state.floatingPagerHover) floatingPager.classList.remove("visible");
-  }, ms);
+  gridController.showFloatingPagerTemporarily(ms);
 }
 
 function hideFloatingPager() {
-  window.clearTimeout(state.floatingPagerTimer);
-  floatingPager.classList.remove("visible");
+  gridController.hideFloatingPager();
 }
 
 function updateGridPager() {
-  const pages = gridPageCount();
-  state.gridPage = Math.max(0, Math.min(state.gridPage, pages - 1));
-  const show = shouldShowPager();
-  topPager.classList.toggle("hidden", !show);
-  updatePagerButtonState(topPagePrev, topPageNext, pages);
-  applyActionButtons();
-  renderBottomPager(pages);
-  renderFloatingPager(pages);
+  gridController.updatePager();
 }
 
 function setGridPage(page) {
-  const pages = gridPageCount();
-  state.gridPage = Math.max(0, Math.min(Math.floor(Number(page) || 1) - 1, pages - 1));
-  renderGrid();
-  document.getElementById("mainArea")?.scrollIntoView({ block: "start" });
-  showFloatingPagerTemporarily(2200);
+  gridController.setPage(page);
 }
 
 function renderEmptyState() {
-  if (!state.scannedPath) {
-    emptyState.classList.add("hidden");
-    emptyState.innerHTML = "";
-    return;
-  }
-  const tx = t();
-  const filtered = state.all.length > 0;
-  emptyState.innerHTML = `
-    <h2>${escapeHtml(filtered ? tx.noMatchTitle : tx.noMediaTitle)}</h2>
-    <p>${escapeHtml(filtered ? tx.noMatchBody : tx.noMediaBody)}</p>
-  `;
-  emptyState.classList.remove("hidden");
+  gridController.renderEmptyState();
 }
 
 function renderGrid() {
-  const renderStart = performance.now();
-  destroyObservers();
-  releaseGridMedia();
-  grid.innerHTML = "";
-  emptyState.classList.add("hidden");
-  if (state.view.length === 0) {
-    state.perf.pageItems = 0;
-    state.perf.loadedMedia = 0;
-    state.perf.renderMs = Math.round(performance.now() - renderStart);
-    updateGridPager();
-    updateSubInfo();
-    renderEmptyState();
-    return;
-  }
-  const frag = document.createDocumentFragment();
-  const pageStart = state.gridPage * state.pageSize;
-  const pageItems = state.view.slice(pageStart, pageStart + state.pageSize);
-  state.perf.pageItems = pageItems.length;
-  for (const [pageIndex, item] of pageItems.entries()) {
-    const card = document.createElement("article");
-    card.className = "video-card";
-    card.dataset.key = item.key;
-    card.dataset.rel = item.rel;
-    card._mediaItem = item;
-    const largeVideoPlaceholder = item.type === "video"
-      && Number(item.size_mb) > LARGE_VIDEO_MB
-      && !state.previewLargeVideos;
-    card.classList.toggle("large-video-card", largeVideoPlaceholder);
-    const mediaHtml = item.type === "image"
-      ? `<img class="media-image" data-src="${item.url}" alt="${escapeHtml(item.name)}" loading="lazy" decoding="async" />`
-      : largeVideoPlaceholder
-        ? `<div class="large-video-placeholder">${ICONS.play}<strong>${t().largeVideoTitle}</strong><span>${fmtBytes(item.size_mb)}</span><small>${t().largeVideoHint}</small></div>`
-      : `<video muted loop playsinline preload="none" data-src="${item.url}" data-rel="${escapeHtml(item.rel)}" data-grid-index="${pageIndex}"></video>`;
-    card.innerHTML = `
-      <div class="video-wrap" title="${escapeHtml(item.name)}">
-        ${mediaHtml}
-        <div class="workflow-badge hidden" title="${escapeHtml(t().workflowBadge)}">${ICONS.workflow}</div>
-        <div class="card-quick-actions">
-          <button class="batch-select-btn" data-batch-select="${escapeHtml(item.key)}"></button>
-        </div>
-        <div class="video-overlay"><div class="video-name">${escapeHtml(item.name)}</div></div>
-      </div>
-      <div class="card-footer">
-        <div class="card-actions">
-          <button class="card-action-btn card-favorite-btn" data-card-action="favorite"></button>
-          <button class="card-action-btn" data-card-action="copy-path"></button>
-          <button class="card-action-btn" data-card-action="open-folder"></button>
-          <button class="card-action-btn danger" data-card-action="trash"></button>
-          <div class="card-more-actions">
-            <button class="card-action-btn card-more-toggle" type="button" aria-expanded="false"></button>
-            <div class="card-more-menu hidden">
-              <button type="button" data-card-action="copy-path"></button>
-              <button type="button" data-card-action="open-folder"></button>
-            </div>
-          </div>
-        </div>
-      </div>`;
-    card.classList.toggle("is-favorite", !!item.favorite);
-    card.classList.toggle("is-batch-selected", state.batchSelected.has(item.key));
-    applyWorkflowStatusToCard(card, item);
-    card.querySelector(".video-wrap").addEventListener("click", () => {
-      if (state.batchMode) {
-        toggleBatchItem(item.key);
-        return;
-      }
-      openModal(item);
-    });
-    card.querySelector(".batch-select-btn").addEventListener("click", e => {
-      e.stopPropagation();
-      toggleBatchItem(item.key);
-    });
-    const moreToggle = card.querySelector(".card-more-toggle");
-    const moreMenu = card.querySelector(".card-more-menu");
-    moreToggle?.addEventListener("click", e => {
-      e.stopPropagation();
-      const open = moreMenu.classList.contains("hidden");
-      moreMenu.classList.toggle("hidden", !open);
-      moreToggle.setAttribute("aria-expanded", open ? "true" : "false");
-    });
-    card.querySelectorAll("[data-card-action]").forEach(btn => {
-      btn.addEventListener("click", e => {
-        e.stopPropagation();
-        moreMenu?.classList.add("hidden");
-        moreToggle?.setAttribute("aria-expanded", "false");
-        handleCardAction(btn.dataset.cardAction, item);
-      });
-    });
-    frag.appendChild(card);
-  }
-  grid.appendChild(frag);
-  updateReviewButtons();
-  setupObservers();
-  updateGridPager();
-  state.perf.renderMs = Math.round(performance.now() - renderStart);
-  state.perf.loadedMedia = countLoadedMedia();
-  updateSubInfo();
+  gridController.render();
 }
 
 function updateReviewButtons() {
@@ -1872,8 +1769,7 @@ function updateMediaFilterUI() {
 }
 
 function currentPageItems() {
-  const pageStart = state.gridPage * state.pageSize;
-  return state.view.slice(pageStart, pageStart + state.pageSize);
+  return gridController.currentPageItems();
 }
 
 function selectedBatchItems() {
@@ -2299,134 +2195,30 @@ function exportBatchCsv() {
 }
 
 let loadObserver = null;
-let warmObserver = null;
-let playObserver = null;
 let workflowObserver = null;
 
 function resetWorkflowStatusState() {
-  state.workflowStatusVersion += 1;
-  state.workflowStatusCache.clear();
-  state.workflowStatusQueue = [];
-  state.workflowStatusQueued.clear();
-}
-
-function workflowStatusKey(item) {
-  return `${state.scanId || ""}::${item?.key || ""}`;
+  workflowStatusController?.reset();
 }
 
 function applyWorkflowStatusToCard(card, item) {
-  const badge = card?.querySelector(".workflow-badge");
-  if (!badge || !item) return;
-  const status = state.workflowStatusCache.get(workflowStatusKey(item));
-  const pending = status?.state === "pending";
-  const kind = status?.workflow_kind || (status?.has_generation ? "generation" : status?.has_workflow ? "workflow_only" : "none");
-  const visible = pending || kind === "generation" || kind === "workflow_only";
-  badge.classList.toggle("hidden", !visible);
-  badge.classList.toggle("pending", pending);
-  badge.classList.toggle("generation", !pending && kind === "generation");
-  badge.classList.toggle("workflow-only", !pending && kind === "workflow_only");
-  badge.innerHTML = pending ? ICONS.searchIcon : ICONS.workflow;
-  badge.title = pending ? t().workflowChecking : kind === "generation" ? t().workflowGeneration : kind === "workflow_only" ? t().workflowOnly : t().workflowBadge;
-}
-
-function applyWorkflowStatusForItem(item) {
-  if (!item) return;
-  document.querySelectorAll(`.video-card[data-key="${escapeCssIdent(item.key)}"]`).forEach(card => {
-    applyWorkflowStatusToCard(card, item);
-  });
-}
-
-function queueWorkflowStatusForItem(item) {
-  if (!item || !state.scanId) return;
-  const cacheKey = workflowStatusKey(item);
-  if (state.workflowStatusCache.has(cacheKey) || state.workflowStatusQueued.has(cacheKey)) return;
-  state.workflowStatusQueued.add(cacheKey);
-  state.workflowStatusCache.set(cacheKey, { state: "pending", has_workflow: false });
-  applyWorkflowStatusForItem(item);
-  state.workflowStatusQueue.push({ item, version: state.workflowStatusVersion });
-  pumpWorkflowStatusQueue();
+  workflowStatusController?.applyToCard(card, item);
 }
 
 function queueWorkflowStatusForCard(card) {
-  if (!card?.dataset?.key) return;
-  const item = card._mediaItem || state.all.find(entry => entry.key === card.dataset.key);
-  queueWorkflowStatusForItem(item);
-}
-
-async function pumpWorkflowStatusQueue() {
-  while (state.workflowStatusActive < 2 && state.workflowStatusQueue.length) {
-    const queued = state.workflowStatusQueue.shift();
-    const item = queued?.item;
-    const version = queued?.version;
-    if (!item || version !== state.workflowStatusVersion) continue;
-    const cacheKey = workflowStatusKey(item);
-    state.workflowStatusActive += 1;
-    try {
-      const params = new URLSearchParams({ path: item.rel, scan_id: state.scanId });
-      const res = await fetch(`/api/workflow-status?${params.toString()}`);
-      const data = await res.json();
-      if (version === state.workflowStatusVersion) {
-        const nextState = data.workflow_kind === "none" ? "empty" : data.workflow_kind === "unknown" ? "unknown" : "ok";
-        state.workflowStatusCache.set(cacheKey, data.ok ? { ...data, state: nextState } : { state: "error", workflow_kind: "none", has_workflow: false, error: data.error || "" });
-      }
-    } catch (err) {
-      if (version === state.workflowStatusVersion) {
-        state.workflowStatusCache.set(cacheKey, { state: "error", workflow_kind: "none", has_workflow: false, error: String(err || "") });
-      }
-    } finally {
-      state.workflowStatusQueued.delete(cacheKey);
-      state.workflowStatusActive -= 1;
-      if (version === state.workflowStatusVersion) applyWorkflowStatusForItem(item);
-      pumpWorkflowStatusQueue();
-    }
-  }
+  workflowStatusController?.queueCard(card);
 }
 
 function syncWorkflowStatusFromFullMetadata(item, metadata) {
-  if (!item || !metadata) return;
-  const hasWorkflow = !!metadata.workflow;
-  const hasGeneration = !!(
-    metadata.prompt
-    || metadata.negative_prompt
-    || metadata.model
-    || (Array.isArray(metadata.loras) ? metadata.loras.length : metadata.loras)
-  );
-  const workflowKind = hasGeneration ? "generation" : hasWorkflow ? "workflow_only" : "none";
-  state.workflowStatusCache.set(workflowStatusKey(item), {
-    state: workflowKind === "none" ? "empty" : "ok",
-    has_workflow: hasWorkflow,
-    has_generation: hasGeneration,
-    workflow_kind: workflowKind,
-    probe_complete: true,
-    needs_full_probe: false,
-  });
-  applyWorkflowStatusForItem(item);
+  workflowStatusController?.syncFromFullMetadata(item, metadata);
 }
 
 function destroyObservers() {
   if (loadObserver) loadObserver.disconnect();
-  if (warmObserver) warmObserver.disconnect();
-  if (playObserver) playObserver.disconnect();
   if (workflowObserver) workflowObserver.disconnect();
   loadObserver = null;
-  warmObserver = null;
-  playObserver = null;
   workflowObserver = null;
-}
-
-function videoCardKey(video) {
-  return video?.closest?.(".video-card")?.dataset?.key || "";
-}
-
-function isVideoBlocked(video) {
-  const key = videoCardKey(video);
-  return !!key && state.blockedMediaKeys.has(key);
-}
-
-function clearVideoReleaseTimer(video) {
-  const timer = state.videoReleaseTimers.get(video);
-  if (timer) clearTimeout(timer);
-  state.videoReleaseTimers.delete(video);
+  playbackController?.destroyObservers();
 }
 
 function releaseMediaElement(media) {
@@ -2438,40 +2230,10 @@ function releaseMediaElement(media) {
   }
 }
 
-function releaseGridVideo(video) {
-  if (!video) return;
-  clearVideoReleaseTimer(video);
-  state.warmVideos.delete(video);
-  state.visibleVideos.delete(video);
-  state.videoViewport.delete(video);
-  video.closest(".video-card")?.classList.remove("paused-by-limit");
-  releaseMediaElement(video);
-}
-
-function scheduleGridVideoRelease(video) {
-  if (!video) return;
-  video.pause();
-  state.visibleVideos.delete(video);
-  state.videoViewport.delete(video);
-  video.closest(".video-card")?.classList.remove("paused-by-limit");
-  clearVideoReleaseTimer(video);
-  const timer = setTimeout(() => {
-    state.videoReleaseTimers.delete(video);
-    if (!video.isConnected || !state.warmVideos.has(video) || isVideoBlocked(video)) {
-      releaseGridVideo(video);
-      syncLoadedMediaStat();
-    }
-  }, VIDEO_RELEASE_DELAY_MS);
-  state.videoReleaseTimers.set(video, timer);
-}
-
 function releaseGridMedia() {
-  state.videoReleaseTimers.forEach(timer => clearTimeout(timer));
-  state.videoReleaseTimers.clear();
-  document.querySelectorAll(".video-wrap video, .video-wrap img.media-image").forEach(releaseMediaElement);
-  state.visibleVideos.clear();
-  state.warmVideos.clear();
-  state.videoViewport.clear();
+  document.querySelectorAll(".video-wrap img.media-image").forEach(releaseMediaElement);
+  if (playbackController) playbackController.releaseGridMedia();
+  else document.querySelectorAll(".video-wrap video").forEach(releaseMediaElement);
   state.perf.loadedMedia = 0;
   state.perf.warmVideos = 0;
   state.perf.activeVideos = 0;
@@ -2498,48 +2260,9 @@ function setupObservers() {
     }
   }, { root: null, rootMargin: "320px 0px", threshold: .01 });
 
-  warmObserver = new IntersectionObserver(entries => {
-    for (const entry of entries) {
-      const video = entry.target;
-      if (entry.isIntersecting && !isVideoBlocked(video)) {
-        clearVideoReleaseTimer(video);
-        state.warmVideos.add(video);
-        ensureSrc(video);
-      } else {
-        state.warmVideos.delete(video);
-        scheduleGridVideoRelease(video);
-      }
-    }
-    state.perf.warmVideos = state.warmVideos.size;
-    scheduleUpdatePlaying();
-  }, { root: null, rootMargin: `${VIDEO_WARM_MARGIN_PX}px 0px`, threshold: .01 });
-
-  playObserver = new IntersectionObserver(entries => {
-    for (const entry of entries) {
-      const video = entry.target;
-      if (entry.isIntersecting && entry.intersectionRatio > 0 && !isVideoBlocked(video)) {
-        state.visibleVideos.add(video);
-        state.videoViewport.set(video, {
-          ratio: entry.intersectionRatio,
-          index: Number(video.dataset.gridIndex) || 0,
-        });
-      } else {
-        state.visibleVideos.delete(video);
-        state.videoViewport.delete(video);
-        video.pause();
-        video.closest(".video-card")?.classList.remove("paused-by-limit");
-      }
-    }
-    scheduleUpdatePlaying();
-  }, { root: null, rootMargin: "0px", threshold: [0, .1, .25, .5, .75] });
-
   for (const image of images) loadObserver.observe(image);
   for (const card of cards) workflowObserver.observe(card);
-  for (const video of videos) {
-    warmObserver.observe(video);
-    playObserver.observe(video);
-  }
-  scheduleUpdatePlaying();
+  playbackController?.observe(videos);
 }
 
 function countLoadedMedia() {
@@ -2565,7 +2288,6 @@ function syncLoadedMediaStatNow() {
 }
 
 function ensureSrc(media) {
-  if (media?.tagName === "VIDEO" && isVideoBlocked(media)) return;
   if (!media.getAttribute("src") && media.dataset.src) {
     media.src = media.dataset.src;
     if (media.tagName === "VIDEO") media.load();
@@ -2578,114 +2300,26 @@ function pauseAndRelease(media) {
   syncLoadedMediaStat();
 }
 
-function selectVideosByVisibleRows(candidates, playLimit) {
-  if (playLimit <= 0) return [];
-  const rows = new Map();
-  for (const video of candidates) {
-    const metric = state.videoViewport.get(video);
-    if (!metric) continue;
-    const rowIndex = Math.floor(metric.index / Math.max(1, state.columns));
-    const row = rows.get(rowIndex) || { index: rowIndex, ratioTotal: 0, maxRatio: 0, items: [] };
-    row.items.push({ video, ...metric });
-    row.ratioTotal += metric.ratio;
-    row.maxRatio = Math.max(row.maxRatio, metric.ratio);
-    rows.set(rowIndex, row);
-  }
-  const orderedRows = [...rows.values()].sort((a, b) => {
-    const avgA = a.ratioTotal / Math.max(1, a.items.length);
-    const avgB = b.ratioTotal / Math.max(1, b.items.length);
-    if (Math.abs(avgB - avgA) > .08) return avgB - avgA;
-    if (Math.abs(b.maxRatio - a.maxRatio) > .08) return b.maxRatio - a.maxRatio;
-    return a.index - b.index;
-  });
-  const selected = [];
-  for (const row of orderedRows) {
-    row.items.sort((a, b) => a.index - b.index);
-    for (const item of row.items) {
-      selected.push(item.video);
-      if (selected.length >= playLimit) return selected;
-    }
-  }
-  return selected;
-}
-
 function effectiveWallPlayLimit() {
-  return state.columns >= 10 ? 0 : Math.max(4, Math.min(72, Number(state.playLimit) || 8));
+  return playbackController?.effectiveWallPlayLimit()
+    ?? (state.columns >= 10 ? 0 : Math.max(4, Math.min(72, Number(state.playLimit) || 8)));
 }
 
 function isWallPreviewStatic() {
-  return !state.wallAutoplay || effectiveWallPlayLimit() <= 0;
+  return playbackController?.isWallPreviewStatic() ?? (!state.wallAutoplay || effectiveWallPlayLimit() <= 0);
 }
 
 function scheduleUpdatePlaying() {
-  if (state.updateTimer) return;
-  state.updateTimer = requestAnimationFrame(() => {
-    state.updateTimer = null;
-    updatePlaying();
-  });
-}
-
-function updatePlaying() {
-  const started = performance.now();
-  const playLimit = effectiveWallPlayLimit();
-  const canPlayWall = (
-    state.playingEnabled
-    && !isWallPreviewStatic()
-    && !(state.pauseWhenInactive && document.hidden)
-    && modal.classList.contains("hidden")
-    && slideshow.classList.contains("hidden")
-    && !state.showTrash
-  );
-  const candidates = canPlayWall
-    ? [...state.visibleVideos].filter(video => (
-      video.isConnected
-      && state.warmVideos.has(video)
-      && !isVideoBlocked(video)
-      && (state.videoViewport.get(video)?.ratio || 0) >= .1
-    ))
-    : [];
-  const selected = selectVideosByVisibleRows(candidates, playLimit);
-  const selectedSet = new Set(selected);
-  const candidateSet = new Set(candidates);
-
-  for (const video of [...state.warmVideos]) {
-    if (!video.isConnected) {
-      releaseGridVideo(video);
-      continue;
-    }
-    const card = video.closest(".video-card");
-    if (isVideoBlocked(video)) {
-      video.pause();
-      card?.classList.remove("paused-by-limit");
-      continue;
-    }
-    if (selectedSet.has(video)) {
-      ensureSrc(video);
-      card?.classList.remove("paused-by-limit");
-      video.muted = true;
-      video.loop = true;
-      video.playsInline = true;
-      video.play().catch(() => {});
-    } else {
-      video.pause();
-      card?.classList.toggle("paused-by-limit", canPlayWall && candidateSet.has(video) && playLimit > 0);
-    }
-  }
-
-  state.perf.warmVideos = state.warmVideos.size;
-  state.perf.activeVideos = canPlayWall ? selected.length : 0;
-  state.perf.schedulerMs = Math.round((performance.now() - started) * 10) / 10;
+  playbackController?.scheduleUpdate();
 }
 
 function pauseAllInline() {
-  document.querySelectorAll(".video-wrap video").forEach(v => {
-    v.pause();
-    v.closest(".video-card")?.classList.remove("paused-by-limit");
-  });
+  if (playbackController) playbackController.pauseAll();
+  else document.querySelectorAll(".video-wrap video").forEach(video => video.pause());
 }
 
 function resumeVisibleInline() {
-  scheduleUpdatePlaying();
+  playbackController?.resume();
 }
 
 function pauseActiveViewForInactive() {
@@ -2696,9 +2330,7 @@ function pauseActiveViewForInactive() {
   pauseAllInline();
   modalVideo.pause();
   if (state.wasSlideshowPlayingBeforeHidden) {
-    state.slideshowPlaying = false;
-    clearTimeout(state.slideshowTimer);
-    applyActionButtons();
+    slideshowController.setPlaying(false);
   }
 }
 
@@ -2712,366 +2344,34 @@ function resumeActiveViewAfterInactive() {
     playModalVideoSoon();
   }
   if (state.wasSlideshowPlayingBeforeHidden && !slideshow.classList.contains("hidden")) {
-    state.slideshowPlaying = true;
-    applyActionButtons();
-    scheduleSlideshow();
+    slideshowController.setPlaying(true);
   }
   state.wasModalVideoPlayingBeforeHidden = false;
   state.wasSlideshowPlayingBeforeHidden = false;
 }
 
 function updateVideoModeUI() {
-  const tx = t();
-  const modeLabels = {
-    loop: [tx.loopOne, "repeat"],
-    sequence: [tx.sequential, "list"],
-    random: [tx.randomPlay, "shuffle"],
-  };
-  modalVideoModeSeg.querySelectorAll("button[data-video-mode]").forEach(btn => {
-    const [label, icon] = modeLabels[btn.dataset.videoMode] || [btn.textContent, "play"];
-    setButtonLabel(btn, label, icon, { iconOnly: true });
-    btn.classList.toggle("active", btn.dataset.videoMode === state.videoMode);
-  });
-  modalVideo.loop = state.videoMode === "loop";
+  modalViewer.updateVideoModeUI();
 }
 
 function updateModalNav() {
-  const currentType = state.currentModalItem?.type;
-  const items = currentType === "image" ? currentImageItems() : currentType === "video" ? currentVideoItems() : [];
-  const canNavigate = items.length > 1;
-  modalPrev.classList.toggle("hidden", !canNavigate);
-  modalNext.classList.toggle("hidden", !canNavigate);
-}
-
-function renderMetadataBlock(title, value, options = {}) {
-  const safeValue = String(value || "").trim();
-  if (!safeValue && options.hideEmpty) return "";
-  const body = safeValue || t().metadataPending;
-  const collapsed = !!options.collapsed;
-  const copy = safeValue
-    ? `<button class="metadata-copy" type="button" data-copy-meta="${escapeHtml(safeValue)}">${escapeHtml(t().copy)}</button>`
-    : "";
-  if (collapsed) {
-    return `
-      <details class="metadata-block metadata-fold">
-        <summary><span>${escapeHtml(title)}</span>${copy}</summary>
-        <p>${escapeHtml(body)}</p>
-      </details>`;
-  }
-  return `
-    <section class="metadata-block">
-      <div class="metadata-block-head"><strong>${escapeHtml(title)}</strong>${copy}</div>
-      <p>${escapeHtml(body)}</p>
-    </section>`;
-}
-
-function parseLoraDisplay(raw) {
-  const original = String(raw || "").trim();
-  const badges = [];
-  let name = original;
-  name = name.replace(/\s+-\s+(model\s+)?strength\s+([-+]?\d*\.?\d+)/ig, (_, label, value) => {
-    badges.push(`${label ? "model " : ""}${value}`);
-    return "";
-  });
-  name = name.replace(/\s+-\s+clip\s+strength\s+([-+]?\d*\.?\d+)/ig, (_, value) => {
-    badges.push(`clip ${value}`);
-    return "";
-  });
-  name = name.replace(/\s*\((model|clip|strength)\s*[:=]\s*([-+]?\d*\.?\d+)\)\s*/ig, (_, label, value) => {
-    badges.push(label.toLowerCase() === "strength" ? value : `${label.toLowerCase()} ${value}`);
-    return " ";
-  });
-  name = name.trim();
-  const fileName = name.split(/[\\/]/).filter(Boolean).pop() || name || original;
-  return { original, name: fileName, badges };
-}
-
-function renderMetadataLoraBlock(value, options = {}) {
-  const items = Array.isArray(value)
-    ? value.map(item => String(item || "").trim()).filter(Boolean)
-    : String(value || "").split(",").map(item => item.trim()).filter(Boolean);
-  if (!items.length) return "";
-  const copyText = items.join("\n");
-  const content = `
-    <ul class="metadata-lora-list">
-      ${items.map(item => {
-        const parsed = parseLoraDisplay(item);
-        const badges = parsed.badges.map(badge => `<span class="metadata-lora-badge">${escapeHtml(badge)}</span>`).join("");
-        return `<li title="${escapeHtml(parsed.original)}"><span class="metadata-lora-name">${escapeHtml(parsed.name)}</span>${badges ? `<span class="metadata-lora-badges">${badges}</span>` : ""}</li>`;
-      }).join("")}
-    </ul>`;
-  if (options.collapsed) {
-    return `
-      <details class="metadata-block metadata-fold metadata-lora-block">
-        <summary><span>${escapeHtml(t().metadataLora)}</span><button class="metadata-copy" type="button" data-copy-meta="${escapeHtml(copyText)}">${escapeHtml(t().copy)}</button></summary>
-        ${content}
-      </details>`;
-  }
-  return `
-    <section class="metadata-block metadata-lora-block">
-      <div class="metadata-block-head">
-        <strong>${escapeHtml(t().metadataLora)}</strong>
-        <button class="metadata-copy" type="button" data-copy-meta="${escapeHtml(copyText)}">${escapeHtml(t().copy)}</button>
-      </div>
-      ${content}
-    </section>`;
-}
-
-function metadataSourceLabel(source) {
-  const labels = {
-    embedded: "Embedded",
-    sidecar: "Sidecar JSON",
-    ffprobe: "ffprobe",
-    mediainfo: "MediaInfo",
-    filesystem: "File",
-  };
-  return labels[source] || String(source || "").trim();
-}
-
-function metadataNoteText(metadata, options = {}) {
-  const tx = t();
-  if (options.error) return options.error;
-  if (options.loading) return tx.metadataLoading;
-  const sources = Array.isArray(metadata?.metadata_sources)
-    ? metadata.metadata_sources.map(metadataSourceLabel).filter(Boolean).join(" / ")
-    : "";
-  const status = metadata?.metadata_status || "empty";
-  if (status === "ok") {
-    return sources ? `${tx.metadataDetected}: ${sources}` : tx.metadataDetected;
-  }
-  if (status === "partial") {
-    return sources ? `${tx.metadataPartial} (${sources})` : tx.metadataPartial;
-  }
-  return tx.metadataEmpty || tx.metadataPending;
-}
-
-function metadataJson(value) {
-  if (!value) return "";
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return "";
-  }
-}
-
-function aspectRatioText(width, height) {
-  const w = Number(width || 0);
-  const h = Number(height || 0);
-  if (!w || !h) return "";
-  const actual = w / h;
-  const common = [
-    [1, 1], [2, 3], [3, 2], [3, 4], [4, 3], [4, 5], [5, 4],
-    [9, 16], [16, 9], [9, 21], [21, 9], [5, 7], [7, 5],
-  ];
-  let best = common[0];
-  let bestDiff = Infinity;
-  for (const pair of common) {
-    const diff = Math.abs(actual - pair[0] / pair[1]);
-    if (diff < bestDiff) {
-      best = pair;
-      bestDiff = diff;
-    }
-  }
-  const tolerance = 0.045;
-  const decimal = actual.toFixed(2).replace(/\.00$/, "");
-  if (bestDiff <= tolerance) return `${best[0]}:${best[1]} approx (${decimal}:1)`;
-  const gcd = (a, b) => (b ? gcd(b, a % b) : a);
-  const divisor = gcd(Math.round(w), Math.round(h)) || 1;
-  return `${Math.round(w / divisor)}:${Math.round(h / divisor)} (${decimal}:1)`;
-}
-
-function mediaPixelDimensions(item, metadata = null) {
-  let width = Number(metadata?.width || 0);
-  let height = Number(metadata?.height || 0);
-  if (item?.type === "image" && modalImage.complete && modalImage.naturalWidth && state.currentModalItem?.key === item.key) {
-    width = modalImage.naturalWidth;
-    height = modalImage.naturalHeight;
-  }
-  if (item?.type === "video" && modalVideo.videoWidth && state.currentModalItem?.key === item.key) {
-    width = modalVideo.videoWidth;
-    height = modalVideo.videoHeight;
-  }
-  return { width, height };
-}
-
-function renderMetadataActions(metadata, raw, workflow) {
-  if (!raw && !workflow) return "";
-  const tx = t();
-  const rawButton = raw
-    ? `<button class="metadata-action-btn" type="button" data-copy-meta="${escapeHtml(raw)}">${escapeHtml(tx.metadataCopyRaw)}</button>`
-    : "";
-  const workflowButton = workflow
-    ? `<button class="metadata-action-btn" type="button" data-copy-meta="${escapeHtml(workflow)}">${escapeHtml(tx.metadataCopyWorkflow)}</button>`
-    : "";
-  const comfyButton = workflow
-    ? `<button class="metadata-action-btn" type="button" data-open-comfy="1">${escapeHtml(tx.metadataOpenComfy)}</button>`
-    : "";
-  return `
-    <section class="metadata-actions">
-      <div class="metadata-actions-title">${escapeHtml(tx.metadataActions)}</div>
-      <div class="metadata-actions-row">${workflowButton}${rawButton}${comfyButton}</div>
-    </section>`;
-}
-
-function renderMetadataInfo(items) {
-  const rows = items.filter(row => row.value);
-  if (!rows.length) return "";
-  return `
-    <section class="metadata-block metadata-info-block">
-      <div class="metadata-block-head"><strong>${escapeHtml(t().metadataBasic)}</strong></div>
-      <dl class="metadata-info-list">
-        ${rows.map(row => `<div><dt>${escapeHtml(row.label)}</dt><dd>${escapeHtml(row.value)}</dd></div>`).join("")}
-      </dl>
-    </section>`;
-}
-
-function renderModalMetadata(item, metadata = null, options = {}) {
-  const tx = t();
-  const loading = options.loading;
-  const error = options.error;
-  const source = metadata?.source_url
-    || metadata?.civitai_version_url
-    || metadata?.civitai_model_url
-    || item.full_path
-    || item.rel
-    || item.url;
-  const pixels = mediaPixelDimensions(item, metadata);
-  const dimensions = pixels.width && pixels.height ? `${pixels.width} x ${pixels.height}px` : "";
-  const ratio = aspectRatioText(pixels.width, pixels.height);
-  const duration = metadata?.duration ? `${Math.round(Number(metadata.duration) * 10) / 10}s` : "";
-  const infoRows = [
-    { label: tx.metadataPath, value: source },
-    { label: tx.mediaTypeTitle, value: item.type || "media" },
-    { label: tx.metadataSize, value: fmtBytes(item.size_mb) },
-    { label: tx.metadataDate, value: item.mtime_text },
-    { label: tx.metadataDimensions, value: dimensions },
-    { label: tx.metadataRatio, value: ratio },
-    { label: tx.metadataDuration, value: duration },
-    { label: tx.metadataFormat, value: metadata?.format || "" },
-    { label: tx.metadataCodec, value: metadata?.codec || "" },
-  ];
-  const raw = metadata?.raw_metadata && Object.keys(metadata.raw_metadata || {}).length ? metadataJson(metadata.raw_metadata) : "";
-  const workflow = metadata?.workflow ? metadataJson(metadata.workflow) : "";
-  modalMetadata.innerHTML = `
-    ${renderMetadataInfo(infoRows)}
-    ${error || loading ? `<p class="metadata-note">${escapeHtml(metadataNoteText(metadata, { loading, error }))}</p>` : ""}
-    ${renderMetadataActions(metadata, raw, workflow)}
-    ${renderMetadataBlock(tx.metadataModel, metadata?.model || "", { hideEmpty: true })}
-    ${renderMetadataLoraBlock(metadata?.loras, { collapsed: true })}
-    ${renderMetadataBlock(tx.metadataPrompt, metadata?.prompt || "", { hideEmpty: true, collapsed: true })}
-    ${renderMetadataBlock(tx.metadataNegative, metadata?.negative_prompt || "", { hideEmpty: true, collapsed: true })}
-  `;
-  modalMetadata.classList.toggle("hidden", !item || !["image", "video"].includes(item.type));
-}
-
-async function loadModalMetadata(item) {
-  const requestId = ++state.metadataRequestId;
-  state.currentModalMetadata = null;
-  state.currentModalMetadataLoading = true;
-  state.currentModalMetadataError = "";
-  renderModalMetadata(item, null, { loading: true });
-  try {
-    const params = new URLSearchParams({ path: item.rel || "", scan_id: item.scan_id || state.scanId || "" });
-    const res = await fetch(`/api/metadata?${params.toString()}`);
-    const data = await res.json();
-    if (requestId !== state.metadataRequestId || state.currentModalItem?.key !== item.key) return;
-    if (!res.ok || !data.ok) {
-      state.currentModalMetadata = null;
-      state.currentModalMetadataLoading = false;
-      state.currentModalMetadataError = data.error || t().metadataError;
-      renderModalMetadata(item, null, { error: data.error || t().metadataError });
-      return;
-    }
-    state.currentModalMetadata = data.metadata || {};
-    state.currentModalMetadataLoading = false;
-    state.currentModalMetadataError = "";
-    syncWorkflowStatusFromFullMetadata(item, state.currentModalMetadata);
-    renderModalMetadata(item, state.currentModalMetadata);
-  } catch {
-    if (requestId === state.metadataRequestId && state.currentModalItem?.key === item.key) {
-      state.currentModalMetadata = null;
-      state.currentModalMetadataLoading = false;
-      state.currentModalMetadataError = t().metadataError;
-      renderModalMetadata(item, null, { error: t().metadataError });
-    }
-  }
+  modalViewer.updateNav();
 }
 
 function refreshModalMetadataPanel() {
-  if (modal.classList.contains("hidden") || !state.currentModalItem) return;
-  renderModalMetadata(state.currentModalItem, state.currentModalMetadata, {
-    loading: state.currentModalMetadataLoading,
-    error: state.currentModalMetadataError,
-  });
+  metadataPanel.refresh();
 }
 
 function renderModalItem(item) {
-  if (item.type !== "image" && state.modalSlideshowPlaying) setModalSlideshowPlaying(false);
-  state.currentModalItem = item;
-  modalName.textContent = item.name;
-  modalMeta.textContent = `${item.type || "video"} · ${fmtBytes(item.size_mb)} · ${item.mtime_text} · ${item.rel}`;
-  modalVideo.pause();
-  modalVideo.removeAttribute("src");
-  modalImage.removeAttribute("src");
-  modalVideo.classList.toggle("hidden", item.type === "image");
-  modalImage.classList.toggle("hidden", item.type !== "image");
-  modalSlideshow.classList.toggle("hidden", item.type !== "image");
-  modalSlideshowFullscreen.classList.toggle("hidden", item.type !== "image");
-  modalImageUiToggle.classList.add("hidden");
-  modalVideoUiToggle.classList.add("hidden");
-  state.currentModalMetadata = null;
-  state.currentModalMetadataLoading = true;
-  state.currentModalMetadataError = "";
-  modalVideoControls.classList.toggle("hidden", item.type !== "video");
-  modalContent.classList.toggle("is-video", item.type === "video");
-  if (item.type === "image") {
-    modalImage.src = item.url;
-    modalImage.alt = item.name;
-  } else {
-    modalVideo.src = item.url;
-    modalVideo.muted = false;
-    updateVideoModeUI();
-  }
-  renderModalMetadata(item, null, { loading: true });
-  loadModalMetadata(item);
-  updateModalNav();
-  applyActionButtons();
+  modalViewer.renderItem(item);
 }
 
 function openModal(item) {
-  hideFloatingPager();
-  pauseAllInline();
-  renderModalItem(item);
-  setModalControlsHidden(false);
-  modal.classList.remove("hidden");
-  scheduleAutoHideControls("modal", item.type === "video" ? 2000 : 1500, true);
-  pauseAllInline();
-  if (item.type !== "image") playModalVideoSoon();
+  modalViewer.open(item);
 }
 
 function closeModal() {
-  if (isModalFullscreen()) document.exitFullscreen?.();
-  setModalSlideshowPlaying(false);
-  clearTimeout(state.mediaNavTimer);
-  clearTimeout(state.modalToolbarTimer);
-  state.modalToolbarTimer = null;
-  releaseMediaElement(modalVideo);
-  releaseMediaElement(modalImage);
-  modalSlideshow.classList.add("hidden");
-  modalSlideshowFullscreen.classList.add("hidden");
-  modalImageUiToggle.classList.add("hidden");
-  modalMetadata.classList.add("hidden");
-  modalVideoControls.classList.add("hidden");
-  modalContent.classList.remove("is-video", "controls-hidden", "nav-active");
-  state.modalControlsHidden = false;
-  modalHiddenActions.classList.add("hidden");
-  modalHiddenExitFullscreen.classList.add("hidden");
-  modalPrev.classList.add("hidden");
-  modalNext.classList.add("hidden");
-  modal.classList.add("hidden");
-  state.currentModalItem = null;
-  updateGridPager();
-  if (state.playingEnabled) resumeVisibleInline();
+  modalViewer.close();
 }
 
 function currentImageItems() {
@@ -3110,32 +2410,15 @@ function showModalImage(direction = 1, options = {}) {
 }
 
 function playModalVideoSoon() {
-  setTimeout(() => modalVideo.play().catch(() => {}), 30);
+  modalViewer.playVideoSoon();
 }
 
 function showModalVideo(direction = 1) {
-  const current = state.currentModalItem;
-  if (!current || current.type !== "video") return;
-  const videos = currentVideoItems();
-  if (videos.length < 2) return;
-  let next = 0;
-  if (direction === 0) {
-    next = Math.floor(Math.random() * videos.length);
-    if (videos.length > 1 && videos[next].key === current.key) next = (next + 1) % videos.length;
-  } else {
-    let index = videos.findIndex(item => item.key === current.key);
-    if (index < 0) index = 0;
-    next = (index + direction + videos.length) % videos.length;
-  }
-  renderModalItem(videos[next]);
-  playModalVideoSoon();
+  modalViewer.showVideo(direction);
 }
 
 function adjustModalVideoVolume(delta) {
-  const next = Math.max(0, Math.min(1, modalVideo.volume + delta));
-  modalVideo.volume = next;
-  if (next > 0) modalVideo.muted = false;
-  showToast(`${t().volumeLabel} ${Math.round(next * 100)}%`, 900);
+  modalViewer.adjustVideoVolume(delta);
 }
 
 function getWheelJump(kind) {
@@ -3150,213 +2433,56 @@ function getWheelJump(kind) {
   return 1;
 }
 
-function resolveSlideshowEffect() {
-  if (state.slideshowEffect !== "random") return state.slideshowEffect;
-  const effects = ["fade", "slide", "drift"];
-  return effects[Math.floor(Math.random() * effects.length)];
-}
-
-function driftVars() {
-  const dirs = [
-    ["-2%", "-1%", "3%", "2%"],
-    ["2%", "1%", "-3%", "-2%"],
-    ["-1%", "2%", "2%", "-3%"],
-    ["1%", "-2%", "-2%", "3%"],
-  ];
-  const d = dirs[Math.floor(Math.random() * dirs.length)];
-  return { "--sx": d[0], "--sy": d[1], "--ex": d[2], "--ey": d[3] };
-}
-
 function renderSlideshow(direction = 1) {
-  const item = state.slideshowItems[state.slideshowIndex];
-  if (!item) return;
-  const incoming = state.slideshowActiveLayer === 0 ? slideshowImageB : slideshowImageA;
-  const outgoing = state.slideshowActiveLayer === 0 ? slideshowImageA : slideshowImageB;
-  const effect = resolveSlideshowEffect();
-  clearTimeout(state.slideshowCleanupTimer);
-  incoming.className = "slideshow-image";
-  outgoing.className = "slideshow-image";
-  incoming.classList.remove("hidden");
-  incoming.src = item.url;
-  incoming.alt = item.name;
-  incoming.style.objectFit = state.slideshowFit;
-  outgoing.style.objectFit = state.slideshowFit;
-  incoming.style.zIndex = 2;
-  outgoing.style.zIndex = 1;
-  const duration = effect === "drift" ? Math.max(1, state.slideshowInterval) * 1000 : effect === "fade" ? 650 : effect === "slide" ? 560 : 0;
-  const outgoingDuration = effect === "drift" ? 760 : duration;
-  incoming.style.removeProperty("--drift-duration");
-  outgoing.style.removeProperty("--drift-duration");
-  if (effect === "drift") {
-    incoming.style.animationDuration = "";
-    incoming.style.setProperty("--drift-duration", `${duration}ms`);
-    outgoing.style.animationDuration = `${outgoingDuration}ms`;
-  } else {
-    incoming.style.animationDuration = `${duration}ms`;
-    outgoing.style.animationDuration = `${outgoingDuration}ms`;
-  }
-  const vars = driftVars();
-  for (const [key, value] of Object.entries(vars)) incoming.style.setProperty(key, value);
-  if (effect === "none") {
-    outgoing.classList.add("hidden");
-  } else {
-    outgoing.classList.remove("hidden");
-    incoming.classList.add(`effect-${effect}`);
-    if (effect === "fade") outgoing.classList.add("effect-fade-out");
-    if (effect === "drift") outgoing.classList.add("effect-drift-out");
-    if (effect === "slide") {
-      incoming.classList.add(direction >= 0 ? "from-right" : "from-left");
-      outgoing.classList.add("effect-slide-out", direction >= 0 ? "to-left" : "to-right");
-    }
-    state.slideshowCleanupTimer = setTimeout(() => outgoing.classList.add("hidden"), outgoingDuration + 40);
-  }
-  slideshowName.textContent = item.name;
-  slideshowCounter.textContent = `${state.slideshowIndex + 1} / ${state.slideshowItems.length}`;
-  state.slideshowActiveLayer = state.slideshowActiveLayer === 0 ? 1 : 0;
-  scheduleSlideshow();
+  slideshowController.render(direction);
 }
 
 function scheduleSlideshow() {
-  clearTimeout(state.slideshowTimer);
-  if (!state.slideshowPlaying || slideshow.classList.contains("hidden")) return;
-  state.slideshowTimer = setTimeout(() => showNextSlide(1), state.slideshowInterval * 1000);
+  slideshowController.schedule();
 }
 
 function showNextSlide(direction = 1) {
-  if (!state.slideshowItems.length) return;
-  let next = state.slideshowIndex + direction;
-  if (next >= state.slideshowItems.length) {
-    if (!state.slideshowLoop) {
-      state.slideshowPlaying = false;
-      applyActionButtons();
-      return;
-    }
-    next = 0;
-  }
-  if (next < 0) next = state.slideshowLoop ? state.slideshowItems.length - 1 : 0;
-  state.slideshowIndex = next;
-  renderSlideshow(direction);
+  slideshowController.showNext(direction);
 }
 
 function openSlideshowFromCurrent(options = {}) {
-  hideFloatingPager();
-  const current = state.currentModalItem;
-  const images = currentImageItems();
-  if (!current || current.type !== "image" || !images.length) {
-    showToast(t().noImages);
-    return;
-  }
-  state.slideshowItems = images;
-  state.slideshowIndex = Math.max(0, images.findIndex(item => item.key === current.key));
-  state.slideshowPlaying = true;
-  slideshowInterval.value = String(state.slideshowInterval);
-  slideshowEffect.value = state.slideshowEffect;
-  slideshowFit.value = state.slideshowFit;
-  slideshowLoop.checked = state.slideshowLoop;
-  setSlideshowControlsHidden(false);
-  closeModal();
-  slideshow.classList.remove("hidden");
-  pauseAllInline();
-  applyLanguage();
-  renderSlideshow(1);
-  applyActionButtons();
-  scheduleAutoHideControls("slideshow", 1000, true);
-  if (options.requestFullscreen) {
-    slideshow.requestFullscreen?.().catch(() => {});
-  }
+  slideshowController.openFromCurrent(options);
 }
 
 function openFullscreenSlideshowFromCurrent() {
-  openSlideshowFromCurrent({ requestFullscreen: true });
+  slideshowController.openFullscreenFromCurrent();
 }
 
 function scheduleModalSlideshow() {
-  clearTimeout(state.modalSlideshowTimer);
-  if (!state.modalSlideshowPlaying || modal.classList.contains("hidden") || state.currentModalItem?.type !== "image") return;
-  state.modalSlideshowTimer = setTimeout(() => {
-    showModalImage(1, { fromTimer: true });
-    scheduleModalSlideshow();
-  }, state.slideshowInterval * 1000);
+  slideshowController.scheduleModal();
 }
 
 function applyModalDriftAnimation() {
-  modalImage.classList.remove("modal-drift-active");
-  const vars = driftVars();
-  for (const [key, value] of Object.entries(vars)) modalImage.style.setProperty(key, value);
-  modalImage.style.setProperty("--modal-drift-duration", `${Math.max(1, state.slideshowInterval) * 1000}ms`);
-  void modalImage.offsetWidth;
-  modalImage.classList.add("modal-drift-active");
+  slideshowController.applyModalDrift();
 }
 
 function clearModalDriftAnimation() {
-  modalImage.classList.remove("modal-drift-active");
-  modalImage.style.removeProperty("--modal-drift-duration");
-  modalImage.style.removeProperty("--sx");
-  modalImage.style.removeProperty("--sy");
-  modalImage.style.removeProperty("--ex");
-  modalImage.style.removeProperty("--ey");
+  slideshowController.clearModalDrift();
 }
 
 function setModalSlideshowPlaying(playing) {
-  clearTimeout(state.modalSlideshowTimer);
-  state.modalSlideshowTimer = null;
-  const images = currentImageItems();
-  state.modalSlideshowPlaying = !!playing && !modal.classList.contains("hidden") && state.currentModalItem?.type === "image" && images.length > 1;
-  modalContent.classList.toggle("modal-slideshow-playing", state.modalSlideshowPlaying);
-  if (state.modalSlideshowPlaying) {
-    applyModalDriftAnimation();
-  } else {
-    clearModalDriftAnimation();
-  }
-  applyActionButtons();
-  if (state.modalSlideshowPlaying) scheduleModalSlideshow();
+  slideshowController.setModalPlaying(playing);
 }
 
 function toggleModalSlideshow() {
-  const images = currentImageItems();
-  if (state.currentModalItem?.type !== "image" || images.length < 2) {
-    showToast(t().noImages);
-    return;
-  }
-  setModalSlideshowPlaying(!state.modalSlideshowPlaying);
+  slideshowController.toggleModal();
 }
 
 function closeSlideshow(options = {}) {
-  const shouldResumeInline = options.resumeInline !== false;
-  if (isSlideshowFullscreen()) document.exitFullscreen?.();
-  clearTimeout(state.slideshowTimer);
-  clearTimeout(state.slideshowCleanupTimer);
-  clearTimeout(state.mediaNavTimer);
-  clearTimeout(state.slideshowToolbarTimer);
-  state.slideshowToolbarTimer = null;
-  setSlideshowControlsHidden(false);
-  slideshowHiddenActions.classList.add("hidden");
-  slideshowExitFullscreen.classList.add("hidden");
-  slideshow.classList.remove("nav-active");
-  slideshow.classList.add("hidden");
-  releaseMediaElement(slideshowImageA);
-  releaseMediaElement(slideshowImageB);
-  updateGridPager();
-  if (shouldResumeInline && state.playingEnabled) resumeVisibleInline();
+  slideshowController.close(options);
 }
 
 function returnSlideshowToModal() {
-  const item = state.slideshowItems[state.slideshowIndex];
-  state.slideshowReturnAfterFullscreenExit = false;
-  closeSlideshow({ resumeInline: false });
-  if (item) openModal(item);
+  slideshowController.returnToModal();
 }
 
 function setSlideshowControlsHidden(hidden) {
-  state.slideshowControlsHidden = hidden;
-  slideshow.classList.toggle("controls-hidden", hidden);
-  slideshowHiddenActions.classList.add("hidden");
-  slideshowUiToggle.textContent = compactText("hideUi", "Hide");
-  slideshowUiShow.textContent = labelText("showUi", "Show UI", "显示控制");
-  if (hidden) {
-    slideshow.classList.remove("nav-active");
-  }
-  applyActionButtons();
+  slideshowController.setControlsHidden(hidden);
 }
 
 function setModalControlsHidden(hidden) {
@@ -3443,26 +2569,15 @@ function toggleModalFullscreen() {
 }
 
 function toggleSlideshowFullscreen() {
-  if (isSlideshowFullscreen()) {
-    state.slideshowReturnAfterFullscreenExit = false;
-    document.exitFullscreen?.();
-  } else {
-    state.slideshowReturnAfterFullscreenExit = true;
-    slideshow.requestFullscreen?.().catch(() => {});
-  }
+  slideshowController.toggleFullscreen();
 }
 
 function handleFullscreenChange() {
-  updateFullscreenLabels();
-  if (!document.fullscreenElement && state.slideshowReturnAfterFullscreenExit && !slideshow.classList.contains("hidden")) {
-    returnSlideshowToModal();
-  }
+  slideshowController.handleFullscreenChange();
 }
 
 function toggleSlideshowPlay() {
-  state.slideshowPlaying = !state.slideshowPlaying;
-  applyActionButtons();
-  scheduleSlideshow();
+  slideshowController.togglePlay();
 }
 
 async function openInExplorer(item) {
@@ -3577,13 +2692,7 @@ function removeItemsFromState(items) {
   const cards = [...grid.querySelectorAll(".video-card")].filter(card => keys.has(card.dataset.key));
   cards.forEach(card => {
     const video = card.querySelector(".video-wrap video");
-    if (video) {
-      clearVideoReleaseTimer(video);
-      state.warmVideos.delete(video);
-      state.visibleVideos.delete(video);
-      state.videoViewport.delete(video);
-      video.pause();
-    }
+    if (video) playbackController?.evictVideo(video);
     card.classList.add("is-removing");
   });
   // Schedule the DOM removal before follow-up UI work so a later UI error cannot leave a stale playable card behind.
@@ -3610,18 +2719,17 @@ function removeItemFromState(item) {
 }
 
 function setPlaybackBlocked(items, blocked) {
-  for (const item of Array.isArray(items) ? items : [items]) {
-    if (!item?.key) continue;
-    if (blocked) state.blockedMediaKeys.add(item.key);
-    else state.blockedMediaKeys.delete(item.key);
-  }
-  if (!blocked) scheduleUpdatePlaying();
+  playbackController?.setBlocked(items, blocked);
+}
+
+function evictGridMediaElement(media) {
+  if (media?.tagName === "VIDEO" && playbackController) playbackController.evictVideo(media);
+  else releaseMediaElement(media);
 }
 
 function releaseActionPreviewMedia(source) {
   if (source === "slideshow") {
-    releaseMediaElement(slideshowImageA);
-    releaseMediaElement(slideshowImageB);
+    slideshowController.releasePreviewMedia();
     return;
   }
   releaseMediaElement(modalVideo);
@@ -3643,12 +2751,7 @@ async function releaseMediaBeforeFileAction(item, source) {
   document.querySelectorAll(".video-wrap video, .video-wrap img.media-image").forEach(media => {
     if (media.dataset.rel === item.rel || media.dataset.src === item.url || media.getAttribute("src") === item.url) {
       matchedGridMedia += 1;
-      releaseMediaElement(media);
-    }
-  });
-  state.visibleVideos.forEach(video => {
-    if (video.dataset.rel === item.rel || video.dataset.src === item.url || video.getAttribute("src") === item.url) {
-      state.visibleVideos.delete(video);
+      evictGridMediaElement(media);
     }
   });
   syncLoadedMediaStatNow();
@@ -3673,12 +2776,7 @@ async function releaseMediaBeforeBatchAction(items) {
   document.querySelectorAll(".video-wrap video, .video-wrap img.media-image").forEach(media => {
     if (rels.has(media.dataset.rel) || urls.has(media.dataset.src) || urls.has(media.getAttribute("src"))) {
       matchedGridMedia += 1;
-      releaseMediaElement(media);
-    }
-  });
-  [...state.visibleVideos].forEach(video => {
-    if (rels.has(video.dataset.rel) || urls.has(video.dataset.src) || urls.has(video.getAttribute("src"))) {
-      state.visibleVideos.delete(video);
+      evictGridMediaElement(media);
     }
   });
   syncLoadedMediaStatNow();
@@ -3706,14 +2804,7 @@ function restoreActionPreviewMedia(item, source) {
 
 function continueAfterFileAction(item, source, oldIndex) {
   if (source === "slideshow") {
-    state.slideshowItems = currentImageItems();
-    if (!state.slideshowItems.length) {
-      closeSlideshow();
-      return;
-    }
-    state.slideshowIndex = Math.max(0, Math.min(oldIndex, state.slideshowItems.length - 1));
-    renderSlideshow(1);
-    applyActionButtons();
+    slideshowController.refreshItems(currentImageItems(), oldIndex);
     return;
   }
 
@@ -4551,6 +3642,30 @@ function setButtonStyle(style, save = true) {
   if (save) saveSettingsSoft();
 }
 
+function normalizeModalVolume(value) {
+  const volume = Number(value);
+  if (!Number.isFinite(volume)) return 1;
+  return Math.max(0, Math.min(1, volume));
+}
+
+function loadModalAudioPrefs() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("localVideoWallModalAudio") || "null");
+    if (!saved || typeof saved !== "object") return;
+    state.modalMuted = !!saved.muted;
+    state.modalVolume = normalizeModalVolume(saved.volume);
+  } catch {}
+}
+
+function saveModalAudioPrefs() {
+  try {
+    localStorage.setItem("localVideoWallModalAudio", JSON.stringify({
+      muted: !!state.modalMuted,
+      volume: normalizeModalVolume(state.modalVolume),
+    }));
+  } catch {}
+}
+
 async function init() {
   try {
     await fetchBootstrap();
@@ -4592,6 +3707,7 @@ async function init() {
     state.fontSize = ["small", "standard", "large"].includes(localFontSize || cfg.font_size) ? (localFontSize || cfg.font_size) : "small";
     state.contentAlign = ["left", "center", "right"].includes(cfg.content_align) ? cfg.content_align : "center";
     state.buttonStyle = (localButtonStyle || cfg.button_style) === "icons" ? "icons" : "text";
+    loadModalAudioPrefs();
     state.slideshowInterval = Math.max(1, Math.min(15, Number(cfg.slideshow_interval || 5)));
     state.slideshowEffect = ["none", "fade", "slide", "drift", "random"].includes(cfg.slideshow_effect) ? cfg.slideshow_effect : "drift";
     state.slideshowFit = cfg.slideshow_fit === "cover" ? "cover" : "contain";
@@ -4906,6 +4022,12 @@ modalHiddenExitFullscreen.addEventListener("click", toggleModalFullscreen);
 modalHiddenClose.addEventListener("click", closeModal);
 modalImage.addEventListener("load", refreshModalMetadataPanel);
 modalVideo.addEventListener("loadedmetadata", refreshModalMetadataPanel);
+modalVideo.addEventListener("volumechange", () => {
+  if (state.currentModalItem?.type !== "video") return;
+  state.modalMuted = !!modalVideo.muted;
+  state.modalVolume = normalizeModalVolume(modalVideo.volume);
+  saveModalAudioPrefs();
+});
 modalVideo.addEventListener("ended", () => {
   if (state.currentModalItem?.type !== "video") return;
   if (state.videoMode === "sequence") showModalVideo(1);
