@@ -118,6 +118,11 @@ function focusMainWindow() {
   mainWindow.focus();
 }
 
+function isTrustedAppUrl(url) {
+  const value = String(url || '');
+  return value === APP_URL || value.startsWith(`${APP_URL}/`);
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1500,
@@ -127,6 +132,9 @@ function createWindow() {
     title: APP_NAME,
     backgroundColor: '#17181b',
     autoHideMenuBar: true,
+    frame: false,
+    thickFrame: true,
+    resizable: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -168,7 +176,7 @@ if (!gotSingleInstanceLock) {
 
     ipcMain.on('native-drag:start', (event, request) => {
       const senderUrl = String(event.senderFrame?.url || '');
-      if (!(senderUrl === APP_URL || senderUrl.startsWith(`${APP_URL}/`))) {
+      if (!isTrustedAppUrl(senderUrl)) {
         event.sender.send('native-drag:result', {
           ok: false,
           reason: 'invalid-sender',
@@ -204,6 +212,13 @@ if (!gotSingleInstanceLock) {
           error: error?.message || String(error),
         });
       }
+    });
+
+    ipcMain.on('desktop-window:close', event => {
+      const senderUrl = String(event.senderFrame?.url || '');
+      if (!isTrustedAppUrl(senderUrl)) return;
+      const window = BrowserWindow.fromWebContents(event.sender);
+      if (window && !window.isDestroyed()) window.close();
     });
 
     createWindow();

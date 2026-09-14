@@ -88,6 +88,8 @@ class ScanAndSettingsTests(unittest.TestCase):
         return status, data
 
     def test_scan_lists_media_and_records_the_temporary_root(self) -> None:
+        zero_byte_media = self.media_dir / "paid-placeholder.mp4"
+        zero_byte_media.write_bytes(b"")
         status, data = self._post(
             "/api/scan",
             {
@@ -102,6 +104,8 @@ class ScanAndSettingsTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(data["count"], 2)
         self.assertEqual({item["name"] for item in data["videos"]}, {"clip.mp4", "image.png"})
+        self.assertTrue(zero_byte_media.exists())
+        self.assertEqual(zero_byte_media.stat().st_size, 0)
         self.assertEqual(data["config"]["last_video_dir"], str(self.media_dir))
         self.assertEqual(data["config"]["path_history"][0], str(self.media_dir))
         if app.os.name == "nt":

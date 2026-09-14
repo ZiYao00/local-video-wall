@@ -11,7 +11,7 @@
 
 ![Local Video Wall preview](assets/preview01.gif)
 
-Local Video Wall turns a local folder into a browser-based media wall. It is designed for people who generate, download, compare, and organize large batches of local AI images and videos.
+Local Video Wall turns a local folder into a local media wall that can run in Chrome/Edge or the Windows Desktop host. It is designed for people who generate, download, compare, and organize large batches of local AI images and videos.
 
 It is **not** a cloud album, a professional video editor, a general-purpose file manager, or a ComfyUI plugin. Its focus is narrower: helping you review local AI media quickly without uploading it anywhere.
 
@@ -44,6 +44,7 @@ Local Video Wall provides one place to browse, compare, inspect, mark, export, a
 - Search, sort, favorite, and batch-select media.
 - Export selected review data to CSV.
 - Use filename exclusion rules to hide unwanted categories during scanning.
+- Ignore zero-byte media placeholders during scanning without deleting the source files.
 - Save recent paths and favorite folders for quicker access.
 
 ### Image and video preview
@@ -133,7 +134,7 @@ service.bat
 
 ### Local Video Wall Desktop
 
-The Windows desktop host uses the same Local Video Wall UI and Python backend, but adds native Windows file drag-out. Media from an active scan can be dragged directly into native targets such as video editors without browser folder authorization.
+The Windows desktop host uses the same Local Video Wall UI and Python backend, but adds native Windows file drag-out. Media from an active scan can be dragged directly into native targets such as video editors without browser folder authorization. The Desktop shell is frameless, keeps window resizing, adds a close button beside Settings, and uses the same wide-screen Left / Center / Right layout behavior as the browser host.
 
 For the current source-tree setup, install the desktop runtime once:
 

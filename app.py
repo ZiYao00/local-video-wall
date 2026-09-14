@@ -918,6 +918,8 @@ def scan_videos(
                 suffix = p.suffix.lower()
                 if not p.is_file() or suffix not in MEDIA_EXTENSIONS:
                     continue
+                if p.stat().st_size == 0:
+                    continue
                 should_filter_type = exclude_scope == "all" or suffix in IMAGE_EXTENSIONS
                 if exclude_enabled and keyword_keys and should_filter_type:
                     filename_key = p.name.casefold()

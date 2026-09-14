@@ -11,6 +11,8 @@ import { createWorkflowStatusController } from "./js/workflow-status.js";
 const apiClient = createApiClient();
 const desktopBridge = window.localVideoWallDesktop || null;
 const IS_DESKTOP_HOST = desktopBridge?.isDesktop === true;
+const SIDE_LAYOUT_MIN_WIDTH = 1180;
+document.body.classList.toggle("desktop-host", IS_DESKTOP_HOST);
 
 const state = {
   all: [],
@@ -911,6 +913,7 @@ const batchExportBtn = $("#batchExportBtn");
 const batchExitBtn = $("#batchExitBtn");
 const immersiveBtn = $("#immersiveBtn");
 const desktopLaunchBtn = $("#desktopLaunchBtn");
+const desktopCloseBtn = $("#desktopCloseBtn");
 const expandBtn = $("#expandBtn");
 const trashToggle = $("#trashToggle");
 const trashView = $("#trashView");
@@ -1260,7 +1263,7 @@ function updateContentAlignLabels() {
 function applyContentAlign() {
   const align = ["left", "center", "right"].includes(state.contentAlign) ? state.contentAlign : "center";
   const sidebarWidth = document.body.classList.contains("sidebar-open") ? folderPanel.getBoundingClientRect().width : 0;
-  const modalSideLayoutAvailable = window.innerWidth >= 1400;
+  const modalSideLayoutAvailable = window.innerWidth >= SIDE_LAYOUT_MIN_WIDTH;
   document.documentElement.style.setProperty("--sidebar-panel-width", `${Math.round(sidebarWidth)}px`);
   document.body.classList.remove("content-align-left", "content-align-center", "content-align-right");
   document.body.classList.add(`content-align-${align}`);
@@ -1335,11 +1338,13 @@ function applyActionButtons() {
   setButtonLabel(topPageNext, tx.pageNext, "right", { iconOnly: true });
   setButtonLabel(immersiveBtn, state.immersive ? tx.exitImmersive : tx.immersive, state.immersive ? "close" : "fullscreen", { iconOnly: true });
   desktopLaunchBtn.classList.toggle("hidden", IS_DESKTOP_HOST);
+  desktopCloseBtn.classList.toggle("hidden", !IS_DESKTOP_HOST);
   dragPathBtn.classList.toggle("hidden", IS_DESKTOP_HOST);
   if (!IS_DESKTOP_HOST) {
     setButtonLabel(desktopLaunchBtn, labelText("openDesktop", "Open Local Video Wall Desktop", "打开 Local Video Wall 桌面版"), "desktop", { iconOnly: true });
     desktopLaunchBtn.disabled = !!state.desktopLaunchBusy;
   }
+  if (IS_DESKTOP_HOST) setButtonLabel(desktopCloseBtn, tx.close, "close", { iconOnly: true });
   updateContentAlignLabels();
   updateContentAlignToolbarButton();
   setButtonLabel(modalSlideshow, state.modalSlideshowPlaying ? tx.pause : tx.slideshow, state.modalSlideshowPlaying ? "pause" : "slideshow", { iconOnly: true });
@@ -1587,7 +1592,7 @@ function applyLayout() {
 function getContentWidthRule() {
   if (document.body.classList.contains("sidebar-open")) return "calc(100% - 24px)";
   const width = window.innerWidth || 1600;
-  if (state.contentAlign !== "center" && width >= 1400) return "calc(50vw - 42px)";
+  if (state.contentAlign !== "center" && width >= SIDE_LAYOUT_MIN_WIDTH) return "calc(50vw - 18px)";
   if (width >= 2400) return "75vw";
   if (width >= 1600) return "86vw";
   return "calc(100% - 24px)";
@@ -4577,6 +4582,11 @@ folderPanelRefresh.addEventListener("click", () => loadFolderRoots(true));
 desktopLaunchBtn.addEventListener("click", event => {
   event.stopPropagation();
   void launchDesktopApp();
+});
+desktopCloseBtn.addEventListener("click", event => {
+  event.stopPropagation();
+  if (!IS_DESKTOP_HOST || !desktopBridge?.closeWindow) return;
+  desktopBridge.closeWindow();
 });
 favoritePathBtn.addEventListener("click", e => {
   e.stopPropagation();

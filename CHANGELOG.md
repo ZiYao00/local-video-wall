@@ -1,13 +1,17 @@
 # Changelog
 
-## Unreleased - Desktop Stabilization
+## 1.9.0 - 2026-09-14
 
-- Added the Local Video Wall Desktop Electron host while keeping Chrome as a compatible fallback host for the same local frontend and Python backend.
+- Added Local Video Wall Desktop as a Windows desktop host while keeping Chrome as a compatible fallback for the same local frontend and Python backend.
 - Added Windows native drag-out in Desktop mode using `scan_id + full_path`, with active-scan, real-path containment, file-existence, and media-extension validation in the Electron main process.
 - Added browser-to-Desktop launch support plus the Windows desktop shortcut flow, while hiding browser-only drag authorization UI when running inside Desktop.
 - Kept Chrome drag-out authorization unchanged for browser use; Desktop does not depend on `webkitdirectory` grants and therefore does not require reauthorization after a page refresh or Desktop restart.
+- Added a frameless Desktop shell with a draggable top toolbar, preserved window resizing, and added a Desktop-only close button beside Settings.
+- Made wide-screen Left / Center / Right layouts consistent between browser and Desktop, lowered the side-layout activation threshold to 1180 px, made Left / Right wall and preview layouts flush to the window edge, and removed filename/path text from side previews.
+- Ignored zero-byte supported media files during scans so placeholder downloads such as inaccessible paid Bilibili videos do not appear in the wall; files are skipped only and are never deleted.
 - Documented the source-distribution rule for Desktop: the existing `desktop/.gitignore` keeps `node_modules/` (including `electron.exe`) out of Git, while `package.json` / `package-lock.json` remain the dependency source of truth.
-- Marked the current Desktop work as a testing/stabilization baseline. Bundled Python, installers, portable builds, auto-update, and other packaging work remain deferred until multi-round real-world testing is complete.
+- Verified the release baseline with the full 41-test `unittest` suite plus JavaScript syntax and diff checks.
+- Bundled Python, Setup/Portable installers, auto-update, and other full packaging work remain deferred; v1.9.0 is still distributed from the source tree / GitHub source archive.
 
 ## 1.8.3 - 2026-08-01
 

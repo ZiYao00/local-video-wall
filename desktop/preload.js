@@ -10,6 +10,10 @@ contextBridge.exposeInMainWorld('localVideoWallDesktop', {
     });
     return true;
   },
+  closeWindow: () => {
+    ipcRenderer.send('desktop-window:close');
+    return true;
+  },
   onDragResult: callback => {
     if (typeof callback !== 'function') return () => {};
     const listener = (_event, payload) => callback(payload || {});

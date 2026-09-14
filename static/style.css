@@ -1474,15 +1474,15 @@ body.sidebar-open .app-shell{
   margin-right:auto;
 }
 
-@media (min-width:1400px){
+@media (min-width:1180px){
   body:not(.sidebar-open).content-align-left :is(#subInfo,#batchBar,#grid,#gridPager,#emptyState){
-    margin-left:12px;
+    margin-left:0;
     margin-right:auto;
   }
 
   body:not(.sidebar-open).content-align-right :is(#subInfo,#batchBar,#grid,#gridPager,#emptyState){
     margin-left:auto;
-    margin-right:12px;
+    margin-right:0;
   }
 }
 
@@ -2618,28 +2618,40 @@ body.dense-grid .workflow-badge{
   display:none!important;
 }
 
-@media (min-width:1400px){
+@media (min-width:1180px){
   body.content-align-left .modal-content:not(.is-video):not(:fullscreen),
   body.content-align-right .modal-content:not(.is-video):not(:fullscreen),
   body.content-align-left .modal-content.is-video:not(:fullscreen),
   body.content-align-right .modal-content.is-video:not(:fullscreen){
     top:30px;
     bottom:30px;
-    width:calc((100vw - var(--sidebar-panel-width,0px)) / 2 - 42px);
+    width:calc((100vw - var(--sidebar-panel-width,0px)) / 2 - 18px);
     height:auto;
     border-radius:18px;
   }
 
   body.content-align-left .modal-content:not(.is-video):not(:fullscreen),
   body.content-align-left .modal-content.is-video:not(:fullscreen){
-    left:calc(var(--sidebar-panel-width,0px) + 24px);
+    left:var(--sidebar-panel-width,0px);
+    border-radius:0 18px 18px 0;
     right:auto;
   }
 
   body.content-align-right .modal-content:not(.is-video):not(:fullscreen),
   body.content-align-right .modal-content.is-video:not(:fullscreen){
     left:auto;
-    right:24px;
+    right:0;
+    border-radius:18px 0 0 18px;
+  }
+
+  body.content-align-left .modal-content:not(:fullscreen) .modal-title,
+  body.content-align-right .modal-content:not(:fullscreen) .modal-title{
+    display:none;
+  }
+
+  body.content-align-left .modal-content:not(:fullscreen) .modal-header,
+  body.content-align-right .modal-content:not(:fullscreen) .modal-header{
+    justify-content:flex-end;
   }
 
   body.content-align-left .modal-content:not(.is-video):not(:fullscreen) .modal-metadata,
@@ -3254,4 +3266,24 @@ body.theme-light .settings-inline-detail .settings-dialog-panel{
   color:white;
   border-color:rgba(118,146,255,.62);
   background:var(--accent-2);
+}
+
+body.desktop-host .topbar{
+  -webkit-app-region:drag;
+}
+
+body.desktop-host .topbar button,
+body.desktop-host .topbar input,
+body.desktop-host .topbar select,
+body.desktop-host .topbar textarea,
+body.desktop-host .topbar .toolbar-popover,
+body.desktop-host .topbar .path-history-menu,
+body.desktop-host .topbar .path-suggest-menu{
+  -webkit-app-region:no-drag;
+}
+
+body.desktop-host .desktop-window-close:hover{
+  background:rgb(196,43,55);
+  border-color:rgb(196,43,55);
+  color:white;
 }

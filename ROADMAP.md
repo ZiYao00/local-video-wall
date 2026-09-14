@@ -335,9 +335,25 @@ Not planned for this phase:
 - Automatic tagging.
 - Mandatory external tools.
 
+## Released Phase - v1.9.0 Desktop Host And Stabilization
+
+Release status: `v1.9.0` was released on 2026-09-14 as the first stable source-tree release of Local Video Wall Desktop.
+
+Completed:
+
+- Added the Electron-based Local Video Wall Desktop host while preserving Chrome as the browser fallback/debug host.
+- Added scan-context-validated Windows native drag-out for images and videos without browser directory reauthorization.
+- Added the Windows Desktop shortcut / browser-to-Desktop launch flow.
+- Added a frameless, resizable Desktop shell with a draggable top toolbar and a dedicated close button.
+- Unified wide-screen Left / Center / Right layout behavior between browser and Desktop, including edge-flush side layouts and cleaner side previews.
+- Ignored zero-byte media placeholders during scans without deleting source files.
+- Kept full installer, bundled Python, portable packaging, and auto-update work deferred.
+
+Internal architecture work originally assigned to v1.9.0 moves to v1.10.0. The next user-facing Tags & Review milestone moves to v1.11.0.
+
 ## Phase 3 - Tags And Review Workflow
 
-Recommended version: `v1.9.0 - Tags & Review Workflow`
+Recommended version: `v1.11.0 - Tags & Review Workflow`
 
 Goal: make the app useful for organizing assets, not only previewing them.
 
