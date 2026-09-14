@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased - Desktop Stabilization
+
+- Added the Local Video Wall Desktop Electron host while keeping Chrome as a compatible fallback host for the same local frontend and Python backend.
+- Added Windows native drag-out in Desktop mode using `scan_id + full_path`, with active-scan, real-path containment, file-existence, and media-extension validation in the Electron main process.
+- Added browser-to-Desktop launch support plus the Windows desktop shortcut flow, while hiding browser-only drag authorization UI when running inside Desktop.
+- Kept Chrome drag-out authorization unchanged for browser use; Desktop does not depend on `webkitdirectory` grants and therefore does not require reauthorization after a page refresh or Desktop restart.
+- Documented the source-distribution rule for Desktop: the existing `desktop/.gitignore` keeps `node_modules/` (including `electron.exe`) out of Git, while `package.json` / `package-lock.json` remain the dependency source of truth.
+- Marked the current Desktop work as a testing/stabilization baseline. Bundled Python, installers, portable builds, auto-update, and other packaging work remain deferred until multi-round real-world testing is complete.
+
 ## 1.8.3 - 2026-08-01
 
 - Added a dependency-free `unittest` regression suite for path containment, local-trash move/restore transitions, name conflicts, Unicode paths, JSON persistence, PNG A1111/ComfyUI metadata extraction, metadata normalization, and HTTP byte-range media responses.

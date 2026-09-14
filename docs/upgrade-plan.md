@@ -39,6 +39,34 @@
 - **回退**：Desktop 出现问题时，Chrome 原有流程仍可继续使用，不删除浏览器拖拽兼容链路。
 每个阶段开始前，若改动面大，按 `.codex-backups/README.md` 规则新建对应分类的“开始前”快照。
 
+## Desktop Stabilization — 当前测试阶段（2026-09-14）
+
+当前目标不是打包，而是把已经完成的 Desktop 功能收口成稳定测试基线，随后进入多轮真实使用测试。
+
+### 已收口的正式链路
+
+- [x] Electron Desktop 宿主加载现有 `127.0.0.1:8787` 前后端，不复制第二套 UI。
+- [x] Desktop 使用 Electron 原生文件拖拽，不依赖 Chrome 的目录授权和 `webkitdirectory` 会话授权。
+- [x] 原生拖拽使用 `scan_id + full_path`，主进程验证活动扫描、真实路径边界、文件存在性和媒体扩展名。
+- [x] Chrome 保留原浏览器拖拽授权流程，并可从页面打开 Desktop。
+- [x] Desktop 隐藏浏览器专属的拖拽授权入口和 Settings > Drag 页。
+- [x] Windows 快捷方式可通过现有 `service.bat desktop` 流程启动服务后打开 Desktop。
+- [x] `desktop/.gitignore` 已忽略 `node_modules/`，根目录规则已忽略 `*.log`；Git 只保留 Electron 依赖声明，不提交 `electron.exe`。
+
+### 当前只做测试与修复
+
+- [ ] 启动/重复启动/关闭/重新打开 Desktop。
+- [ ] 小目录、大目录、图片/视频混合目录、中文路径、不同磁盘扫描。
+- [ ] 图片与视频分别拖到 Explorer、Photoshop、ComfyUI 及其它实际目标软件。
+- [ ] 刷新或重新打开 Desktop 后确认不出现浏览器目录重新授权。
+- [ ] 扫描后删除、移动、重命名媒体，以及磁盘离线时检查错误反馈。
+- [ ] 每轮只修复已复现问题；测试稳定前不继续扩大 Desktop 功能范围。
+
+### 明确延后
+
+- 项目内置 Python 环境、Python backend 打包、Electron Builder、Setup/Portable、自动更新、正式安装/卸载流程全部延后到多轮测试稳定之后再讨论。
+- `desktop-drag-poc/` 与 `static/drag-out-poc/` 目前保留为未跟踪验证材料，不属于正式运行依赖；等 Desktop 多轮测试通过后再单独决定归档或移除，不在当前收尾阶段删除。
+
 ---
 
 ## v1.8.1 — 安全（先做这个）
