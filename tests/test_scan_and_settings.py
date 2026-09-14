@@ -110,7 +110,7 @@ class ScanAndSettingsTests(unittest.TestCase):
         self.assertEqual(data["config"]["path_history"][0], str(self.media_dir))
         if app.os.name == "nt":
             registry = json.loads(self.desktop_scan_registry.read_text(encoding="utf-8"))
-            self.assertEqual(registry["scans"][data["scan_id"]], str(self.media_dir))
+            self.assertTrue(Path(registry["scans"][data["scan_id"]]).samefile(self.media_dir))
 
     def test_scan_rejects_missing_directory_without_writing_config(self) -> None:
         missing = self.root / "missing"
