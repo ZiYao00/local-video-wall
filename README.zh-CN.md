@@ -131,6 +131,19 @@ py --version
 service.bat
 ```
 
+### Local Video Wall 桌面版
+
+Local Video Wall Desktop 使用与浏览器版相同的界面和 Python 后端，但增加 Windows 原生文件拖拽。当前有效扫描中的媒体可以直接拖入剪辑软件等原生 Windows 应用，不需要浏览器目录授权。
+
+当前源码形态只需首次安装一次桌面运行依赖：
+
+```powershell
+cd desktop
+npm install
+```
+
+之后可以通过 `service.bat` 安装 **Local Video Wall Desktop** 桌面快捷方式，也可以从浏览器页面点击“打开 Local Video Wall 桌面版”。Chrome 继续保留为兼容/调试入口，并保留浏览器专用的拖拽授权流程。
+
 开发者也可以直接运行：
 
 ```powershell

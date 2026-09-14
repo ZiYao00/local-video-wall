@@ -28,6 +28,15 @@
 | 之后 | 打包、贡献者文档等 | 视情况 | 未开始 |
 
 **每个阶段完成、验证、（可选）发布之后，再进入下一个。**
+
+## Local Video Wall Desktop — 桌面宿主决策
+
+- **产品名**：用户界面统一称 **Local Video Wall Desktop / Local Video Wall 桌面版**；`Electron` 仅作为内部技术实现名，不作为产品名称。
+- **同一项目，两种宿主**：Chrome 与 Local Video Wall Desktop 都加载同一个 `127.0.0.1:8787` Python 后端和同一套前端 UI；Chrome 保留作为兼容/调试入口，Desktop 作为日常增强入口。
+- **桌面拖拽不需要浏览器授权**：Desktop 直接使用 Windows 本地文件权限和原生文件拖拽；`drag_roots` 仅服务 Chrome 的浏览器兼容拖拽，不再是 Desktop 的前置条件。
+- **桌面安全边界**：Desktop 只接受当前有效扫描上下文中的媒体。前端提交 `scan_id + full_path`，桌面主进程读取后端生成的活动扫描注册表，验证扫描 ID、真实路径边界、文件存在性和媒体扩展名后才允许原生拖出。
+- **入口**：Chrome 页面提供“打开 Local Video Wall Desktop”按钮；Windows 桌面快捷方式可直接启动后台服务并打开 Desktop。
+- **回退**：Desktop 出现问题时，Chrome 原有流程仍可继续使用，不删除浏览器拖拽兼容链路。
 每个阶段开始前，若改动面大，按 `.codex-backups/README.md` 规则新建对应分类的“开始前”快照。
 
 ---

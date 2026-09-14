@@ -28,10 +28,12 @@ class ScanAndSettingsTests(unittest.TestCase):
         self.config_file = self.root / "config.json"
         self.review_file = self.root / "review_data.json"
         self.action_log = self.root / "actions.log"
+        self.desktop_scan_registry = self.root / "desktop-scans.json"
         self.file_patches = [
             patch.object(app, "CONFIG_FILE", self.config_file),
             patch.object(app, "REVIEW_FILE", self.review_file),
             patch.object(app, "ACTION_LOG_FILE", self.action_log),
+            patch.object(app, "DESKTOP_SCAN_REGISTRY_FILE", self.desktop_scan_registry),
         ]
         for file_patch in self.file_patches:
             file_patch.start()
@@ -102,6 +104,9 @@ class ScanAndSettingsTests(unittest.TestCase):
         self.assertEqual({item["name"] for item in data["videos"]}, {"clip.mp4", "image.png"})
         self.assertEqual(data["config"]["last_video_dir"], str(self.media_dir))
         self.assertEqual(data["config"]["path_history"][0], str(self.media_dir))
+        if app.os.name == "nt":
+            registry = json.loads(self.desktop_scan_registry.read_text(encoding="utf-8"))
+            self.assertEqual(registry["scans"][data["scan_id"]], str(self.media_dir))
 
     def test_scan_rejects_missing_directory_without_writing_config(self) -> None:
         missing = self.root / "missing"

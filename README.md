@@ -131,6 +131,19 @@ For background service controls, run:
 service.bat
 ```
 
+### Local Video Wall Desktop
+
+The Windows desktop host uses the same Local Video Wall UI and Python backend, but adds native Windows file drag-out. Media from an active scan can be dragged directly into native targets such as video editors without browser folder authorization.
+
+For the current source-tree setup, install the desktop runtime once:
+
+```powershell
+cd desktop
+npm install
+```
+
+Then use `service.bat` to install the **Local Video Wall Desktop** shortcut, or click **Open Local Video Wall Desktop** from the browser UI. Chrome remains available as the compatibility/debug host and keeps its browser-specific drag authorization flow.
+
 Developers can also run:
 
 ```powershell

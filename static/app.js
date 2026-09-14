@@ -9,6 +9,8 @@ import { createSlideshowController } from "./js/slideshow-controller.js";
 import { createWorkflowStatusController } from "./js/workflow-status.js";
 
 const apiClient = createApiClient();
+const desktopBridge = window.localVideoWallDesktop || null;
+const IS_DESKTOP_HOST = desktopBridge?.isDesktop === true;
 
 const state = {
   all: [],
@@ -85,6 +87,7 @@ const state = {
   dragAuthBusy: false,
   dragAuthRoot: "",
   dragConfigBusy: false,
+  desktopLaunchBusy: false,
   settingsTab: "interface",
   perf: { scanMs: 0, renderMs: 0, schedulerMs: 0, pageItems: 0, loadedMedia: 0, warmVideos: 0, activeVideos: 0 },
   loadedStatTimer: null,
@@ -104,8 +107,8 @@ const COLUMN_GAPS = { 2: 18, 3: 18, 4: 18, 5: 18, 6: 18, 7: 16, 8: 14, 9: 12, 10
 const COLUMN_OPTIONS = Object.keys(COLUMN_WIDTHS).map(Number);
 const LARGE_VIDEO_MB = 500;
 const COMFYUI_URL = "http://127.0.0.1:8188/";
-const EXPECTED_API_VERSION = 3;
-const REQUIRED_BACKEND_CAPABILITIES = ["local_trash", "batch_trash", "trash_restore", "system_trash", "drag_out_roots", "drag_root_verify"];
+const EXPECTED_API_VERSION = 4;
+const REQUIRED_BACKEND_CAPABILITIES = ["local_trash", "batch_trash", "trash_restore", "system_trash", "drag_out_roots", "drag_root_verify", "desktop_shell"];
 
 async function fetchBootstrap() {
   if (!apiClient) throw new Error("API client not initialized");
@@ -120,6 +123,30 @@ async function apiFetch(url, options = {}) {
   return apiClient.request(url, options);
 }
 
+async function launchDesktopApp() {
+  if (IS_DESKTOP_HOST || state.desktopLaunchBusy) return;
+  if (!state.backendCompatible) {
+    showToast(t().backendRestartRequired, 7000);
+    return;
+  }
+  state.desktopLaunchBusy = true;
+  applyActionButtons();
+  showToast(labelText("desktopLaunching", "Opening Local Video Wall Desktop...", "正在打开 Local Video Wall 桌面版..."), 2200);
+  try {
+    const response = await apiFetch("/api/desktop-launch", { method: "POST" });
+    const data = await response.json();
+    if (!response.ok || !data?.ok) throw new Error(data?.error || `HTTP ${response.status}`);
+    showToast(labelText("desktopLaunched", "Local Video Wall Desktop opened.", "Local Video Wall 桌面版已打开。"), 2600);
+  } catch (error) {
+    console.error(error);
+    const prefix = labelText("desktopLaunchFailed", "Could not open Local Video Wall Desktop.", "无法打开 Local Video Wall 桌面版。");
+    showToast(`${prefix} ${error?.message || ""}`.trim(), 5200);
+  } finally {
+    state.desktopLaunchBusy = false;
+    applyActionButtons();
+  }
+}
+
 const ICONS = {
   back: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 18l-6-6 6-6"/><path d="M9 12h11"/></svg>',
   check: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6L9 17l-5-5"/></svg>',
@@ -132,6 +159,7 @@ const ICONS = {
   close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>',
   download: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>',
   externalOpen: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M20 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4"/></svg>',
+  desktop: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M15 8h4v4"/><path d="M19 8l-6 6"/></svg>',
   eye: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   eyeOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6A3 3 0 0 0 13.4 13.4"/><path d="M9.9 4.3A10.6 10.6 0 0 1 12 4c6 0 10 8 10 8a17.8 17.8 0 0 1-3.1 4.3"/><path d="M6.2 6.5C3.5 8.3 2 12 2 12s4 8 10 8a10 10 0 0 0 5-1.4"/></svg>',
   folder: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h5l2 2"/></svg>',
@@ -882,6 +910,7 @@ const batchTrashBtn = $("#batchTrashBtn");
 const batchExportBtn = $("#batchExportBtn");
 const batchExitBtn = $("#batchExitBtn");
 const immersiveBtn = $("#immersiveBtn");
+const desktopLaunchBtn = $("#desktopLaunchBtn");
 const expandBtn = $("#expandBtn");
 const trashToggle = $("#trashToggle");
 const trashView = $("#trashView");
@@ -918,6 +947,21 @@ const trashConfirmDontAskLabel = $("#trashConfirmDontAskLabel");
 const trashConfirmCancel = $("#trashConfirmCancel");
 const trashConfirmOk = $("#trashConfirmOk");
 let trashConfirmResolve = null;
+
+if (IS_DESKTOP_HOST && desktopBridge?.onDragResult) {
+  desktopBridge.onDragResult(result => {
+    if (result?.ok) return;
+    const scanError = ["invalid-scan-context", "scan-context-unavailable", "outside-scan-context"].includes(result?.reason);
+    const message = scanError
+      ? labelText(
+        "nativeDragScanContext",
+        "This media is no longer part of an active scan. Scan the folder again, then drag it.",
+        "该媒体已不属于有效扫描上下文，请重新扫描该目录后再拖拽。",
+      )
+      : labelText("nativeDragFailed", "Native drag-out failed.", "原生拖拽失败。");
+    showToast(`${message} ${result?.error || ""}`.trim(), 5200);
+  });
+}
 let trashConfirmAllowDontAsk = true;
 const trashConfirmDontAskWrap = trashConfirmDontAsk.closest("label");
 const modal = $("#modal");
@@ -1290,6 +1334,12 @@ function applyActionButtons() {
   setButtonLabel(topPagePrev, tx.pagePrevious, "left", { iconOnly: true });
   setButtonLabel(topPageNext, tx.pageNext, "right", { iconOnly: true });
   setButtonLabel(immersiveBtn, state.immersive ? tx.exitImmersive : tx.immersive, state.immersive ? "close" : "fullscreen", { iconOnly: true });
+  desktopLaunchBtn.classList.toggle("hidden", IS_DESKTOP_HOST);
+  dragPathBtn.classList.toggle("hidden", IS_DESKTOP_HOST);
+  if (!IS_DESKTOP_HOST) {
+    setButtonLabel(desktopLaunchBtn, labelText("openDesktop", "Open Local Video Wall Desktop", "打开 Local Video Wall 桌面版"), "desktop", { iconOnly: true });
+    desktopLaunchBtn.disabled = !!state.desktopLaunchBusy;
+  }
   updateContentAlignLabels();
   updateContentAlignToolbarButton();
   setButtonLabel(modalSlideshow, state.modalSlideshowPlaying ? tx.pause : tx.slideshow, state.modalSlideshowPlaying ? "pause" : "slideshow", { iconOnly: true });
@@ -1547,6 +1597,7 @@ const SETTINGS_TABS = ["interface", "scan", "drag", "playback", "filters", "acti
 
 function updateSettingsTabs() {
   const tx = t();
+  if (IS_DESKTOP_HOST && state.settingsTab === "drag") state.settingsTab = "interface";
   const config = {
     interface: [tx.interfaceSettings, "iconMode"],
     scan: [tx.scanSettings, "scan"],
@@ -1560,22 +1611,27 @@ function updateSettingsTabs() {
   settingsTabs.setAttribute("aria-label", tx.settings);
   settingsTabs.querySelectorAll("button[data-settings-tab]").forEach(button => {
     const tab = button.dataset.settingsTab;
+    const unavailable = IS_DESKTOP_HOST && tab === "drag";
     const [label, icon] = config[tab] || [tab, "settings"];
-    const active = tab === state.settingsTab;
+    const active = !unavailable && tab === state.settingsTab;
+    button.classList.toggle("hidden", unavailable);
+    button.setAttribute("aria-hidden", unavailable ? "true" : "false");
     setButtonLabel(button, label, icon, { iconOnly: false, iconText: true });
     button.classList.toggle("active", active);
     button.setAttribute("aria-selected", active ? "true" : "false");
     button.tabIndex = active ? 0 : -1;
   });
   settingsContent.querySelectorAll("[data-settings-section]").forEach(section => {
-    const active = section.dataset.settingsSection === state.settingsTab;
+    const unavailable = IS_DESKTOP_HOST && section.dataset.settingsSection === "drag";
+    const active = !unavailable && section.dataset.settingsSection === state.settingsTab;
     section.classList.toggle("hidden", !active);
     section.setAttribute("aria-hidden", active ? "false" : "true");
   });
 }
 
 function setSettingsTab(tab, { focus = false } = {}) {
-  const next = SETTINGS_TABS.includes(tab) ? tab : "interface";
+  const requested = IS_DESKTOP_HOST && tab === "drag" ? "interface" : tab;
+  const next = SETTINGS_TABS.includes(requested) ? requested : "interface";
   const changed = state.settingsTab !== next;
   state.settingsTab = next;
   updateSettingsTabs();
@@ -3462,6 +3518,13 @@ function dragTitleForPath(path, status = dragStatusForPath(path)) {
 
 function applyDragButtonState(button, path, row = null) {
   if (!button) return;
+  if (IS_DESKTOP_HOST) {
+    button.classList.add("hidden");
+    button.disabled = true;
+    if (row) row.classList.remove("drag-ready", "drag-refresh", "drag-authorizing");
+    return;
+  }
+  button.classList.remove("hidden");
   const status = dragStatusForPath(path);
   const authorizing = state.dragAuthBusy && pathKey(path) === pathKey(state.dragAuthRoot);
   button.disabled = !!state.dragAuthBusy || !!state.dragConfigBusy;
@@ -3829,6 +3892,28 @@ function fullPathForItem(item) {
 
 function handleMediaDragStart(event, item) {
   const fullPath = fullPathForItem(item);
+  if (IS_DESKTOP_HOST) {
+    const scanId = String(item?.scan_id || state.scanId || "");
+    if (!fullPath || !scanId) {
+      showToast(
+        labelText(
+          "nativeDragScanContext",
+          "This media is not attached to an active scan. Scan the folder again, then drag it.",
+          "该媒体没有有效扫描上下文，请重新扫描该目录后再拖拽。",
+        ),
+        4200,
+      );
+      return false;
+    }
+    event.preventDefault();
+    try {
+      desktopBridge.startDrag(fullPath, scanId);
+    } catch (error) {
+      console.error(error);
+      showToast(labelText("nativeDragFailed", "Native drag-out failed.", "原生拖拽失败。"), 4200);
+    }
+    return false;
+  }
   const result = dragOutController.resolveFile(fullPath);
   if (!result.ok) {
     showToast(result.state === "refresh" ? t().dragNeedsRefresh : t().dragNeedsAuthorize, 3200);
@@ -4489,6 +4574,10 @@ folderPanelToggle.addEventListener("click", e => {
 });
 folderPanelClose.addEventListener("click", closeFolderPanel);
 folderPanelRefresh.addEventListener("click", () => loadFolderRoots(true));
+desktopLaunchBtn.addEventListener("click", event => {
+  event.stopPropagation();
+  void launchDesktopApp();
+});
 favoritePathBtn.addEventListener("click", e => {
   e.stopPropagation();
   toggleFavoritePath(pathInput.value);
@@ -4557,7 +4646,7 @@ settingsTabs.addEventListener("click", event => {
 });
 settingsTabs.addEventListener("keydown", event => {
   if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
-  const buttons = [...settingsTabs.querySelectorAll("button[data-settings-tab]")];
+  const buttons = [...settingsTabs.querySelectorAll("button[data-settings-tab]:not(.hidden)")];
   if (!buttons.length) return;
   const current = Math.max(0, buttons.indexOf(document.activeElement));
   let next = current;

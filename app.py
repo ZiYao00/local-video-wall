@@ -65,6 +65,10 @@ STATIC_DIR = BASE_DIR / "static"
 CONFIG_FILE = BASE_DIR / "config.json"
 REVIEW_FILE = BASE_DIR / "review_data.json"
 ACTION_LOG_FILE = BASE_DIR / "file_actions.log"
+DESKTOP_DIR = BASE_DIR / "desktop"
+DESKTOP_ELECTRON_EXE = DESKTOP_DIR / "node_modules" / "electron" / "dist" / "electron.exe"
+DESKTOP_RUNTIME_DIR = Path(os.environ.get("APPDATA") or BASE_DIR) / "LocalVideoWall"
+DESKTOP_SCAN_REGISTRY_FILE = DESKTOP_RUNTIME_DIR / "desktop-scans.json"
 WORKFLOW_STATUS_CACHE = {}
 WORKFLOW_STATUS_LOCK = threading.Lock()
 
@@ -75,8 +79,8 @@ MEDIA_EXTENSIONS = VIDEO_EXTENSIONS | IMAGE_EXTENSIONS
 INTERNAL_MEDIA_DIRS = {"_video_wall_trash", "_video_wall_review"}
 TRASH_DIR_NAME = "_video_wall_trash"
 TRASH_ITEM_META_NAME = "item.json"
-API_VERSION = 3
-API_CAPABILITIES = ["local_trash", "batch_trash", "trash_restore", "system_trash", "drag_out_roots", "drag_root_verify"]
+API_VERSION = 4
+API_CAPABILITIES = ["local_trash", "batch_trash", "trash_restore", "system_trash", "drag_out_roots", "drag_root_verify", "desktop_shell"]
 DRAG_ROOT_VERIFY_MAX_SAMPLES = 5
 DRAG_ROOT_VERIFY_MTIME_TOLERANCE_MS = 3000
 
@@ -136,6 +140,7 @@ DEFAULT_CONFIG = {
 runtime_lock = threading.Lock()
 runtime_video_dir = ""
 runtime_scan_roots: dict[str, str] = {}
+DESKTOP_SCAN_REGISTRY_LIMIT = 32
 review_lock = threading.Lock()
 trash_lock = threading.RLock()
 
@@ -694,10 +699,34 @@ def get_current_video_dir() -> Path | None:
     return Path(p)
 
 
+def sync_desktop_scan_registry(snapshot: dict[str, str] | None = None) -> None:
+    if os.name != "nt":
+        return
+    if snapshot is None:
+        with runtime_lock:
+            snapshot = dict(runtime_scan_roots)
+    try:
+        write_json_file(
+            DESKTOP_SCAN_REGISTRY_FILE,
+            {
+                "pid": os.getpid(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "scans": snapshot,
+            },
+        )
+    except OSError as exc:
+        print(f"[desktop] Could not update scan registry: {exc}")
+
+
 def register_scan_root(path: str) -> str:
     scan_id = uuid.uuid4().hex
     with runtime_lock:
         runtime_scan_roots[scan_id] = normalize_path(path)
+        while len(runtime_scan_roots) > DESKTOP_SCAN_REGISTRY_LIMIT:
+            oldest = next(iter(runtime_scan_roots))
+            runtime_scan_roots.pop(oldest, None)
+        snapshot = dict(runtime_scan_roots)
+    sync_desktop_scan_registry(snapshot)
     return scan_id
 
 
@@ -1102,6 +1131,35 @@ if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
         return ""
 
 
+
+def launch_desktop_shell() -> dict:
+    if os.name != "nt":
+        return {"ok": False, "reason": "unsupported-platform", "error": "Local Video Wall Desktop is currently available on Windows only."}
+    if not DESKTOP_ELECTRON_EXE.exists() or not DESKTOP_ELECTRON_EXE.is_file():
+        return {
+            "ok": False,
+            "reason": "desktop-not-installed",
+            "error": "Local Video Wall Desktop is not installed. Run npm install in the desktop folder first.",
+        }
+    try:
+        creationflags = (
+            getattr(subprocess, "DETACHED_PROCESS", 0)
+            | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        )
+        subprocess.Popen(
+            [str(DESKTOP_ELECTRON_EXE), str(DESKTOP_DIR)],
+            cwd=str(DESKTOP_DIR),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            close_fds=True,
+            creationflags=creationflags,
+        )
+    except Exception as exc:
+        return {"ok": False, "reason": "desktop-launch-failed", "error": f"Could not launch Local Video Wall Desktop: {exc}"}
+    return {"ok": True}
+
+
 def choose_folder_dialog() -> str:
     title = "Choose a video folder"
     if os.name == "nt":
@@ -1428,6 +1486,10 @@ class AppHandler(BaseHTTPRequestHandler):
         except Exception as exc:
             self.send_json({"ok": False, "error": f"Workflow status read failed: {exc}"}, 500)
 
+    def api_desktop_launch(self):
+        result = launch_desktop_shell()
+        self.send_json(result, 200 if result.get("ok") else 503)
+
     def api_file_action(self, payload: dict):
         request_start = time.perf_counter()
         timings = {}
@@ -1647,6 +1709,7 @@ class AppHandler(BaseHTTPRequestHandler):
             "/api/open": self._get_method_not_allowed,
             "/api/open-file": self._get_method_not_allowed,
             "/api/choose-folder": self._get_method_not_allowed,
+            "/api/desktop-launch": self._get_method_not_allowed,
             "/api/file-path": self._get_file_path,
             "/api/metadata": self._get_metadata,
             "/api/workflow-status": self._get_workflow_status,
@@ -1742,6 +1805,7 @@ class AppHandler(BaseHTTPRequestHandler):
             "/api/open": lambda data: self.api_open_in_explorer(data.get("path", ""), data.get("scan_id", "")),
             "/api/open-file": lambda data: self.api_open_file_default_app(data.get("path", ""), data.get("scan_id", "")),
             "/api/choose-folder": lambda _data: self.send_json({"ok": True, "path": choose_folder_dialog()}),
+            "/api/desktop-launch": lambda _data: self.api_desktop_launch(),
         }
         handler = routes.get(path)
         if handler is None:
@@ -1873,6 +1937,7 @@ class AppHandler(BaseHTTPRequestHandler):
 
 
 def main():
+    sync_desktop_scan_registry({})
     cfg = load_config()
     if cfg.get("remember_path") and cfg.get("last_video_dir"):
         set_current_video_dir(cfg["last_video_dir"])

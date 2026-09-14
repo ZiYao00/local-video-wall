@@ -9,6 +9,9 @@ set "APP_PORT=8787"
 set "TASK_NAME=LocalVideoWall"
 set "SCRIPT_DIR=%~dp0"
 set "APP_PY=%SCRIPT_DIR%app.py"
+set "DESKTOP_DIR=%SCRIPT_DIR%desktop"
+set "DESKTOP_ELECTRON=%DESKTOP_DIR%\node_modules\electron\dist\electron.exe"
+set "DESKTOP_START_VBS=%SCRIPT_DIR%desktop-start.vbs"
 set "HELPER_DIR=%APPDATA%\LocalVideoWall"
 set "VBS_PATH=%HELPER_DIR%\start_hidden.vbs"
 set "LOG_PATH=%HELPER_DIR%\service.log"
@@ -26,9 +29,12 @@ if /i "%~1"=="open" set "COMMAND_MODE=1" & goto open_browser
 if /i "%~1"=="start-open" set "COMMAND_MODE=1" & goto start_and_open
 if /i "%~1"=="install-startup" set "COMMAND_MODE=1" & goto install_startup
 if /i "%~1"=="uninstall-startup" set "COMMAND_MODE=1" & goto uninstall_startup
+if /i "%~1"=="desktop" set "COMMAND_MODE=1" & goto open_desktop
+if /i "%~1"=="install-desktop" set "COMMAND_MODE=1" & goto install_desktop
+if /i "%~1"=="uninstall-desktop" set "COMMAND_MODE=1" & goto uninstall_desktop
 if not "%~1"=="" (
   echo Unknown command: %~1
-  echo Valid commands: start, stop, restart, status, open, start-open, install-startup, uninstall-startup
+  echo Valid commands: start, stop, restart, status, open, start-open, install-startup, uninstall-startup, desktop, install-desktop, uninstall-desktop
   exit /b 1
 )
 
@@ -50,6 +56,9 @@ echo 5. Open browser
 echo 6. Check status
 echo 7. Restart background service
 echo 8. Start in background and open browser
+echo 9. Open Local Video Wall Desktop
+echo 10. Install Local Video Wall Desktop shortcut
+echo 11. Remove Local Video Wall Desktop shortcut
 echo 0. Exit
 echo.
 set /p "choice=Choose: "
@@ -62,6 +71,9 @@ if "%choice%"=="5" goto open_browser
 if "%choice%"=="6" goto check_status
 if "%choice%"=="7" goto restart_service
 if "%choice%"=="8" goto start_and_open
+if "%choice%"=="9" goto open_desktop
+if "%choice%"=="10" goto install_desktop
+if "%choice%"=="11" goto uninstall_desktop
 if "%choice%"=="0" goto end
 goto menu
 
@@ -114,6 +126,8 @@ if "%errorlevel%"=="0" (
   if exist "%STARTUP_LNK%" del "%STARTUP_LNK%" >nul 2>nul
   echo Startup entry installed.
   echo It uses a Windows Task Scheduler logon task and the APPDATA helper script.
+  call :install_desktop_shortcut >nul 2>nul
+  if not "!errorlevel!"=="0" echo Desktop shortcut was not created; install desktop dependencies first.
   if "%COMMAND_MODE%"=="1" exit /b 0
 ) else (
   powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut('%STARTUP_LNK%'); $shortcut.TargetPath = 'wscript.exe'; $shortcut.Arguments = [char]34 + '%VBS_PATH%' + [char]34; $shortcut.WorkingDirectory = '%HELPER_DIR%'; $shortcut.WindowStyle = 1; $shortcut.Description = 'Start Local Video Wall in the background'; $shortcut.Save()" >nul 2>nul
@@ -121,6 +135,8 @@ if "%errorlevel%"=="0" (
     if exist "%STARTUP_VBS%" del "%STARTUP_VBS%" >nul 2>nul
     echo Startup entry installed.
     echo It uses the current user's Startup folder shortcut and the APPDATA helper script.
+    call :install_desktop_shortcut >nul 2>nul
+    if not "!errorlevel!"=="0" echo Desktop shortcut was not created; install desktop dependencies first.
     if "%COMMAND_MODE%"=="1" exit /b 0
   ) else (
     echo Failed to install startup entry.
@@ -221,6 +237,52 @@ if "%RUNNING%"=="1" (
 )
 start "" "%APP_URL%"
 if "%COMMAND_MODE%"=="1" exit /b 0
+pause
+goto menu
+
+:open_desktop
+call :is_running
+if not "%RUNNING%"=="1" (
+  call :launch_background
+  if not "%errorlevel%"=="0" (
+    echo Service did not start. Local Video Wall Desktop was not opened.
+    if "%COMMAND_MODE%"=="1" exit /b 1
+    pause
+    goto menu
+  )
+)
+if not exist "%DESKTOP_ELECTRON%" (
+  echo Local Video Wall Desktop runtime is not installed:
+  echo %DESKTOP_ELECTRON%
+  if "%COMMAND_MODE%"=="1" exit /b 1
+  pause
+  goto menu
+)
+start "" "%DESKTOP_ELECTRON%" "%DESKTOP_DIR%"
+if "%COMMAND_MODE%"=="1" exit /b 0
+goto menu
+
+:install_desktop
+call :install_desktop_shortcut
+if "%errorlevel%"=="0" (
+  echo Local Video Wall Desktop shortcut installed.
+  if "%COMMAND_MODE%"=="1" exit /b 0
+) else (
+  echo Failed to install Local Video Wall Desktop shortcut.
+  if "%COMMAND_MODE%"=="1" exit /b 1
+)
+pause
+goto menu
+
+:uninstall_desktop
+call :remove_desktop_shortcut
+if "%errorlevel%"=="0" (
+  echo Local Video Wall Desktop shortcut removed.
+  if "%COMMAND_MODE%"=="1" exit /b 0
+) else (
+  echo Failed to remove Local Video Wall Desktop shortcut.
+  if "%COMMAND_MODE%"=="1" exit /b 1
+)
 pause
 goto menu
 
@@ -326,6 +388,17 @@ if "%errorlevel%"=="0" (
   exit /b 0
 )
 exit /b 0
+
+
+:install_desktop_shortcut
+if not exist "%DESKTOP_ELECTRON%" exit /b 1
+if not exist "%DESKTOP_START_VBS%" exit /b 1
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%desktop-shortcut.ps1" install >nul 2>nul
+exit /b %errorlevel%
+
+:remove_desktop_shortcut
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%desktop-shortcut.ps1" remove >nul 2>nul
+exit /b %errorlevel%
 
 :ensure_helper_dir
 if not exist "%HELPER_DIR%" (

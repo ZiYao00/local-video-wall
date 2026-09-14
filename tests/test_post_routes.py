@@ -14,6 +14,7 @@ class PostActionRouteTests(unittest.TestCase):
         self.handler.api_trash_action = Mock()
         self.handler.api_open_in_explorer = Mock()
         self.handler.api_open_file_default_app = Mock()
+        self.handler.api_desktop_launch = Mock()
         self.handler.send_json = Mock()
 
     def test_payload_routes_dispatch_to_existing_handlers(self) -> None:
@@ -43,6 +44,10 @@ class PostActionRouteTests(unittest.TestCase):
 
         picker.assert_called_once_with()
         self.handler.send_json.assert_called_once_with({"ok": True, "path": "D:/Media"})
+
+    def test_desktop_launch_route_uses_desktop_handler(self) -> None:
+        self.assertTrue(self.handler._dispatch_post_action("/api/desktop-launch", {}))
+        self.handler.api_desktop_launch.assert_called_once_with()
 
     def test_unknown_route_is_not_dispatched(self) -> None:
         self.assertFalse(self.handler._dispatch_post_action("/api/unknown", {}))
