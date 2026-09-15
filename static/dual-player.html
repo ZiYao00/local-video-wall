@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Local Video Wall - Dual Player</title>
+  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="stylesheet" href="/static/dual-player.css" />
+</head>
+<body class="icon-buttons font-size-small">
+  <div id="backendNotice" class="backend-notice hidden" role="alert"></div>
+
+  <main class="dual-player" aria-label="Dual media player">
+    <section class="player-pane" data-pane="left" aria-label="Left player">
+      <div class="source-toolbar path-row">
+        <button class="btn dual-back-btn" type="button" title="Back to Media Wall" aria-label="Back to Media Wall"></button>
+        <div class="path-combo">
+          <button class="path-combo-btn favorite-path-btn" type="button" title="Favorite path" aria-label="Favorite path"></button>
+          <input class="path-input" type="text" autocomplete="off" spellcheck="false" placeholder="Enter a file or folder path" aria-label="Left media path" />
+          <button class="path-combo-btn path-history-toggle" type="button" title="Path history" aria-label="Path history"></button>
+          <div class="path-history-menu hidden"></div>
+          <div class="path-suggest-menu hidden"></div>
+        </div>
+        <button class="btn choose-folder-btn" type="button"></button>
+        <button class="btn primary scan-btn" type="button"></button>
+        <button class="btn icon-toggle toolbar-toggle recursive-toggle-btn" type="button" aria-pressed="false"></button>
+        <select class="select mode-select" aria-label="Left media type" hidden>
+          <option value="image">Images</option>
+          <option value="video">Videos</option>
+        </select>
+      </div>
+
+      <div class="pane-stage">
+        <div class="media-viewer image-viewer hidden">
+          <img class="dual-slide-layer slide-layer-a" alt="" />
+          <img class="dual-slide-layer slide-layer-b hidden" alt="" />
+          <button class="nav-arrow prev image-prev" type="button" aria-label="Previous image">‹</button>
+          <button class="nav-arrow next image-next" type="button" aria-label="Next image">›</button>
+          <div class="media-controls slideshow-media-controls">
+            <button class="btn slideshow-play" type="button"></button>
+            <select class="select small slideshow-interval" aria-label="Slideshow interval"></select>
+            <select class="select slideshow-effect" aria-label="Slideshow effect">
+              <option value="none">None</option>
+              <option value="fade">Fade</option>
+              <option value="slide">Slide</option>
+              <option value="drift">Drift</option>
+              <option value="random">Random</option>
+            </select>
+            <select class="select slideshow-fit" aria-label="Image fit">
+              <option value="contain">Contain</option>
+              <option value="cover">Cover</option>
+            </select>
+            <button class="btn slideshow-loop" type="button"></button>
+            <button class="btn slideshow-fullscreen" type="button"></button>
+            <span class="media-counter slideshow-counter"></span>
+          </div>
+        </div>
+
+        <div class="media-viewer video-viewer hidden">
+          <video class="pane-video" playsinline preload="metadata" controls></video>
+          <button class="nav-arrow prev video-prev" type="button" aria-label="Previous video">‹</button>
+          <button class="nav-arrow next video-next" type="button" aria-label="Next video">›</button>
+          <div class="media-controls video-media-controls">
+            <div class="seg video-mode-seg" aria-label="Video playback order">
+              <button type="button" data-video-mode="loop"></button>
+              <button type="button" data-video-mode="sequence"></button>
+              <button type="button" data-video-mode="random"></button>
+            </div>
+            <button class="btn video-fullscreen" type="button"></button>
+            <span class="media-counter video-counter"></span>
+          </div>
+        </div>
+
+        <div class="pane-empty">
+          <strong>No media loaded</strong>
+          <span>Choose or enter a path above, then Scan.</span>
+        </div>
+        <div class="pane-status" role="status"></div>
+      </div>
+    </section>
+
+    <div class="divider" aria-hidden="true"></div>
+
+    <section class="player-pane" data-pane="right" aria-label="Right player">
+      <div class="source-toolbar path-row">
+        <div class="path-combo">
+          <button class="path-combo-btn favorite-path-btn" type="button" title="Favorite path" aria-label="Favorite path"></button>
+          <input class="path-input" type="text" autocomplete="off" spellcheck="false" placeholder="Enter a file or folder path" aria-label="Right media path" />
+          <button class="path-combo-btn path-history-toggle" type="button" title="Path history" aria-label="Path history"></button>
+          <div class="path-history-menu hidden"></div>
+          <div class="path-suggest-menu hidden"></div>
+        </div>
+        <button class="btn choose-folder-btn" type="button"></button>
+        <button class="btn primary scan-btn" type="button"></button>
+        <button class="btn icon-toggle toolbar-toggle recursive-toggle-btn" type="button" aria-pressed="false"></button>
+        <select class="select mode-select" aria-label="Right media type" hidden>
+          <option value="image">Images</option>
+          <option value="video">Videos</option>
+        </select>
+        <div class="desktop-window-controls hidden" aria-label="Window controls">
+          <button class="btn icon-toggle desktop-window-minimize" type="button" title="Minimize" aria-label="Minimize"></button>
+          <button class="btn icon-toggle desktop-window-close" type="button" title="Close" aria-label="Close"></button>
+        </div>
+      </div>
+
+      <div class="pane-stage">
+        <div class="media-viewer image-viewer hidden">
+          <img class="dual-slide-layer slide-layer-a" alt="" />
+          <img class="dual-slide-layer slide-layer-b hidden" alt="" />
+          <button class="nav-arrow prev image-prev" type="button" aria-label="Previous image">‹</button>
+          <button class="nav-arrow next image-next" type="button" aria-label="Next image">›</button>
+          <div class="media-controls slideshow-media-controls">
+            <button class="btn slideshow-play" type="button"></button>
+            <select class="select small slideshow-interval" aria-label="Slideshow interval"></select>
+            <select class="select slideshow-effect" aria-label="Slideshow effect">
+              <option value="none">None</option>
+              <option value="fade">Fade</option>
+              <option value="slide">Slide</option>
+              <option value="drift">Drift</option>
+              <option value="random">Random</option>
+            </select>
+            <select class="select slideshow-fit" aria-label="Image fit">
+              <option value="contain">Contain</option>
+              <option value="cover">Cover</option>
+            </select>
+            <button class="btn slideshow-loop" type="button"></button>
+            <button class="btn slideshow-fullscreen" type="button"></button>
+            <span class="media-counter slideshow-counter"></span>
+          </div>
+        </div>
+
+        <div class="media-viewer video-viewer hidden">
+          <video class="pane-video" playsinline preload="metadata" controls></video>
+          <button class="nav-arrow prev video-prev" type="button" aria-label="Previous video">‹</button>
+          <button class="nav-arrow next video-next" type="button" aria-label="Next video">›</button>
+          <div class="media-controls video-media-controls">
+            <div class="seg video-mode-seg" aria-label="Video playback order">
+              <button type="button" data-video-mode="loop"></button>
+              <button type="button" data-video-mode="sequence"></button>
+              <button type="button" data-video-mode="random"></button>
+            </div>
+            <button class="btn video-fullscreen" type="button"></button>
+            <span class="media-counter video-counter"></span>
+          </div>
+        </div>
+
+        <div class="pane-empty">
+          <strong>No media loaded</strong>
+          <span>Choose or enter a path above, then Scan.</span>
+        </div>
+        <div class="pane-status" role="status"></div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/static/js/dual-player.js"></script>
+</body>
+</html>

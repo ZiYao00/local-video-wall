@@ -60,7 +60,8 @@ class MediaRangeTests(unittest.TestCase):
         self.assertEqual(response.status, 200)
         self.assertEqual(payload["port"], self.server.server_port)
         self.assertTrue(payload["token"])
-        self.assertEqual(payload["app_version"], "1.9.0")
+        self.assertEqual(payload["app_version"], app.APP_VERSION)
+        self.assertIn("dual_player", payload["capabilities"])
 
     def test_choose_folder_get_request_is_rejected_without_opening_a_dialog(self) -> None:
         connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
@@ -108,7 +109,7 @@ class MediaRangeTests(unittest.TestCase):
             "Origin": "http://127.0.0.1",
             "Referer": f"http://127.0.0.1:{self.server.server_port}/",
         }
-        for path in ("/static/style.css", "/static/app.js", "/static/js/playback-controller.js", "/static/js/workflow-status.js", "/static/js/api-client.js", "/static/js/media-utils.js", "/static/js/grid-controller.js", "/static/js/metadata-panel.js", "/static/js/modal-viewer.js", "/static/js/slideshow-controller.js"):
+        for path in ("/static/style.css", "/static/app.js", "/static/dual-player.html", "/static/dual-player.css", "/static/js/dual-player.js", "/static/js/path-source-controller.js", "/static/js/slideshow-engine.js", "/static/js/video-playback-engine.js", "/static/js/viewer-icons.js", "/static/js/playback-controller.js", "/static/js/workflow-status.js", "/static/js/api-client.js", "/static/js/media-utils.js", "/static/js/grid-controller.js", "/static/js/metadata-panel.js", "/static/js/modal-viewer.js", "/static/js/slideshow-controller.js"):
             with self.subTest(path=path):
                 connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
                 connection.request("GET", path, headers=headers)

@@ -80,7 +80,7 @@ INTERNAL_MEDIA_DIRS = {"_video_wall_trash", "_video_wall_review"}
 TRASH_DIR_NAME = "_video_wall_trash"
 TRASH_ITEM_META_NAME = "item.json"
 API_VERSION = 4
-API_CAPABILITIES = ["local_trash", "batch_trash", "trash_restore", "system_trash", "drag_out_roots", "drag_root_verify", "desktop_shell"]
+API_CAPABILITIES = ["local_trash", "batch_trash", "trash_restore", "system_trash", "drag_out_roots", "drag_root_verify", "desktop_shell", "dual_player"]
 DRAG_ROOT_VERIFY_MAX_SAMPLES = 5
 DRAG_ROOT_VERIFY_MTIME_TOLERANCE_MS = 3000
 
@@ -140,6 +140,7 @@ DEFAULT_CONFIG = {
 runtime_lock = threading.Lock()
 runtime_video_dir = ""
 runtime_scan_roots: dict[str, str] = {}
+runtime_player_scan_roots: dict[str, str] = {}
 DESKTOP_SCAN_REGISTRY_LIMIT = 32
 review_lock = threading.Lock()
 trash_lock = threading.RLock()
@@ -741,6 +742,25 @@ def get_scan_root(scan_id: str) -> Path | None:
     return Path(p)
 
 
+def register_player_scan_root(path: str) -> str:
+    scan_id = uuid.uuid4().hex
+    with runtime_lock:
+        runtime_player_scan_roots[scan_id] = normalize_path(path)
+        while len(runtime_player_scan_roots) > DESKTOP_SCAN_REGISTRY_LIMIT:
+            oldest = next(iter(runtime_player_scan_roots))
+            runtime_player_scan_roots.pop(oldest, None)
+    return scan_id
+
+
+def get_player_scan_root(scan_id: str) -> Path | None:
+    scan_id = (scan_id or "").strip()
+    if not scan_id:
+        return None
+    with runtime_lock:
+        p = runtime_player_scan_roots.get(scan_id)
+    return Path(p) if p else None
+
+
 def set_current_video_dir(path: str):
     global runtime_video_dir
     with runtime_lock:
@@ -759,6 +779,89 @@ def safe_rel_to_path(root: Path, rel: str) -> Path:
     except ValueError:
         raise ValueError("Path outside video directory")
     return full
+
+
+def player_media_item_payload(root: Path, path: Path, scan_id: str) -> dict:
+    item = media_item_payload(root, path, scan_id)
+    item["url"] = f"/player-media?scan_id={quote(scan_id, safe='')}&path={quote(item['rel'], safe='')}"
+    return item
+
+
+def scan_player_source(source_path: str, recursive: bool = False) -> tuple[dict | None, str | None]:
+    normalized = normalize_path(source_path)
+    if not normalized:
+        return None, "Media source path is empty."
+    source = Path(normalized)
+    try:
+        if not source.exists():
+            return None, f"Path does not exist: {source}"
+        cfg = load_config()
+        if source.is_file():
+            suffix = source.suffix.lower()
+            if suffix not in MEDIA_EXTENSIONS:
+                return None, "Unsupported media type."
+            if source.stat().st_size == 0:
+                return None, "Media file is empty."
+            root = source.parent.resolve()
+            protection_error = scan_protection_error(
+                str(root), cfg.get("blocked_scan_paths", []), cfg.get("min_scan_volume_gb", 1)
+            )
+            if protection_error:
+                return None, protection_error
+            scan_id = register_player_scan_root(str(root))
+            item = player_media_item_payload(root, source.resolve(), scan_id)
+            return {
+                "ok": True, "source_type": "file", "path": str(source),
+                "scan_id": scan_id, "count": 1, "recursive": False, "items": [item],
+            }, None
+        if not source.is_dir():
+            return None, "Source must be a media file or folder."
+
+        protection_error = scan_protection_error(
+            str(source), cfg.get("blocked_scan_paths", []), cfg.get("min_scan_volume_gb", 1)
+        )
+        if protection_error:
+            return None, protection_error
+        root = source.resolve()
+        candidates = []
+        if recursive:
+            for current, dirs, names in os.walk(root):
+                current_path = Path(current)
+                try:
+                    depth = len(current_path.relative_to(root).parts)
+                except ValueError:
+                    continue
+                dirs[:] = [name for name in dirs if name not in INTERNAL_MEDIA_DIRS]
+                if depth >= 2:
+                    dirs[:] = []
+                candidates.extend(current_path / name for name in names)
+        else:
+            candidates = list(root.iterdir())
+
+        files = []
+        for child in candidates:
+            try:
+                if any(part in INTERNAL_MEDIA_DIRS for part in child.relative_to(root).parts):
+                    continue
+                if not child.is_file() or child.suffix.lower() not in MEDIA_EXTENSIONS:
+                    continue
+                if child.stat().st_size == 0:
+                    continue
+                files.append(child)
+            except (OSError, ValueError):
+                continue
+        try:
+            files.sort(key=lambda item: item.stat().st_mtime, reverse=True)
+        except OSError:
+            files.sort(key=lambda item: item.name.casefold())
+        scan_id = register_player_scan_root(str(root))
+        items = [player_media_item_payload(root, item, scan_id) for item in files]
+        return {
+            "ok": True, "source_type": "folder", "path": str(root),
+            "scan_id": scan_id, "count": len(items), "recursive": bool(recursive), "items": items,
+        }, None
+    except OSError as exc:
+        return None, f"Could not read media source: {exc}"
 
 
 def verify_drag_root_samples(root_path: str, samples) -> dict:
@@ -1305,8 +1408,8 @@ class AppHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
-    def serve_media(self, rel: str, scan_id: str = ""):
-        root = get_scan_root(scan_id)
+    def serve_media(self, rel: str, scan_id: str = "", player: bool = False):
+        root = get_player_scan_root(scan_id) if player else get_scan_root(scan_id)
         if root is None:
             self.send_error(404, "No video directory selected")
             return
@@ -1637,6 +1740,7 @@ class AppHandler(BaseHTTPRequestHandler):
             "port": PORT,
             "version": API_VERSION,
             "app_version": APP_VERSION,
+            "capabilities": API_CAPABILITIES,
         })
 
     def _get_config(self, _qs: dict) -> None:
@@ -1686,6 +1790,9 @@ class AppHandler(BaseHTTPRequestHandler):
     def _get_media(self, qs: dict) -> None:
         self.serve_media(qs.get("path", [""])[0], qs.get("scan_id", [""])[0])
 
+    def _get_player_media(self, qs: dict) -> None:
+        self.serve_media(qs.get("path", [""])[0], qs.get("scan_id", [""])[0], player=True)
+
     def _get_health(self, _qs: dict) -> None:
         cfg = load_config()
         self.send_json({
@@ -1711,6 +1818,7 @@ class AppHandler(BaseHTTPRequestHandler):
             "/api/open": self._get_method_not_allowed,
             "/api/open-file": self._get_method_not_allowed,
             "/api/choose-folder": self._get_method_not_allowed,
+            "/api/player/source": self._get_method_not_allowed,
             "/api/desktop-launch": self._get_method_not_allowed,
             "/api/file-path": self._get_file_path,
             "/api/metadata": self._get_metadata,
@@ -1718,6 +1826,7 @@ class AppHandler(BaseHTTPRequestHandler):
             "/api/trash/list": self._get_trash_list,
             "/api/review": self._get_review,
             "/media": self._get_media,
+            "/player-media": self._get_player_media,
             "/health": self._get_health,
         }
         handler = routes.get(path)
@@ -1779,6 +1888,16 @@ class AppHandler(BaseHTTPRequestHandler):
         cfg = save_config(cfg)
         self.send_json({"ok": True, "config": cfg})
 
+    def _post_player_source(self, payload: dict) -> None:
+        result, error = scan_player_source(
+            str(payload.get("path", "")),
+            recursive=bool(payload.get("recursive", False)),
+        )
+        if error:
+            self.send_json({"ok": False, "error": error}, 400)
+            return
+        self.send_json(result)
+
     def _post_review(self, payload: dict) -> None:
         try:
             review = update_review_item(payload.get("key", ""), payload)
@@ -1792,6 +1911,7 @@ class AppHandler(BaseHTTPRequestHandler):
             "/api/drag-root/verify": self._post_drag_root_verify,
             "/api/path-state": self._post_path_state,
             "/api/review": self._post_review,
+            "/api/player/source": self._post_player_source,
         }
         handler = routes.get(path)
         if handler is None:

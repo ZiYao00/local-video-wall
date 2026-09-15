@@ -2,6 +2,7 @@ export function createGridController({
   state,
   elements,
   getText,
+  getScrollHost,
   icons,
   largeVideoMb,
   escapeHtml,
@@ -23,7 +24,9 @@ export function createGridController({
     floatingPager,
     topPager,
     topPagePrev,
+    topPageInfo,
     topPageNext,
+    contentToolbar,
     emptyState,
     mainArea,
   } = elements;
@@ -138,6 +141,7 @@ export function createGridController({
     state.gridPage = Math.max(0, Math.min(state.gridPage, pages - 1));
     const show = shouldShowPager();
     topPager.classList.toggle("hidden", !show);
+    if (topPageInfo) topPageInfo.textContent = `${state.gridPage + 1} / ${pages}`;
     updatePagerButtonState(topPagePrev, topPageNext, pages);
     applyActionButtons();
     renderBottomPager(pages);
@@ -287,11 +291,26 @@ export function createGridController({
     updateSubInfo();
   }
 
-  function setPage(page) {
+  function scrollToContentStart() {
+    const anchor = contentToolbar || grid || mainArea;
+    if (!anchor) return;
+    const scrollHost = getScrollHost?.() || window;
+    if (scrollHost === window) {
+      const stickyTop = document.querySelector("#topbar")?.getBoundingClientRect().height || 0;
+      const top = window.scrollY + anchor.getBoundingClientRect().top - stickyTop - 8;
+      window.scrollTo({ top: Math.max(0, Math.round(top)), behavior: "auto" });
+      return;
+    }
+    const hostRect = scrollHost.getBoundingClientRect();
+    const top = scrollHost.scrollTop + anchor.getBoundingClientRect().top - hostRect.top - 8;
+    scrollHost.scrollTo({ top: Math.max(0, Math.round(top)), behavior: "auto" });
+  }
+
+  function setPage(page, { scrollMode = "content-start" } = {}) {
     const pages = pageCount();
     state.gridPage = Math.max(0, Math.min(Math.floor(Number(page) || 1) - 1, pages - 1));
     render();
-    mainArea?.scrollIntoView({ block: "start" });
+    if (scrollMode === "content-start") scrollToContentStart();
     showFloatingPagerTemporarily(2200);
   }
 

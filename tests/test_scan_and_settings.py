@@ -43,8 +43,10 @@ class ScanAndSettingsTests(unittest.TestCase):
         with app.runtime_lock:
             self.original_runtime_video_dir = app.runtime_video_dir
             self.original_scan_roots = dict(app.runtime_scan_roots)
+            self.original_player_scan_roots = dict(app.runtime_player_scan_roots)
             app.runtime_video_dir = ""
             app.runtime_scan_roots.clear()
+            app.runtime_player_scan_roots.clear()
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
 
@@ -56,6 +58,8 @@ class ScanAndSettingsTests(unittest.TestCase):
             app.runtime_video_dir = self.original_runtime_video_dir
             app.runtime_scan_roots.clear()
             app.runtime_scan_roots.update(self.original_scan_roots)
+            app.runtime_player_scan_roots.clear()
+            app.runtime_player_scan_roots.update(self.original_player_scan_roots)
         app.PORT = self.original_port
         for file_patch in reversed(self.file_patches):
             file_patch.stop()
@@ -111,6 +115,79 @@ class ScanAndSettingsTests(unittest.TestCase):
         if app.os.name == "nt":
             registry = json.loads(self.desktop_scan_registry.read_text(encoding="utf-8"))
             self.assertTrue(Path(registry["scans"][data["scan_id"]]).samefile(self.media_dir))
+
+    def test_player_source_isolated_from_main_scan_state_and_config(self) -> None:
+        main_dir = self.root / "main-media"
+        main_dir.mkdir()
+        app.set_current_video_dir(str(main_dir))
+
+        status, data = self._post("/api/player/source", {"path": str(self.media_dir)})
+
+        self.assertEqual(status, 200)
+        self.assertTrue(data["ok"])
+        self.assertEqual(data["source_type"], "folder")
+        self.assertEqual(data["count"], 2)
+        self.assertEqual(app.get_current_video_dir(), main_dir)
+        self.assertFalse(self.config_file.exists())
+        self.assertTrue(app.get_player_scan_root(data["scan_id"]).samefile(self.media_dir))
+        self.assertTrue(all(item["url"].startswith("/player-media?") for item in data["items"]))
+
+    def test_player_sources_can_use_two_independent_roots(self) -> None:
+        other_dir = self.root / "other-media"
+        other_dir.mkdir()
+        (other_dir / "other.jpg").write_bytes(b"image")
+
+        left_status, left = self._post("/api/player/source", {"path": str(self.media_dir)})
+        right_status, right = self._post("/api/player/source", {"path": str(other_dir)})
+
+        self.assertEqual(left_status, 200)
+        self.assertEqual(right_status, 200)
+        self.assertNotEqual(left["scan_id"], right["scan_id"])
+        self.assertTrue(app.get_player_scan_root(left["scan_id"]).samefile(self.media_dir))
+        self.assertTrue(app.get_player_scan_root(right["scan_id"]).samefile(other_dir))
+
+    def test_player_source_recursive_scan_includes_nested_media(self) -> None:
+        nested = self.media_dir / "nested"
+        deeper = nested / "deeper"
+        deeper.mkdir(parents=True)
+        (nested / "nested.jpg").write_bytes(b"image")
+        (deeper / "deep.mp4").write_bytes(b"video")
+
+        status, data = self._post(
+            "/api/player/source",
+            {"path": str(self.media_dir), "recursive": True},
+        )
+
+        self.assertEqual(status, 200)
+        self.assertTrue(data["recursive"])
+        self.assertEqual(
+            {item["name"] for item in data["items"]},
+            {"clip.mp4", "image.png", "nested.jpg", "deep.mp4"},
+        )
+
+    def test_player_source_accepts_single_media_file_and_rejects_empty_media(self) -> None:
+        clip = self.media_dir / "clip.mp4"
+        status, data = self._post("/api/player/source", {"path": str(clip)})
+        self.assertEqual(status, 200)
+        self.assertEqual(data["source_type"], "file")
+        self.assertEqual([item["name"] for item in data["items"]], ["clip.mp4"])
+
+        empty = self.media_dir / "empty.mp4"
+        empty.write_bytes(b"")
+        status, data = self._post("/api/player/source", {"path": str(empty)})
+        self.assertEqual(status, 400)
+        self.assertFalse(data["ok"])
+        self.assertIn("empty", data["error"].lower())
+
+    def test_player_media_missing_scan_id_never_falls_back_to_main_root(self) -> None:
+        app.set_current_video_dir(str(self.media_dir))
+        connection = http.client.HTTPConnection("127.0.0.1", self.server.server_port, timeout=5)
+        connection.request("GET", "/player-media?scan_id=missing&path=clip.mp4")
+        response = connection.getresponse()
+        response.read()
+        connection.close()
+
+        self.assertEqual(response.status, 404)
 
     def test_scan_rejects_missing_directory_without_writing_config(self) -> None:
         missing = self.root / "missing"

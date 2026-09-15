@@ -232,6 +232,13 @@ if (!gotSingleInstanceLock) {
       }
     });
 
+    ipcMain.on('desktop-window:minimize', event => {
+      const senderUrl = String(event.senderFrame?.url || '');
+      if (!isTrustedAppUrl(senderUrl)) return;
+      const window = BrowserWindow.fromWebContents(event.sender);
+      if (window && !window.isDestroyed()) window.minimize();
+    });
+
     ipcMain.on('desktop-window:close', event => {
       const senderUrl = String(event.senderFrame?.url || '');
       if (!isTrustedAppUrl(senderUrl)) return;

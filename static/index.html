@@ -6,72 +6,44 @@
   <title>Local Video Wall</title>
   <link rel="stylesheet" href="/static/style.css" />
 </head>
-<body>
+<body class="media-wall-page">
   <header id="topbar" class="topbar">
-    <div class="topline">
-      <div class="path-row">
-        <button id="folderPanelToggle" class="btn" title="Folders" aria-label="Folders">Folders</button>
-        <div class="path-combo">
-          <button id="favoritePathBtn" class="path-combo-btn" title="Favorite path" aria-label="Favorite path">Favorite</button>
-          <input id="pathInput" class="path-input" type="text" placeholder="Enter a video folder path, for example C:\Users\YourName\Videos" spellcheck="false" />
-          <button id="dragPathBtn" class="path-combo-btn drag-auth-toggle" type="button" title="Authorize drag-out" aria-label="Authorize drag-out">Drag</button>
-          <button id="pathHistoryToggle" class="path-combo-btn" title="Path history" aria-label="Path history">History</button>
-          <div id="pathHistoryMenu" class="path-history-menu hidden"></div>
-          <div id="pathSuggestMenu" class="path-suggest-menu hidden"></div>
-        </div>
-        <button id="chooseFolderBtn" class="btn">Choose Folder</button>
-        <button id="scanBtn" class="btn primary">Scan</button>
-        <button id="recursiveToggleBtn" class="btn icon-toggle toolbar-toggle" type="button" title="Scan subfolders (max 2 levels)" aria-label="Scan subfolders (max 2 levels)" aria-pressed="false"></button>
-        <input id="searchInput" class="search" type="search" placeholder="Search filename..." autocomplete="off" />
-        <div id="mediaFilterSeg" class="seg" title="Media type">
-          <button type="button" data-media-filter="all">All</button>
-          <button type="button" data-media-filter="video">Videos</button>
-          <button type="button" data-media-filter="image">Images</button>
-          <button type="button" data-media-filter="favorites">Favorites</button>
-        </div>
-        <button id="resetFiltersBtn" class="btn ghost">Reset Filters</button>
-        <button id="batchToggleBtn" class="btn ghost">Batch</button>
-        <select id="sortSelect" class="select" title="Sort">
-          <option value="mtime_desc">Newest modified</option>
-          <option value="mtime_asc">Oldest modified</option>
-          <option value="name_asc">Filename A-Z</option>
-          <option value="name_desc">Filename Z-A</option>
-          <option value="path_asc">Path A-Z</option>
-          <option value="path_desc">Path Z-A</option>
-          <option value="size_desc">Size large-small</option>
-          <option value="size_asc">Size small-large</option>
-          <option value="random">Random order</option>
-        </select>
-        <select id="columnsSelect" class="select small" title="Grid columns">
-          <optgroup id="columnsAutoplayGroup" label="Autoplay · 2-9 cols">
-            <option value="2">2 cols</option><option value="3">3 cols</option><option value="4">4 cols</option><option value="5">5 cols</option>
-            <option value="6">6 cols</option><option value="7">7 cols</option><option value="8">8 cols</option><option value="9">9 cols</option>
-          </optgroup>
-          <optgroup id="columnsStaticGroup" label="Static preview · 10-20 cols">
-            <option value="10">10 cols</option><option value="11">11 cols</option><option value="12">12 cols</option><option value="13">13 cols</option>
-            <option value="14">14 cols</option><option value="15">15 cols</option><option value="16">16 cols</option><option value="17">17 cols</option>
-            <option value="18">18 cols</option><option value="19">19 cols</option><option value="20">20 cols</option>
-          </optgroup>
-        </select>
-        <button id="contentAlignToolbarBtn" class="btn icon-toggle toolbar-toggle" type="button" title="Layout position" aria-label="Layout position" aria-haspopup="true" aria-expanded="false"></button>
-        <div id="contentAlignToolbarMenu" class="toolbar-popover hidden" role="menu" aria-label="Layout position">
-          <button type="button" data-content-align="left" role="menuitemradio" aria-checked="false"></button>
-          <button type="button" data-content-align="center" role="menuitemradio" aria-checked="true"></button>
-          <button type="button" data-content-align="right" role="menuitemradio" aria-checked="false"></button>
-        </div>
-        <span id="pageSizeLabel" class="toolbar-label">Per page</span>
-        <input id="pageSizeInput" class="page-size-input" type="number" min="1" max="240" step="1" value="120" title="Items per page" />
-        <div id="topPager" class="top-pager hidden" aria-label="Media page controls">
-          <button id="topPagePrev" class="btn ghost" type="button" title="Previous page" aria-label="Previous page">Previous</button>
-          <button id="topPageNext" class="btn ghost" type="button" title="Next page" aria-label="Next page">Next</button>
-        </div>
-        <button id="pauseBtn" class="btn ghost">Pause All</button>
-        <button id="immersiveBtn" class="btn">Immersive</button>
-        <button id="desktopLaunchBtn" class="btn icon-toggle" type="button" title="Open Local Video Wall Desktop" aria-label="Open Local Video Wall Desktop"></button>
-        <span class="toolbar-divider" aria-hidden="true"></span>
-        <button id="trashToggle" class="btn icon-toggle" title="Recycle Folder" aria-label="Recycle Folder"></button>
-        <button id="settingsToggle" class="btn icon-toggle" title="Settings" aria-label="Settings" aria-haspopup="dialog" aria-expanded="false"></button>
-        <button id="desktopCloseBtn" class="btn icon-toggle desktop-window-close hidden" type="button" title="Close" aria-label="Close"></button>
+    <div id="topbarFrame" class="topbar-frame">
+      <div class="topline">
+        <div class="path-row">
+          <button id="folderPanelToggle" class="btn" title="Folders" aria-label="Folders">Folders</button>
+          <div class="path-combo">
+            <button id="favoritePathBtn" class="path-combo-btn" title="Favorite path" aria-label="Favorite path">Favorite</button>
+            <input id="pathInput" class="path-input" type="text" placeholder="Enter a video folder path, for example C:\Users\YourName\Videos" spellcheck="false" />
+            <button id="dragPathBtn" class="path-combo-btn drag-auth-toggle" type="button" title="Authorize drag-out" aria-label="Authorize drag-out">Drag</button>
+            <button id="pathHistoryToggle" class="path-combo-btn" title="Path history" aria-label="Path history">History</button>
+            <div id="pathHistoryMenu" class="path-history-menu hidden"></div>
+            <div id="pathSuggestMenu" class="path-suggest-menu hidden"></div>
+          </div>
+          <button id="chooseFolderBtn" class="btn">Choose Folder</button>
+          <button id="scanBtn" class="btn primary">Scan</button>
+          <button id="recursiveToggleBtn" class="btn icon-toggle toolbar-toggle" type="button" title="Scan subfolders (max 2 levels)" aria-label="Scan subfolders (max 2 levels)" aria-pressed="false"></button>
+          <div class="top-search-group">
+            <input id="searchInput" class="search" type="search" placeholder="Search filename..." autocomplete="off" />
+            <div id="mediaFilterSeg" class="seg" title="Media type">
+              <button type="button" data-media-filter="all">All</button>
+              <button type="button" data-media-filter="video">Videos</button>
+              <button type="button" data-media-filter="image">Images</button>
+              <button type="button" data-media-filter="favorites">Favorites</button>
+            </div>
+            <button id="resetFiltersBtn" class="btn ghost hidden">Reset Filters</button>
+          </div>
+          <div class="topbar-spacer" aria-hidden="true"></div>
+          <div class="workspace-actions">
+            <button id="dualPlayerBtn" class="btn toolbar-nav-btn" type="button" title="Dual Player" aria-label="Dual Player"></button>
+            <button id="desktopLaunchBtn" class="btn toolbar-nav-btn" type="button" title="Open Local Video Wall Desktop" aria-label="Open Local Video Wall Desktop"></button>
+            <button id="immersiveBtn" class="btn icon-toggle" type="button">Immersive</button>
+            <span class="toolbar-divider" aria-hidden="true"></span>
+            <button id="trashToggle" class="btn icon-toggle" title="Recycle Folder" aria-label="Recycle Folder"></button>
+            <button id="settingsToggle" class="btn icon-toggle" title="Settings" aria-label="Settings" aria-haspopup="dialog" aria-expanded="false"></button>
+            <button id="desktopMinimizeBtn" class="btn icon-toggle desktop-window-minimize hidden" type="button" title="Minimize" aria-label="Minimize"></button>
+            <button id="desktopCloseBtn" class="btn icon-toggle desktop-window-close hidden" type="button" title="Close" aria-label="Close"></button>
+          </div>
         <div id="settingsMenu" class="settings-menu hidden" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
           <div id="settingsBackdrop" class="settings-backdrop" data-settings-close="1"></div>
           <div id="settingsPanel" class="settings-panel" tabindex="-1">
@@ -228,6 +200,7 @@
           </div>
         </div>
         <button id="expandBtn" class="btn expand hidden">Expand</button>
+        </div>
       </div>
     </div>
   </header>
@@ -261,22 +234,57 @@
         </div>
         <div id="trashList" class="trash-list"></div>
       </section>
-      <div id="batchBar" class="batch-bar hidden">
-        <span id="batchInfo">0 selected</span>
-        <div class="batch-group batch-selection-actions">
-          <button id="batchSelectPageBtn" class="btn">Select all</button>
-          <button id="batchClearBtn" class="btn ghost">Clear</button>
+      <div id="contentToolbar" class="content-toolbar" aria-label="Media view controls">
+        <div class="content-toolbar-actions">
+          <label class="content-sort-control">
+            <span class="content-sort-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M8 6h12"/><path d="M8 12h9"/><path d="M8 18h6"/><path d="M4 5v14"/><path d="M2 17l2 2 2-2"/></svg>
+            </span>
+            <select id="sortSelect" class="select content-sort-select" title="Sort">
+              <option value="mtime_desc">Newest modified</option>
+              <option value="mtime_asc">Oldest modified</option>
+              <option value="name_asc">Filename A-Z</option>
+              <option value="name_desc">Filename Z-A</option>
+              <option value="path_asc">Path A-Z</option>
+              <option value="path_desc">Path Z-A</option>
+              <option value="size_desc">Size large-small</option>
+              <option value="size_asc">Size small-large</option>
+              <option value="random">Random order</option>
+            </select>
+          </label>
+          <select id="columnsSelect" class="select content-columns-select" title="Grid columns">
+            <optgroup id="columnsAutoplayGroup" label="Autoplay · 2-9 cols">
+              <option value="2">2 cols</option><option value="3">3 cols</option><option value="4">4 cols</option><option value="5">5 cols</option>
+              <option value="6">6 cols</option><option value="7">7 cols</option><option value="8">8 cols</option><option value="9">9 cols</option>
+            </optgroup>
+            <optgroup id="columnsStaticGroup" label="Static preview · 10-20 cols">
+              <option value="10">10 cols</option><option value="11">11 cols</option><option value="12">12 cols</option><option value="13">13 cols</option>
+              <option value="14">14 cols</option><option value="15">15 cols</option><option value="16">16 cols</option><option value="17">17 cols</option>
+              <option value="18">18 cols</option><option value="19">19 cols</option><option value="20">20 cols</option>
+            </optgroup>
+          </select>
+          <div id="contentAlignViewSeg" class="seg view-align-seg content-align-flat" title="Layout position">
+            <button type="button" data-content-align="left" aria-label="Left"></button>
+            <button type="button" data-content-align="center" aria-label="Center"></button>
+            <button type="button" data-content-align="right" aria-label="Right"></button>
+          </div>
+          <label class="content-page-size-control">
+            <span id="pageSizeLabel" class="content-control-label">Per page</span>
+            <input id="pageSizeInput" class="page-size-input content-page-size-input" type="number" min="1" max="240" step="1" value="120" title="Items per page" />
+          </label>
+          <button id="pauseBtn" class="btn ghost">Pause All</button>
+          <button id="batchToggleBtn" class="btn ghost" aria-pressed="false">Batch</button>
+          <div id="topPager" class="top-pager hidden" aria-label="Media page controls">
+            <button id="topPagePrev" class="btn ghost" type="button" title="Previous page" aria-label="Previous page">Previous</button>
+            <span id="topPageInfo" class="top-page-info">1 / 1</span>
+            <button id="topPageNext" class="btn ghost" type="button" title="Next page" aria-label="Next page">Next</button>
+          </div>
         </div>
-        <div class="batch-group batch-review-actions">
-          <button id="batchFavoriteBtn" class="btn">Favorite</button>
-          <button id="batchUnfavoriteBtn" class="btn ghost">Unfavorite</button>
-          <button id="batchExportBtn" class="btn ghost">Export CSV</button>
-        </div>
-        <div class="batch-group batch-file-actions">
-          <button id="batchTrashBtn" class="btn ghost danger">Move to Recycle Bin</button>
-        </div>
-        <div class="batch-group batch-exit-actions">
-          <button id="batchExitBtn" class="btn ghost">Exit</button>
+        <button id="contentAlignToolbarBtn" class="hidden" type="button" aria-hidden="true" tabindex="-1"></button>
+        <div id="contentAlignToolbarMenu" class="hidden" aria-hidden="true">
+          <button type="button" data-content-align="left"></button>
+          <button type="button" data-content-align="center"></button>
+          <button type="button" data-content-align="right"></button>
         </div>
       </div>
       <div id="subInfo" class="status-bar hidden"></div>
@@ -285,6 +293,27 @@
       <nav id="floatingPager" class="floating-pager hidden" aria-label="Floating media pages"></nav>
       <div id="emptyState" class="empty hidden"></div>
     </main>
+  </div>
+  <div id="batchBar" class="batch-bar hidden" role="toolbar" aria-label="Batch actions">
+    <div class="batch-status">
+      <span class="batch-status-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg></span>
+      <span id="batchInfo">0 selected</span>
+    </div>
+    <div class="batch-group batch-selection-actions">
+      <button id="batchSelectPageBtn" class="btn">Select all</button>
+      <button id="batchClearBtn" class="btn ghost">Clear</button>
+    </div>
+    <div class="batch-group batch-review-actions">
+      <button id="batchFavoriteBtn" class="btn">Favorite</button>
+      <button id="batchUnfavoriteBtn" class="btn ghost">Unfavorite</button>
+      <button id="batchExportBtn" class="btn ghost">Export CSV</button>
+    </div>
+    <div class="batch-group batch-file-actions">
+      <button id="batchTrashBtn" class="btn ghost danger">Move to Recycle Bin</button>
+    </div>
+    <div class="batch-group batch-exit-actions">
+      <button id="batchExitBtn" class="btn primary">Done</button>
+    </div>
   </div>
   <div id="toast" class="toast hidden"></div>
   <div id="trashConfirmDialog" class="settings-dialog hidden" role="dialog" aria-modal="true" aria-labelledby="trashConfirmTitle">

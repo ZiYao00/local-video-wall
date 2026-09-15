@@ -3284,3 +3284,102 @@ body.desktop-host .desktop-window-close:hover{
   border-color:rgb(196,43,55);
   color:white;
 }
+
+/* Main toolbar IA refresh: global source controls, content controls, floating batch actions. */
+.topbar{padding-left:0;padding-right:0}
+.topbar-frame,#contentToolbar{width:var(--content-width,calc(100% - 24px));max-width:calc(100% - 24px);margin-left:auto;margin-right:auto}
+.topbar-frame .path-row{width:100%;overflow-x:auto;overflow-y:hidden}
+.topbar-frame .path-combo{flex:1 1 390px;min-width:240px;max-width:620px}
+.top-search-group,.workspace-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto;min-width:0}
+.top-search-group .search{width:180px;min-width:150px;max-width:200px;flex:0 0 180px}
+.top-search-group #mediaFilterSeg{flex:0 0 auto}
+.topbar-spacer{flex:1 1 16px;min-width:8px}
+.workspace-actions .toolbar-nav-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+#contentToolbar{min-height:38px;display:flex;align-items:center;justify-content:flex-end;margin-top:0;margin-bottom:10px;position:relative;z-index:35}
+.content-toolbar-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0;margin-left:auto}
+.content-sort-control{position:relative;display:inline-flex;align-items:center;flex:0 0 auto}
+.content-sort-icon{position:absolute;left:10px;top:50%;z-index:1;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.content-sort-icon svg{width:16px;height:16px;display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.content-sort-select{width:132px;padding-left:31px;padding-right:8px}
+.view-options-anchor{position:relative;display:inline-flex}
+.view-options-popover{position:absolute;top:calc(100% + 7px);right:0;z-index:180;width:260px;display:grid;gap:12px;padding:12px;border:1px solid var(--line);border-radius:12px;background:rgba(34,35,39,.99);box-shadow:0 18px 48px rgba(0,0,0,.42)}
+.view-option-row{display:grid;grid-template-columns:88px minmax(0,1fr);align-items:center;gap:10px;min-width:0}
+.view-option-label{color:var(--muted);font-size:11px;white-space:nowrap}
+.view-option-select,.view-page-size{width:100%;min-width:0}
+.view-page-size{height:32px}
+.view-align-seg{width:100%}
+.view-align-seg button{flex:1 1 0;min-width:0;display:inline-flex;align-items:center;justify-content:center}
+.view-align-seg button svg{width:16px;height:16px;display:block;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.top-page-info{min-width:46px;color:var(--muted);font-size:12px;text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap}
+body.immersive #contentToolbar{display:none!important}
+body.theme-light .view-options-popover{background:rgba(249,250,252,.99);box-shadow:0 18px 48px rgba(28,33,48,.18)}
+@media (min-width:1180px){body:not(.sidebar-open).content-align-left .topbar-frame,body:not(.sidebar-open).content-align-left #contentToolbar{margin-left:0;margin-right:auto}body:not(.sidebar-open).content-align-right .topbar-frame,body:not(.sidebar-open).content-align-right #contentToolbar{margin-left:auto;margin-right:0}}
+body.sidebar-open .topbar-frame{width:calc(100% - var(--sidebar-panel-width,360px) - 24px);max-width:none;margin-left:calc(var(--sidebar-panel-width,360px) + 12px);margin-right:12px}
+.batch-bar{position:fixed;left:50%;bottom:24px;z-index:220;width:auto;max-width:calc(100vw - 48px);min-height:50px;margin:0;padding:8px 10px;transform:translateX(-50%);display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:nowrap;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(34,35,39,.96);backdrop-filter:blur(16px);box-shadow:0 18px 58px rgba(0,0,0,.46);container-type:normal;animation:batchToolbarFloatIn .16s ease-out both}
+.batch-status{display:flex;align-items:center;gap:8px;flex:0 0 auto;color:rgb(210,219,255)}
+.batch-status-icon{width:26px;height:26px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;border-radius:8px;background:rgba(88,119,255,.22);color:rgb(189,202,255)}
+.batch-status-icon svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.batch-bar #batchInfo{flex:0 0 auto;min-width:0;margin:0}
+.batch-bar .btn{height:34px}
+body.batch-mode #mainArea{padding-bottom:132px}
+body.batch-mode .floating-pager{display:none!important}
+body.theme-light .batch-bar{border-color:rgba(23,33,58,.12);background:rgba(249,250,252,.97);box-shadow:0 18px 58px rgba(28,33,48,.22)}
+body.theme-light .batch-status{color:rgb(49,70,150)}
+@keyframes batchToolbarFloatIn{from{opacity:.5;transform:translate(-50%,8px) scale(.98)}to{opacity:1;transform:translate(-50%,0) scale(1)}}
+@media (max-width:980px){.topbar-frame .path-row{flex-wrap:wrap}.topbar-frame .path-combo{flex:1 1 380px;max-width:none}.top-search-group{flex:1 1 auto}.workspace-actions{margin-left:auto}.batch-bar{bottom:16px;max-width:calc(100vw - 28px);flex-wrap:wrap}}
+@media (max-width:700px){body.sidebar-open .topbar-frame{width:calc(100% - 24px);max-width:calc(100% - 24px);margin-left:auto;margin-right:auto}.top-search-group .search{width:160px;flex-basis:160px}.content-toolbar-actions{max-width:100%;overflow-x:auto}.batch-bar{width:calc(100vw - 24px);max-width:none;justify-content:flex-start}.batch-bar .batch-group{flex:0 0 auto}}
+@media (prefers-reduced-motion:reduce){.batch-bar,body.batch-mode #mainArea{animation:none!important;transition:none!important}}
+
+/* Flat content controls: the media toolbar has enough room after the IA split. */
+.toolbar-nav-btn.icon-text,#contentToolbar .btn.icon-text,.batch-bar .btn.icon-text{display:inline-flex;flex-direction:row;align-items:center;justify-content:center;gap:7px}
+.content-columns-select{width:84px!important;flex:0 0 auto}
+#contentToolbar .view-align-seg{width:auto;flex:0 0 auto}
+#contentToolbar .view-align-seg button{width:30px;min-width:30px;flex:0 0 30px;padding:0;display:inline-flex;align-items:center;justify-content:center}
+.content-page-size-control{height:34px;display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;color:var(--muted);font-size:12px;white-space:nowrap}
+.content-page-size-input{width:64px!important;height:34px}
+.content-control-label{white-space:nowrap}
+
+/* Container-aware single-row source toolbar. Keep side layouts compact without horizontal toolbar scrolling. */
+.topbar-frame{container-type:inline-size}
+.topbar-frame .path-row{width:100%;min-width:0;flex-wrap:nowrap;overflow:visible;gap:6px}
+.topbar-frame .path-row > *{min-width:0}
+.topbar-frame .path-combo{flex:1 1 360px;min-width:140px;max-width:620px}
+.top-search-group{display:flex;align-items:center;gap:6px;flex:0 1 auto;min-width:0}
+.top-search-group .search{width:auto;min-width:80px;max-width:180px;flex:1 1 140px}
+.workspace-actions{display:flex;align-items:center;gap:6px;flex:0 0 auto;min-width:0}
+.topbar-spacer{flex:1 1 8px;min-width:0}
+#dualPlayerBtn,#desktopLaunchBtn{width:34px;min-width:34px;padding:0}
+
+@container (max-width:900px){
+  .topbar-frame .path-row{gap:4px}
+  .topbar-frame .path-combo{min-width:120px;flex-basis:280px}
+  .top-search-group,.workspace-actions{gap:4px}
+  .top-search-group .search{min-width:68px;max-width:110px;flex-basis:88px}
+  .topbar-spacer{display:none}
+  .topbar-frame .btn.icon-only{width:30px;min-width:30px;padding:0}
+  #mediaFilterSeg .icon-only{width:26px;min-width:26px;padding:0}
+}
+
+@container (max-width:720px){
+  .topbar-frame .path-row{gap:3px}
+  .topbar-frame .path-combo{min-width:108px;flex-basis:220px}
+  .top-search-group,.workspace-actions{gap:3px}
+  .top-search-group .search{min-width:52px;max-width:76px;flex-basis:64px;padding-left:8px;padding-right:8px}
+  .topbar-frame .btn.icon-only{width:28px;min-width:28px;padding:0}
+  #mediaFilterSeg .icon-only{width:24px;min-width:24px;padding:0}
+  .toolbar-divider{margin-left:0;margin-right:0}
+}
+
+/* Electron host: keep the native scroll container inside the frameless window. */
+html.desktop-host{height:100%;min-height:100%;scrollbar-gutter:auto;overflow:hidden}
+body.desktop-host.media-wall-page{height:100vh;min-height:0;display:grid;grid-template-rows:auto minmax(0,1fr);overflow:hidden}
+body.desktop-host.media-wall-page .topbar{position:relative;top:auto;padding-right:8px}
+body.desktop-host.media-wall-page .app-shell{height:100%;min-height:0;overflow:hidden;padding-right:8px}
+body.desktop-host.media-wall-page .app-shell main{height:100%;min-height:0;overflow-x:hidden;overflow-y:auto;scrollbar-gutter:stable}
+body.desktop-host.media-wall-page .folder-panel{position:relative;top:auto;height:100%;align-self:stretch}
+body.desktop-host.media-wall-page.settings-open #mainArea{overflow-y:hidden}
+body.desktop-host.media-wall-page #mainArea{scrollbar-width:thin}
+body.desktop-host.media-wall-page #mainArea::-webkit-scrollbar{width:10px}
+body.desktop-host.media-wall-page #mainArea::-webkit-scrollbar-track{background:transparent}
+body.desktop-host.media-wall-page #mainArea::-webkit-scrollbar-thumb{border:2px solid transparent;border-radius:999px;background:rgba(168,171,180,.42);background-clip:content-box}
+body.desktop-host.media-wall-page #mainArea::-webkit-scrollbar-thumb:hover{background:rgba(168,171,180,.62);background-clip:content-box}

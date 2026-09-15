@@ -1,5 +1,6 @@
 import { createApiClient } from "./js/api-client.js";
 import { createDragOutController } from "./js/drag-out-controller.js";
+import { desktopBridge, getPageScrollHost, initDesktopWindowControls, IS_DESKTOP_HOST } from "./js/desktop-window-controls.js";
 import { createGridController } from "./js/grid-controller.js";
 import { escapeCssIdent, escapeHtml, fmtBytes } from "./js/media-utils.js";
 import { createMetadataPanel } from "./js/metadata-panel.js";
@@ -9,10 +10,7 @@ import { createSlideshowController } from "./js/slideshow-controller.js";
 import { createWorkflowStatusController } from "./js/workflow-status.js";
 
 const apiClient = createApiClient();
-const desktopBridge = window.localVideoWallDesktop || null;
-const IS_DESKTOP_HOST = desktopBridge?.isDesktop === true;
 const SIDE_LAYOUT_MIN_WIDTH = 1180;
-document.body.classList.toggle("desktop-host", IS_DESKTOP_HOST);
 
 const state = {
   all: [],
@@ -159,9 +157,11 @@ const ICONS = {
   doubleCheck: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 12l3 3L21 5"/><path d="M3 12l3 3 5-5"/></svg>',
   multiSelect: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="7" height="7" rx="2"/><path d="M6 8.5l1.4 1.4L10 7"/><rect x="13" y="5" width="7" height="7" rx="2"/><rect x="4" y="14" width="7" height="7" rx="2"/><path d="M14 17.5l1.4 1.4L19 16"/></svg>',
   close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 6L6 18"/><path d="M6 6l12 12"/></svg>',
+  minimize: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/></svg>',
   download: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>',
   externalOpen: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M20 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h4"/></svg>',
   desktop: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/><path d="M15 8h4v4"/><path d="M19 8l-6 6"/></svg>',
+  dual: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg>',
   eye: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   eyeOff: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 10.6A3 3 0 0 0 13.4 13.4"/><path d="M9.9 4.3A10.6 10.6 0 0 1 12 4c6 0 10 8 10 8a17.8 17.8 0 0 1-3.1 4.3"/><path d="M6.2 6.5C3.5 8.3 2 12 2 12s4 8 10 8a10 10 0 0 0 5-1.4"/></svg>',
   folder: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h7l2 2h9v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h5l2 2"/></svg>',
@@ -300,6 +300,10 @@ const i18n = {
     copy: "Copy",
     copied: "Copied.",
     sortTitle: "Sort",
+    view: "View",
+    dualPlayer: "Dual Player",
+    done: "Done",
+    selectMode: "Select",
     columnsTitle: "Grid columns",
   pageSizeTitle: "Items per page",
     pageSizeLabelText: "Per page",
@@ -608,6 +612,10 @@ const i18n = {
     copy: "复制",
     copied: "已复制。",
     sortTitle: "排序",
+    view: "视图",
+    dualPlayer: "双播放器",
+    done: "完成",
+    selectMode: "选择",
     columnsTitle: "卡片列数",
   pageSizeTitle: "每页数量",
     pageSizeLabelText: "每页",
@@ -830,10 +838,12 @@ const i18n = {
 
 const $ = s => document.querySelector(s);
 const mainArea = $("#mainArea");
+const contentToolbar = $("#contentToolbar");
 const grid = $("#grid");
 const gridPager = $("#gridPager");
 const topPager = $("#topPager");
 const topPagePrev = $("#topPagePrev");
+const topPageInfo = $("#topPageInfo");
 const topPageNext = $("#topPageNext");
 const floatingPager = $("#floatingPager");
 const subInfo = $("#subInfo");
@@ -889,6 +899,7 @@ const sizeFilterSelect = $("#sizeFilterSelect");
 const dateFilterSelect = $("#dateFilterSelect");
 const mediaFilterSeg = $("#mediaFilterSeg");
 const sortSelect = $("#sortSelect");
+const contentAlignViewSeg = $("#contentAlignViewSeg");
 const pageSizeInput = $("#pageSizeInput");
 const wallAutoplay = $("#wallAutoplay");
 const playLimitSelect = $("#playLimitSelect");
@@ -912,8 +923,12 @@ const batchTrashBtn = $("#batchTrashBtn");
 const batchExportBtn = $("#batchExportBtn");
 const batchExitBtn = $("#batchExitBtn");
 const immersiveBtn = $("#immersiveBtn");
+const dualPlayerBtn = $("#dualPlayerBtn");
 const desktopLaunchBtn = $("#desktopLaunchBtn");
+const desktopMinimizeBtn = $("#desktopMinimizeBtn");
 const desktopCloseBtn = $("#desktopCloseBtn");
+initDesktopWindowControls({ minimizeButton: desktopMinimizeBtn, closeButton: desktopCloseBtn });
+const pageScrollHost = getPageScrollHost(mainArea);
 const expandBtn = $("#expandBtn");
 const trashToggle = $("#trashToggle");
 const trashView = $("#trashView");
@@ -1048,11 +1063,14 @@ const gridController = createGridController({
     floatingPager,
     topPager,
     topPagePrev,
+    topPageInfo,
     topPageNext,
+    contentToolbar,
     emptyState,
     mainArea,
   },
   getText: () => t(),
+  getScrollHost: () => pageScrollHost,
   icons: { play: ICONS.play, workflow: ICONS.workflow },
   largeVideoMb: LARGE_VIDEO_MB,
   escapeHtml,
@@ -1251,10 +1269,10 @@ function updateContentAlignLabels() {
     center: [tx.contentAlignCenter, "alignCenter"],
     right: [tx.contentAlignRight, "right"],
   };
-  [contentAlignSeg, modalContentAlignSeg, contentAlignToolbarMenu].forEach(seg => {
+  [contentAlignSeg, modalContentAlignSeg, contentAlignToolbarMenu, contentAlignViewSeg].forEach(seg => {
     seg?.querySelectorAll("button[data-content-align]").forEach(button => {
       const [label, fallbackIcon] = labels[button.dataset.contentAlign] || [button.textContent, "alignCenter"];
-      const icon = seg === contentAlignToolbarMenu ? layoutIconForAlign(button.dataset.contentAlign) : fallbackIcon;
+      const icon = (seg === contentAlignToolbarMenu || seg === contentAlignViewSeg) ? layoutIconForAlign(button.dataset.contentAlign) : fallbackIcon;
       setButtonLabel(button, label, icon, { iconOnly: seg !== contentAlignSeg });
     });
   });
@@ -1269,6 +1287,11 @@ function applyContentAlign() {
   document.body.classList.add(`content-align-${align}`);
   contentAlignSeg.querySelectorAll("button[data-content-align]").forEach(button => {
     button.classList.toggle("active", button.dataset.contentAlign === align);
+  });
+  contentAlignViewSeg?.querySelectorAll("button[data-content-align]").forEach(button => {
+    const active = button.dataset.contentAlign === align;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", active ? "true" : "false");
   });
   modalContentAlignSeg?.querySelectorAll("button[data-content-align]").forEach(button => {
     const sideButton = button.dataset.contentAlign !== "center";
@@ -1326,25 +1349,31 @@ function applyActionButtons() {
   setButtonLabel(mediaFilterSeg.querySelector('[data-media-filter="video"]'), tx.videosOnly, "film", { iconOnly: true });
   setButtonLabel(mediaFilterSeg.querySelector('[data-media-filter="image"]'), tx.imagesOnly, "image", { iconOnly: true });
   setButtonLabel(mediaFilterSeg.querySelector('[data-media-filter="favorites"]'), tx.favorites, state.mediaType === "favorites" ? "starFilled" : "star", { iconOnly: true });
-  setButtonLabel(batchToggleBtn, state.batchMode ? tx.batchExit : tx.batch, "multiSelect", { iconOnly: true });
+  setButtonLabel(batchToggleBtn, state.batchMode ? tx.done : tx.selectMode, "multiSelect", { iconOnly: false, iconText: true });
+  batchToggleBtn.setAttribute("aria-pressed", state.batchMode ? "true" : "false");
   setButtonLabel(batchSelectPageBtn, tx.batchSelectPage, "check", { iconOnly: false, title: tx.batchSelectPageTitle });
   setButtonLabel(batchClearBtn, tx.batchClear, "close", { iconOnly: false });
   setButtonLabel(batchFavoriteBtn, tx.batchFavorite, "starFilled", { iconOnly: true });
   setButtonLabel(batchUnfavoriteBtn, tx.batchUnfavorite, "star", { iconOnly: true });
   setButtonLabel(batchTrashBtn, tx.batchTrash, "trash", { iconOnly: true });
   setButtonLabel(batchExportBtn, tx.batchExport, "download", { iconOnly: true });
-  setButtonLabel(batchExitBtn, tx.batchExit, "close", { iconOnly: true });
+  setButtonLabel(batchExitBtn, tx.done, "check", { iconOnly: false, iconText: true });
   setButtonLabel(topPagePrev, tx.pagePrevious, "left", { iconOnly: true });
   setButtonLabel(topPageNext, tx.pageNext, "right", { iconOnly: true });
   setButtonLabel(immersiveBtn, state.immersive ? tx.exitImmersive : tx.immersive, state.immersive ? "close" : "fullscreen", { iconOnly: true });
+  setButtonLabel(dualPlayerBtn, tx.dualPlayer, "dual", { iconOnly: true });
   desktopLaunchBtn.classList.toggle("hidden", IS_DESKTOP_HOST);
+  desktopMinimizeBtn.classList.toggle("hidden", !IS_DESKTOP_HOST);
   desktopCloseBtn.classList.toggle("hidden", !IS_DESKTOP_HOST);
   dragPathBtn.classList.toggle("hidden", IS_DESKTOP_HOST);
   if (!IS_DESKTOP_HOST) {
-    setButtonLabel(desktopLaunchBtn, labelText("openDesktop", "Open Local Video Wall Desktop", "打开 Local Video Wall 桌面版"), "desktop", { iconOnly: true });
+    setButtonLabel(desktopLaunchBtn, labelText("openDesktop", "Open Desktop", "打开桌面版"), "desktop", { iconOnly: true });
     desktopLaunchBtn.disabled = !!state.desktopLaunchBusy;
   }
-  if (IS_DESKTOP_HOST) setButtonLabel(desktopCloseBtn, tx.close, "close", { iconOnly: true });
+  if (IS_DESKTOP_HOST) {
+    setButtonLabel(desktopMinimizeBtn, labelText("minimize", "Minimize", "最小化"), "minimize", { iconOnly: true });
+    setButtonLabel(desktopCloseBtn, tx.close, "close", { iconOnly: true });
+  }
   updateContentAlignLabels();
   updateContentAlignToolbarButton();
   setButtonLabel(modalSlideshow, state.modalSlideshowPlaying ? tx.pause : tx.slideshow, state.modalSlideshowPlaying ? "pause" : "slideshow", { iconOnly: true });
@@ -1462,6 +1491,7 @@ function applyLanguage() {
   mediaFilterSeg.querySelector('[data-media-filter="image"]').textContent = tx.imagesOnly;
   mediaFilterSeg.querySelector('[data-media-filter="favorites"]').textContent = tx.favorites;
   sortSelect.title = tx.sortTitle;
+  contentAlignViewSeg.title = tx.contentAlign;
   columnsSelect.title = tx.columnsTitle;
   pageSizeInput.title = tx.pageSizeTitle;
   $("#pageSizeLabel").textContent = tx.pageSizeLabelText;
@@ -1556,6 +1586,7 @@ function applyLanguage() {
   trashSystemBtn.textContent = tx.recycleSystemTrash;
   pageSizeInput.setAttribute("aria-label", tx.pageSizeTitle);
   updateMediaFilterUI();
+  updateFilterResetButton();
   document.querySelectorAll(".tiny-btn").forEach(btn => btn.textContent = tx.location);
   applyTheme();
   applyContentAlign();
@@ -1993,6 +2024,14 @@ function shuffle(items) {
   return arr;
 }
 
+function updateFilterResetButton() {
+  const active = !!searchInput.value.trim()
+    || state.mediaType !== "all"
+    || state.sizeFilter !== "all"
+    || state.dateFilter !== "all";
+  resetFiltersBtn.classList.toggle("hidden", !active);
+}
+
 function applyFilters(resetPage = true) {
   const q = searchInput.value.trim().toLowerCase();
   let items = state.all;
@@ -2007,6 +2046,7 @@ function applyFilters(resetPage = true) {
   if (state.dateFilter === "month") items = items.filter(v => now - Number(v.mtime) <= 86400 * 30);
   if (state.mediaType !== "all" && state.mediaType !== "favorites") items = items.filter(v => v.type === state.mediaType);
   state.view = sortItems(items, sortSelect.value);
+  updateFilterResetButton();
   if (resetPage) state.gridPage = 0;
   renderGrid();
   saveSettingsSoft();
@@ -2053,8 +2093,8 @@ function updateGridPager() {
   gridController.updatePager();
 }
 
-function setGridPage(page) {
-  gridController.setPage(page);
+function setGridPage(page, options = {}) {
+  gridController.setPage(page, options);
 }
 
 function renderEmptyState() {
@@ -2413,11 +2453,12 @@ function setTrashView(visible) {
     pauseAllInline();
     setBatchMode(false);
     batchBar.classList.add("hidden");
-    [grid, gridPager, floatingPager, emptyState, subInfo].forEach(node => node.classList.add("hidden"));
+    [contentToolbar, grid, gridPager, floatingPager, emptyState, subInfo].forEach(node => node.classList.add("hidden"));
     trashView.classList.remove("hidden");
     loadTrashView();
   } else {
     trashView.classList.add("hidden");
+    contentToolbar.classList.remove("hidden");
     grid.classList.remove("hidden");
     subInfo.classList.toggle("hidden", !state.scannedPath);
     if (state.mediaNeedsRender) {
@@ -4290,6 +4331,7 @@ async function scanNow() {
     if (state.showTrash) {
       state.showTrash = false;
       trashView.classList.add("hidden");
+      contentToolbar.classList.remove("hidden");
       grid.classList.remove("hidden");
     }
     state.pathHistory = data.config?.path_history || state.pathHistory;
@@ -4605,14 +4647,13 @@ folderPanelToggle.addEventListener("click", e => {
 });
 folderPanelClose.addEventListener("click", closeFolderPanel);
 folderPanelRefresh.addEventListener("click", () => loadFolderRoots(true));
+dualPlayerBtn.addEventListener("click", event => {
+  event.stopPropagation();
+  window.location.href = "/static/dual-player.html";
+});
 desktopLaunchBtn.addEventListener("click", event => {
   event.stopPropagation();
   void launchDesktopApp();
-});
-desktopCloseBtn.addEventListener("click", event => {
-  event.stopPropagation();
-  if (!IS_DESKTOP_HOST || !desktopBridge?.closeWindow) return;
-  desktopBridge.closeWindow();
 });
 favoritePathBtn.addEventListener("click", e => {
   e.stopPropagation();
@@ -4692,6 +4733,11 @@ settingsTabs.addEventListener("keydown", event => {
   else next = (current + 1) % buttons.length;
   event.preventDefault();
   setSettingsTab(buttons[next].dataset.settingsTab, { focus: true });
+});
+contentAlignViewSeg.addEventListener("click", event => {
+  const button = event.target.closest("button[data-content-align]");
+  if (!button) return;
+  setContentAlign(button.dataset.contentAlign);
 });
 contentAlignToolbarBtn.addEventListener("click", event => {
   event.stopPropagation();
@@ -4827,17 +4873,17 @@ trashConfirmDialog.addEventListener("click", e => {
   if (e.target.dataset.trashConfirm === "cancel") closeTrashConfirmDialog(false);
 });
 clearHistoryBtn.addEventListener("click", clearPathHistory);
-topPagePrev.addEventListener("click", () => setGridPage(state.gridPage));
-topPageNext.addEventListener("click", () => setGridPage(state.gridPage + 2));
+topPagePrev.addEventListener("click", () => setGridPage(state.gridPage, { scrollMode: "preserve" }));
+topPageNext.addEventListener("click", () => setGridPage(state.gridPage + 2, { scrollMode: "preserve" }));
 gridPager.addEventListener("click", e => {
   const button = e.target.closest("button[data-page]");
   if (!button || button.disabled) return;
-  setGridPage(button.dataset.page);
+  setGridPage(button.dataset.page, { scrollMode: "content-start" });
 });
 floatingPager.addEventListener("click", e => {
   const button = e.target.closest("button[data-page]");
   if (!button || button.disabled) return;
-  setGridPage(button.dataset.page);
+  setGridPage(button.dataset.page, { scrollMode: "content-start" });
 });
 floatingPager.addEventListener("mouseenter", () => {
   state.floatingPagerHover = true;
@@ -5129,7 +5175,7 @@ window.addEventListener("keydown", e => {
   }
 });
 document.addEventListener("fullscreenchange", handleFullscreenChange);
-window.addEventListener("scroll", () => {
+pageScrollHost.addEventListener("scroll", () => {
   showFloatingPagerTemporarily();
 }, { passive: true });
 window.addEventListener("resize", () => {

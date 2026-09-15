@@ -10,6 +10,10 @@ contextBridge.exposeInMainWorld('localVideoWallDesktop', {
     });
     return true;
   },
+  minimizeWindow: () => {
+    ipcRenderer.send('desktop-window:minimize');
+    return true;
+  },
   closeWindow: () => {
     ipcRenderer.send('desktop-window:close');
     return true;

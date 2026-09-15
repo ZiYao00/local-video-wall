@@ -15,6 +15,7 @@ class PostActionRouteTests(unittest.TestCase):
         self.handler.api_open_in_explorer = Mock()
         self.handler.api_open_file_default_app = Mock()
         self.handler.api_desktop_launch = Mock()
+        self.handler._post_player_source = Mock()
         self.handler.send_json = Mock()
 
     def test_payload_routes_dispatch_to_existing_handlers(self) -> None:
@@ -58,14 +59,17 @@ class PostStateRouteTests(unittest.TestCase):
         self.handler = object.__new__(app.AppHandler)
         self.handler._post_path_state = Mock()
         self.handler._post_review = Mock()
+        self.handler._post_player_source = Mock()
 
     def test_state_routes_dispatch_to_existing_handlers(self) -> None:
         payload = {"key": "media-key"}
         self.assertTrue(self.handler._dispatch_post_state("/api/path-state", payload))
         self.assertTrue(self.handler._dispatch_post_state("/api/review", payload))
+        self.assertTrue(self.handler._dispatch_post_state("/api/player/source", payload))
 
         self.handler._post_path_state.assert_called_once_with(payload)
         self.handler._post_review.assert_called_once_with(payload)
+        self.handler._post_player_source.assert_called_once_with(payload)
 
     def test_unknown_state_route_is_not_dispatched(self) -> None:
         self.assertFalse(self.handler._dispatch_post_state("/api/unknown", {}))
