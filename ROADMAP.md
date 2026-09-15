@@ -349,11 +349,46 @@ Completed:
 - Ignored zero-byte media placeholders during scans without deleting source files.
 - Kept full installer, bundled Python, portable packaging, and auto-update work deferred.
 
-Internal architecture work originally assigned to v1.9.0 moves to v1.10.0. The next user-facing Tags & Review milestone moves to v1.11.0.
+Internal architecture work originally assigned to v1.9.0 was deferred again because v1.10.0 became a user-facing Dual Player and workspace UX release. The architecture milestone therefore moves to v1.11.0, and the next user-facing Tags & Review milestone moves to v1.12.0.
+
+## Released Phase - v1.10.0 Dual Player And Workspace UX
+
+Release status: `v1.10.0` is the release target for 2026-09-15 after the Dual Player and Desktop/workspace UX work is fully validated.
+
+Completed:
+
+- Added Dual Player with two independent local media sources, image slideshow and video playback modes, per-pane fullscreen, and shared path history/favorites.
+- Kept Dual Player scans isolated from the main Media Wall scan and added an explicit backend capability handshake.
+- Added Dual Player to Local Video Wall Desktop instead of maintaining a separate Desktop implementation.
+- Added shared Desktop Minimize / Close behavior and reusable Desktop host detection/window-control logic.
+- Reworked the main toolbar into a single-row, container-aware layout that remains usable in left/right content layouts without horizontal toolbar scrolling.
+- Moved Desktop Media Wall page scrolling into an internal native viewport so the frameless window keeps an integrated scrollbar position while the browser host retains normal root scrolling.
+- Kept experimental toolbar demo files local-only rather than shipping them as product surfaces.
+- Improved beginner setup guidance for Python and the one-time Node.js/npm Desktop runtime setup.
+
+Still deferred:
+
+- Synchronized Dual Player playback/seek.
+- Drag-resizable Dual Player divider.
+- Four-pane layouts.
+- Full packaged Desktop installer, bundled Python, portable Electron runtime, and automatic update.
+
+## Phase 2.5 - Internal Architecture Refactor
+
+Recommended version: `v1.11.0 - Internal Architecture Refactor`
+
+Goal: reduce coupling before the next review/tagging features without changing the product surface or introducing a frontend framework.
+
+Planned work:
+
+- Finish table-driven backend routing for the remaining scan/settings paths.
+- Extract focused backend modules for scanning, recycle/trash actions, system-open actions, and media streaming.
+- Continue splitting `static/app.js` into small ES modules only where the current boundaries are already clear.
+- Keep browser and Desktop on one shared frontend and preserve the existing regression suite as the refactor gate.
 
 ## Phase 3 - Tags And Review Workflow
 
-Recommended version: `v1.11.0 - Tags & Review Workflow`
+Recommended version: `v1.12.0 - Tags & Review Workflow`
 
 Goal: make the app useful for organizing assets, not only previewing them.
 
@@ -611,30 +646,30 @@ External code can be copied or adapted only when:
 
 ## Recommended Next Step
 
-The next feature step should be:
+After the v1.10.0 release is frozen and validated, the next engineering milestone should be:
 
 ```text
-v1.8.0 - Metadata Stabilization
+v1.11.0 - Internal Architecture Refactor
 ```
 
-Recommended stabilization batch:
+Recommended scope:
 
-1. Test more real ComfyUI PNG samples, especially custom prompt, string, wildcard, and LoRA loader nodes.
-2. Keep the metadata panel readable with many LoRA entries and long prompts.
-3. Validate optional `ffprobe` video-container metadata with more real MP4/WebM/MOV samples.
-4. Keep unsupported or broken metadata non-fatal by returning normalized empty or partial metadata objects.
-5. Keep README, Chinese README, ROADMAP, and CHANGELOG synchronized before each GitHub release.
+1. Finish the remaining backend route-table migration without changing endpoint behavior.
+2. Extract only the backend modules that already have clear boundaries and regression coverage.
+3. Continue small ES-module extraction from `static/app.js` where it reduces duplicated state/host logic.
+4. Keep Browser, Desktop, and Dual Player behavior stable throughout the refactor.
+5. Keep README, Chinese README, ROADMAP, CHANGELOG, and the upgrade plan synchronized before each GitHub release.
 
-After that, the next major feature step should be:
+After that, the next user-facing feature milestone should be:
 
 ```text
-v1.9.0 - Tags & Review Workflow
+v1.12.0 - Tags & Review Workflow
 ```
 
-Still deferred:
+Still deferred beyond those milestones:
 
-- Tags / rating / notes UI.
-- SQLite index.
-- Metadata search.
-- Thumbnail or video cover cache.
+- SQLite local index.
+- Metadata full-text search.
+- Optional thumbnail/video-cover cache.
+- Packaged Python/Electron installer and auto-update.
 - Mandatory ExifTool / ffprobe dependency.

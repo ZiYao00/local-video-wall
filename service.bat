@@ -254,6 +254,7 @@ if not "%RUNNING%"=="1" (
 if not exist "%DESKTOP_ELECTRON%" (
   echo Local Video Wall Desktop runtime is not installed:
   echo %DESKTOP_ELECTRON%
+  call :desktop_setup_help
   if "%COMMAND_MODE%"=="1" exit /b 1
   pause
   goto menu
@@ -269,6 +270,7 @@ if "%errorlevel%"=="0" (
   if "%COMMAND_MODE%"=="1" exit /b 0
 ) else (
   echo Failed to install Local Video Wall Desktop shortcut.
+  call :desktop_setup_help
   if "%COMMAND_MODE%"=="1" exit /b 1
 )
 pause
@@ -399,6 +401,20 @@ exit /b %errorlevel%
 :remove_desktop_shortcut
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%SCRIPT_DIR%desktop-shortcut.ps1" remove >nul 2>nul
 exit /b %errorlevel%
+
+:desktop_setup_help
+echo.
+echo Desktop setup requires Node.js 22.12 or later with npm.
+echo 1. Install Node.js for Windows if it is not already available.
+echo 2. Open Command Prompt in:
+echo    %DESKTOP_DIR%
+echo 3. Run:
+echo    npm install
+echo 4. Then return to the project root and run:
+echo    service.bat desktop
+echo    service.bat install-desktop
+echo.
+exit /b 0
 
 :ensure_helper_dir
 if not exist "%HELPER_DIR%" (

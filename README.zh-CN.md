@@ -53,6 +53,14 @@ Local Video Wall 将浏览、对比、元数据查看、收藏、批量处理和
 - 视频支持大播放器、上一项/下一项、全屏、播放模式和鼠标滚轮调节音量。
 - 可设置适应方式、幻灯片间隔、循环方式等查看选项。
 
+### Dual Player 双播放器
+
+- 左右同时打开两个彼此独立的媒体 Viewer，方便直接对比。
+- 左右两侧可以分别绑定本地文件或文件夹，不会覆盖主媒体墙当前的扫描目录。
+- 两侧可以自由组合图片幻灯片与视频播放。
+- 路径历史与收藏文件夹继续和主应用共享，但播放状态彼此独立。
+- 浏览器版与 Local Video Wall Desktop 均可使用 Dual Player。
+
 ### AI 生成元数据
 
 当素材中存在相应信息时，可以查看：
@@ -96,7 +104,8 @@ Local Video Wall 将浏览、对比、元数据查看、收藏、批量处理和
 
 - Windows 10 或 Windows 11
 - Python 3.10 或更高版本，推荐 Python 3.12
-- 推荐 Chrome 或 Edge
+- 浏览器模式推荐 Chrome 或 Edge
+- Local Video Wall Desktop 源码版首次部署：Node.js 22.12 或更高版本，并带 npm（只需执行一次 `npm install`）
 - 可选：将 `ffprobe` 加入 `PATH`，用于读取更多视频元数据
 
 先确认 Python 可以使用：
@@ -114,7 +123,7 @@ py --version
 ### 下载并运行
 
 1. 打开[最新版本发布页](https://github.com/ZiYao00/local-video-wall/releases/latest)。
-2. 在发布页的 Assets 中下载 **Source code (zip)**。正式的 `local-video-wall-*.zip` 安装包发布后，也会列在这里。
+2. 优先下载发布页中的正式命名包 `local-video-wall-v*.zip`；GitHub 自带的 **Source code (zip)** 仍可作为备用。
 3. 解压到普通本地目录，例如：
 
    ```text
@@ -134,16 +143,27 @@ service.bat
 
 ### Local Video Wall 桌面版
 
-Local Video Wall Desktop 使用与浏览器版相同的界面和 Python 后端，但增加 Windows 原生文件拖拽。当前有效扫描中的媒体可以直接拖入剪辑软件等原生 Windows 应用，不需要浏览器目录授权。Desktop 使用无边框窗口，保留窗口缩放能力，在设置按钮旁提供关闭按钮，并与浏览器版共用相同的宽屏“左 / 中 / 右”布局逻辑。
+Local Video Wall Desktop 使用与浏览器版相同的界面和 Python 后端，但增加 Windows 原生文件拖拽和桌面窗口能力。当前有效扫描中的媒体可以直接拖入剪辑软件等原生 Windows 应用，不需要浏览器目录授权。Desktop 使用无边框可缩放窗口，可从顶部工具栏拖动窗口，提供“最小化 / 关闭”按钮，并将页面滚动条收进窗口内部；宽屏“左 / 中 / 右”布局继续与浏览器版保持一致。Dual Player 也已经支持 Desktop。
 
-当前源码形态只需首次安装一次桌面运行依赖：
+当前源码发布包中，Desktop 仍需要进行一次运行环境初始化；**浏览器模式不需要 Node.js 或 npm**。
+
+1. 如果本机还没有 `node` / `npm`，先安装 Windows 版 Node.js 22.12 或更高版本。
+2. 在解压后的项目目录打开命令行，执行：
 
 ```powershell
 cd desktop
 npm install
+cd ..
 ```
 
-之后可以通过 `service.bat` 安装 **Local Video Wall Desktop** 桌面快捷方式，也可以从浏览器页面点击“打开 Local Video Wall 桌面版”。Chrome 继续保留为兼容/调试入口，并保留浏览器专用的拖拽授权流程。
+3. 使用 `service.bat` 菜单启动 / 安装 Desktop，或者直接执行：
+
+```powershell
+service.bat desktop
+service.bat install-desktop
+```
+
+`service.bat desktop` 会在需要时启动 Python 后端并打开 Local Video Wall Desktop；`service.bat install-desktop` 会在 Electron runtime 已存在后创建 **Local Video Wall Desktop** 桌面快捷方式。完成这次初始化后，也可以直接从浏览器页面点击“打开 Local Video Wall 桌面版”。Chrome 继续保留为兼容/调试入口，并保留浏览器专用的拖拽授权流程。
 
 开发者也可以直接运行：
 
@@ -221,6 +241,7 @@ http://127.0.0.1:8787
 - **提示找不到 `python`：**安装 Python，并在安装时勾选 **Add Python to PATH**。
 - **浏览器没有自动打开：**手动访问 `http://127.0.0.1:8787`。
 - **页面无法访问：**运行 `service.bat`，检查后台服务状态。
+- **Desktop 提示 runtime 未安装：**安装 Node.js 22.12 或更高版本，在项目目录执行 `cd desktop` 与 `npm install`，然后重新运行 `service.bat desktop`。
 - **8787 端口被占用：**关闭冲突程序，或修改 `app.py` 中的 `PORT`。
 - **视频无法带声音自动播放：**这是浏览器限制；媒体墙视频为了自动播放而默认静音。
 - **部分视频元数据缺失：**安装 `ffprobe`，并确保它已经加入 `PATH`。

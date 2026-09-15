@@ -25,7 +25,9 @@
 | v1.8.2 | 稳定性与命名 | 补丁 | 已包含于 v1.8.3 |
 | v1.8.3 | 测试与 CI | 补丁 | 已发布，GitHub Actions 已通过 |
 | v1.9.0 | Desktop 桌面宿主与稳定化 | 次版本 | 已发布（2026-09-14） |
-| v1.10.0 | 内部结构重构 | 次版本 | 顺延继续 |
+| v1.10.0 | Dual Player 与工作区 UX | 次版本 | 发布收口中（2026-09-15） |
+| v1.11.0 | 内部结构重构 | 次版本 | 顺延继续 |
+| v1.12.0 | Tags & Review Workflow | 次版本 | 规划中 |
 | 之后 | 打包、贡献者文档等 | 视情况 | 未开始 |
 
 **每个阶段完成、验证、（可选）发布之后，再进入下一个。**
@@ -71,6 +73,23 @@
 - `desktop-drag-poc/` 与 `static/drag-out-poc/` 继续保留为未跟踪验证材料，不属于正式运行依赖，也不进入 v1.9.0 提交。
 
 ---
+
+## v1.10.0 — Dual Player 与工作区 UX（发布收口）
+
+- **目标**：把已经验证的 Dual Player 从 Web 实验能力收口为 Browser / Desktop 共用的正式比较工作区，同时解决宽屏左右布局下的 Toolbar、Desktop 窗口控制与滚动体验问题。
+- **隔离原则**：不改现有 Modal Viewer；Dual Player 的媒体扫描仍不修改主 Media Wall 的 current_video_dir、主扫描配置或 Desktop 活动扫描注册表。只有 Path History / Favorites 这类明确的用户级偏好通过现有 path-state 接口共享。
+- **Source UI**：每个 Pane 复用主页面 Path Combo 的视觉与交互语义：收藏、路径文本框、历史、路径自动补全、Choose Folder、Scan、Subfolders 保持同一图标体系；路径文本框接受文件夹路径和单个媒体文件路径，选择文件夹只回填路径，不自动扫描。混合目录扫描后显示 Images / Videos 切换。
+- **共享与隔离边界**：Path History / Favorites 与主页面共享；Dual Player 左右 Source Path、scan_id、当前媒体与播放状态仍彼此独立。单媒体文件不会写入共享文件夹历史，避免污染主 Video Wall 的目录历史。
+- **播放器一致性**：图片 Pane 使用独立 Slideshow Engine，支持 1–15s、None/Fade/Slide/Drift/Random、Contain/Cover、Loop、Prev/Next 与 Pane Fullscreen；视频 Pane 使用独立 Video Playback Engine，支持 Loop One / Sequence / Random、Prev/Next、Pane Fullscreen，并按当前 Pane 尺寸实时 contain 自适应。
+- **运行期上下文**：Dual Player 使用独立 runtime_player_scan_roots 与 strict `/player-media`；失效 scan id 直接失败，不回退主 Video Wall 目录；支持与主扫描一致的最多 2 层子目录扫描。
+- **版本握手**：bootstrap 暴露 `dual_player` capability。页面发现运行中的 Python 后端不支持该 capability 时，明确提示重启 Local Video Wall 并禁用扫描，不把 HTML 404 当 JSON 解析。
+- **持久化与共享偏好**：localStorage 保存左右路径、媒体模式、Subfolders、各自 Slideshow 参数与 Video 播放模式/音量；不保存 scan_id，刷新后只恢复表单与播放偏好，不自动 Scan。Theme / Font Size / Language 继续跟随主应用设置。
+- **Desktop 集成**：Dual Player 已允许在 Local Video Wall Desktop 中直接打开；Browser 与 Desktop 共用同一个页面和脚本。Desktop 右侧 Toolbar 提供最小化/关闭按钮，工具栏空白区域可拖动无边框窗口。
+- **Desktop Host 共用层**：新增共享 Desktop Window Controls 适配层，集中处理 Host 检测、Minimize、Close 与 Scroll Host，避免 Media Wall / Dual Player 各写一套 Electron 判断。
+- **首页工具栏收口**：Global Toolbar 保持单行；Path / Search 根据实际容器宽度压缩，Dual Player / Open Desktop 改为图标入口；Sort / Columns / Layout / Per page / Pause / Select / Pager 保持在媒体内容区，Select 模式继续使用底部悬浮 Batch Toolbar。
+- **Desktop Scroll Host**：浏览器继续使用 root/window 滚动；Desktop Media Wall 改由内部原生滚动容器承载页面滚动，滚动条视觉上收进无边框窗口，并在 Settings 打开时锁住背景内容滚动。
+- **正式非目标**：Metadata/Prompt 在 Dual Player 内展示、文件删除、Dual Player Drag Out、同步播放/Seek、可拖分隔线、四分屏，均继续延期。
+- **发布边界**：`static/toolbar-demo.*` 与 `static/js/toolbar-demo.js` 继续作为本地交互验证材料，不进入正式发布。
 
 ## v1.8.1 — 安全（先做这个）
 
@@ -133,9 +152,9 @@
 
 ---
 
-## v1.10.0 — 内部结构重构
+## v1.11.0 — 内部结构重构
 
-> 原计划占用 v1.9.0；由于 Desktop 已作为新的用户可见功能正式发布为 v1.9.0，本阶段顺延到 v1.10.0。
+> 原计划占用 v1.9.0；由于 Desktop 已作为 v1.9.0 发布、Dual Player 与工作区 UX 又收口为 v1.10.0，本阶段继续顺延到 v1.11.0。
 > 不换框架，只做小步拆分，降低“改一处影响一片”的风险。
 > 虽然对用户无可见新功能，但改动大、且为后续新功能铺路，作为一个次版本里程碑。
 > **继续建立在 v1.8.3 / v1.9.0 的回归测试基础上**——重构最需要测试兜底。
@@ -151,15 +170,15 @@
   `recycle-view.js`、`settings.js`，用 `type="module"` 加载。
 
 **验收**：功能与拆分前完全一致；测试仍全绿。
-**发布**：完成后更新 CHANGELOG，打 v1.10.0。
+**发布**：完成后更新 CHANGELOG，打 v1.11.0。
 
 ---
 
 ## 之后（有余力再做，不阻塞上面任何阶段）
 
-- [ ] 发布正式命名 ZIP + SHA-256（不必等 SQLite/全文检索）
+- [ ] v1.10.0 发布正式命名 ZIP + SHA-256，并从 Tag / Git-tracked 文件构建，不混入本地配置、测试媒体或 demo 文件。
 - [ ] 补 `CONTRIBUTING.md`、`SECURITY.md`、`ARCHITECTURE.md`、issue/PR 模板
-- [ ] 同步 ROADMAP 状态（标注当前 stable、修正过期描述）
+- [x] 同步 ROADMAP 状态（v1.10.0 发布线、v1.11.0 重构、v1.12.0 Tags）。
 - [ ] GitHub 仓库删除误标的 `flask` Topic（实际用标准库 `ThreadingHTTPServer`）
 
 ---
@@ -168,6 +187,9 @@
 
 - [ ] 本阶段任务完成并验收
 - [ ] 有测试后：`python -m unittest discover -s tests -v` 全绿
-- [ ] 手工回归：扫描 / 播放 / 元数据 / 收藏 / 回收站 / 恢复 / 设置
+- [ ] 手工回归：扫描 / 播放 / 元数据 / 收藏 / 回收站 / 恢复 / 设置；涉及 Desktop / Dual Player 时同步检查对应入口、窗口控制与返回链路
+- [ ] `README.md` / `README.zh-CN.md` / `CHANGELOG.md` / `ROADMAP.md` / `docs/upgrade-plan.md` 与实际功能同步
+- [ ] 新手启动链路（`start.bat` / `service.bat` / Desktop 首次 npm 初始化说明）与当前依赖一致
 - [ ] CHANGELOG 写明本版本改了什么
 - [ ] 代码与文档中版本号统一
+- [ ] 正式 ZIP 从发布 Tag / Git-tracked 文件构建，解压后完成一次 clean-package smoke test，再上传 ZIP + SHA-256

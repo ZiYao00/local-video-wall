@@ -53,6 +53,14 @@ Local Video Wall provides one place to browse, compare, inspect, mark, export, a
 - Open videos in a larger player with previous/next navigation, fullscreen, playback modes, and mouse-wheel volume control.
 - Adjust fit mode, slideshow interval, loop behavior, and other viewing options.
 
+### Dual Player
+
+- Open two independent media viewers side by side for direct visual comparison.
+- Give each pane its own local file or folder source without replacing the main Media Wall scan.
+- Mix image slideshows and video playback across the two panes.
+- Keep path history and favorite folders shared with the main app while playback state stays independent.
+- Use Dual Player in both the browser host and Local Video Wall Desktop.
+
 ### AI generation metadata
 
 When metadata is available, Local Video Wall can display:
@@ -96,7 +104,8 @@ Recycled videos remain paused on a static frame, and the app does not generate a
 
 - Windows 10 or Windows 11
 - Python 3.10 or later; Python 3.12 is recommended
-- Chrome or Edge recommended
+- Chrome or Edge recommended for browser mode
+- Local Video Wall Desktop source setup: Node.js 22.12 or later with npm (one-time `npm install`)
 - Optional: `ffprobe` on `PATH` for additional video metadata
 
 Check that Python is available:
@@ -114,7 +123,7 @@ py --version
 ### Download and run
 
 1. Open the [latest release](https://github.com/ZiYao00/local-video-wall/releases/latest).
-2. In the release assets, download **Source code (zip)**. A dedicated `local-video-wall-*.zip` package will be listed here when one is published.
+2. Download the named release package `local-video-wall-v*.zip` when it is available. The GitHub **Source code (zip)** archive remains a fallback.
 3. Extract it to a normal local folder, for example:
 
    ```text
@@ -134,16 +143,27 @@ service.bat
 
 ### Local Video Wall Desktop
 
-The Windows desktop host uses the same Local Video Wall UI and Python backend, but adds native Windows file drag-out. Media from an active scan can be dragged directly into native targets such as video editors without browser folder authorization. The Desktop shell is frameless, keeps window resizing, adds a close button beside Settings, and uses the same wide-screen Left / Center / Right layout behavior as the browser host.
+The Windows desktop host uses the same Local Video Wall UI and Python backend, but adds native Windows file drag-out and Desktop window integration. Media from an active scan can be dragged directly into native targets such as video editors without browser folder authorization. The frameless Desktop shell remains resizable, supports window dragging from the toolbar, provides Minimize / Close controls, keeps the page scrollbar visually inside the window, and uses the same wide-screen Left / Center / Right layout behavior as the browser host. Dual Player is available in Desktop as well as in the browser.
 
-For the current source-tree setup, install the desktop runtime once:
+For the current source-tree package, Desktop needs a one-time runtime setup. Browser mode does **not** require Node.js or npm.
+
+1. Install Node.js 22.12 or later for Windows if `node` / `npm` are not already available.
+2. Open Command Prompt in the extracted project folder and run:
 
 ```powershell
 cd desktop
 npm install
+cd ..
 ```
 
-Then use `service.bat` to install the **Local Video Wall Desktop** shortcut, or click **Open Local Video Wall Desktop** from the browser UI. Chrome remains available as the compatibility/debug host and keeps its browser-specific drag authorization flow.
+3. Start or install Desktop with either the interactive `service.bat` menu or these commands:
+
+```powershell
+service.bat desktop
+service.bat install-desktop
+```
+
+`service.bat desktop` starts the Python backend when needed and opens Local Video Wall Desktop. `service.bat install-desktop` creates the **Local Video Wall Desktop** shortcut after the Electron runtime exists. The browser UI can also open Desktop after this one-time setup. Chrome remains available as the compatibility/debug host and keeps its browser-specific drag authorization flow.
 
 Developers can also run:
 
@@ -221,6 +241,7 @@ http://127.0.0.1:8787
 - **`python` is not recognized:** install Python and enable **Add Python to PATH** during installation.
 - **The browser did not open:** visit `http://127.0.0.1:8787` manually.
 - **The page cannot be reached:** run `service.bat` and check the service status.
+- **Desktop says the runtime is not installed:** install Node.js 22.12 or later, run `cd desktop` and `npm install`, then try `service.bat desktop` again.
 - **Port 8787 is already in use:** close the conflicting program or change `PORT` in `app.py`.
 - **Videos do not autoplay with sound:** this is expected browser behavior; wall videos are muted for autoplay.
 - **Some video metadata is missing:** install `ffprobe` and make sure it is available on `PATH`.

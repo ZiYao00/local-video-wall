@@ -7,5 +7,8 @@ Thumbs.db
 *.log
 _perf_test_atakatadai/
 local-video-wall-readme-package.zip
+static/toolbar-demo.html
+static/toolbar-demo.css
+static/js/toolbar-demo.js
 .codex-backups/
 .ai-bridge/

@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.10.0 - 2026-09-15
+
+- Added Dual Player as a first-class comparison workspace with two independent local media sources, per-pane image/video modes, slideshow controls, video playback modes, fullscreen, and shared path history/favorites without replacing the main Media Wall scan.
+- Added isolated Dual Player scan/media routes and a `dual_player` bootstrap capability so stale backends fail clearly instead of producing misleading page errors.
+- Extended Dual Player to Local Video Wall Desktop while preserving the same browser page and Python backend; Desktop now provides shared Minimize / Close controls and draggable toolbar regions on both Media Wall and Dual Player.
+- Added a shared Desktop window-control adapter so Desktop host detection, minimize, close, and page scroll-host selection are not duplicated across pages.
+- Reworked the main toolbar around a single-row, container-aware layout: the path and search fields shrink with the real content width, while Dual Player and Open Desktop use compact icon-only actions instead of forcing horizontal toolbar scrolling in left/right layouts.
+- Reorganized media-view controls around the content area and kept batch-selection actions in a floating toolbar so the top workspace bar remains compact.
+- Moved Desktop Media Wall scrolling into an internal native scroll viewport, keeping the scrollbar visually inside the frameless window while preserving browser root scrolling and locking background scrolling when Settings is open.
+- Added Desktop window minimize IPC with the same trusted-local-page validation used by the existing close action.
+- Improved beginner startup guidance: `start.bat` now reports a clear Python installation requirement, and `service.bat` explains the one-time Node.js/npm Desktop runtime setup when Electron is missing.
+- Updated English/Chinese setup documentation, release/version planning, and the source-package guidance for the v1.10.0 release.
+
 ## 1.9.0 - 2026-09-14
 
 - Added Local Video Wall Desktop as a Windows desktop host while keeping Chrome as a compatible fallback for the same local frontend and Python backend.
