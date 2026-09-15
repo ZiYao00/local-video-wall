@@ -118,6 +118,21 @@ function focusMainWindow() {
   mainWindow.focus();
 }
 
+function refreshMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.reloadIgnoringCache();
+}
+
+async function loadLatestApp(window) {
+  if (!window || window.isDestroyed()) return;
+  try {
+    await window.webContents.session.clearCache();
+  } catch (error) {
+    console.warn('[desktop] could not clear renderer cache:', error?.message || error);
+  }
+  if (!window.isDestroyed()) await window.loadURL(APP_URL);
+}
+
 function isTrustedAppUrl(url) {
   const value = String(url || '');
   return value === APP_URL || value.startsWith(`${APP_URL}/`);
@@ -162,14 +177,17 @@ function createWindow() {
     mainWindow = null;
   });
 
-  void mainWindow.loadURL(APP_URL);
+  void loadLatestApp(mainWindow);
 }
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
   app.quit();
 } else {
-  app.on('second-instance', () => focusMainWindow());
+  app.on('second-instance', () => {
+    refreshMainWindow();
+    focusMainWindow();
+  });
 
   app.whenReady().then(async () => {
     await prepareDragIcon();

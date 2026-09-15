@@ -2303,6 +2303,25 @@ body.dense-grid .workflow-badge{
   }
 }
 
+.modal-media-stage{
+  position:absolute;
+  inset:0 min(380px,28vw) 0 0;
+  z-index:1;
+  overflow:hidden;
+  background:#000;
+}
+
+.modal-media-stage .modal-video,
+.modal-media-stage .modal-image{
+  position:absolute;
+  inset:0;
+  width:100%;
+  height:100%;
+  padding:0;
+  object-fit:contain;
+  background:#000;
+}
+
 .modal-metadata{
   position:absolute;
   top:58px;
@@ -2317,10 +2336,6 @@ body.dense-grid .workflow-badge{
   backdrop-filter:blur(12px);
 }
 
-.modal-content:not(.is-video) .modal-image{
-  padding-right:calc(min(380px,28vw) + 92px);
-}
-
 .modal-content.modal-slideshow-playing .modal-image.modal-drift-active{
   animation:modalImageDrift var(--modal-drift-duration,5000ms) ease both;
   will-change:transform;
@@ -2331,13 +2346,12 @@ body.dense-grid .workflow-badge{
   to{transform:translate(var(--ex),var(--ey)) scale(1.1)}
 }
 
-.modal-content:fullscreen .modal-metadata{
-  display:none;
+.modal-content:fullscreen .modal-media-stage{
+  right:0;
 }
 
-.modal-content.is-video:not(:fullscreen) .modal-video{
-  right:min(380px,28vw);
-  width:calc(100% - min(380px,28vw));
+.modal-content:fullscreen .modal-metadata{
+  display:none;
 }
 
 .metadata-title{
@@ -2661,15 +2675,9 @@ body.dense-grid .workflow-badge{
     display:none;
   }
 
-  body.content-align-left .modal-content.is-video:not(:fullscreen) .modal-video,
-  body.content-align-right .modal-content.is-video:not(:fullscreen) .modal-video{
+  body.content-align-left .modal-content:not(:fullscreen) .modal-media-stage,
+  body.content-align-right .modal-content:not(:fullscreen) .modal-media-stage{
     right:0;
-    width:100%;
-  }
-
-  body.content-align-left .modal-content:not(.is-video):not(:fullscreen) .modal-image,
-  body.content-align-right .modal-content:not(.is-video):not(:fullscreen) .modal-image{
-    padding-right:74px;
   }
 
   body.content-align-left .modal-content:not(.is-video):not(:fullscreen) .modal-title strong,
@@ -2681,23 +2689,12 @@ body.dense-grid .workflow-badge{
 }
 
 @media (max-width:1180px){
+  .modal-media-stage{
+    right:0;
+  }
+
   .modal-metadata{
     display:none;
-  }
-
-  .modal-content:not(.is-video) .modal-image{
-    padding-right:74px;
-  }
-
-  .modal-content.is-video:not(:fullscreen) .modal-video{
-    right:0;
-    width:100%;
-  }
-}
-
-@media (max-width:760px){
-  .modal-content:not(.is-video) .modal-image{
-    padding-right:48px;
   }
 }
 

@@ -307,10 +307,12 @@
         <div class="modal-title"><strong id="modalName"></strong><span id="modalMeta"></span></div>
         <div class="modal-actions"><div id="modalContentAlignSeg" class="seg modal-align-seg" title="Layout position"><button type="button" data-content-align="left">Left</button><button type="button" data-content-align="center">Center</button><button type="button" data-content-align="right">Right</button></div><button id="modalSlideshow" class="btn hidden">Slideshow</button><button id="modalSlideshowFullscreen" class="btn hidden">Fullscreen</button><button id="modalFavorite" class="btn">Favorite</button><button id="modalMoveTrash" class="btn danger">Move to Trash</button><button id="modalOpenDefault" class="btn">Open in Default App</button><button id="modalOpenFolder" class="btn">Show in Folder</button><div id="modalVideoControls" class="modal-video-controls hidden"><div id="modalVideoModeSeg" class="seg"><button data-video-mode="loop">Loop</button><button data-video-mode="sequence">Seq</button><button data-video-mode="random">Random</button></div><button id="modalFullscreen" class="btn">Fullscreen</button><button id="modalVideoUiToggle" class="btn ghost hidden">Hide UI</button></div><button id="modalImageUiToggle" class="btn ghost hidden">Hide UI</button><button id="modalClose" class="btn ghost">Close</button></div>
       </div>
-      <button id="modalPrev" class="modal-nav modal-nav-prev hidden" aria-label="Previous item">&#8249;</button>
-      <button id="modalNext" class="modal-nav modal-nav-next hidden" aria-label="Next item">&#8250;</button>
-      <video id="modalVideo" class="modal-video" controls loop autoplay playsinline></video>
-      <img id="modalImage" class="modal-image hidden" alt="" />
+      <div class="modal-media-stage">
+        <button id="modalPrev" class="modal-nav modal-nav-prev hidden" aria-label="Previous item">&#8249;</button>
+        <button id="modalNext" class="modal-nav modal-nav-next hidden" aria-label="Next item">&#8250;</button>
+        <video id="modalVideo" class="modal-video" controls loop autoplay playsinline></video>
+        <img id="modalImage" class="modal-image hidden" alt="" />
+      </div>
       <aside id="modalMetadata" class="modal-metadata hidden" aria-label="Media metadata"></aside>
       <div id="modalHiddenActions" class="modal-hidden-actions hidden">
         <button id="modalHiddenExitFullscreen" class="btn hidden">Exit Fullscreen</button>

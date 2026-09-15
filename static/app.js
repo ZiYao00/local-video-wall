@@ -2868,6 +2868,11 @@ function scheduleAutoHideControls(kind, delay = 1200, reset = false) {
   }
   if (state[timerKey]) return;
   state[timerKey] = setTimeout(() => {
+    const navContainer = kind === "slideshow" ? slideshow : modalContent;
+    if (mediaNavIsHovered(navContainer)) {
+      state[timerKey] = null;
+      return;
+    }
     if (kind === "slideshow" && !slideshow.classList.contains("hidden")) setSlideshowControlsHidden(true);
     if (kind === "modal" && !modal.classList.contains("hidden")) setModalControlsHidden(true);
     state[timerKey] = null;
@@ -2877,8 +2882,8 @@ function scheduleAutoHideControls(kind, delay = 1200, reset = false) {
 function handleAutoControls(kind, event) {
   const root = kind === "slideshow" ? slideshow : modalContent;
   const toolbarSelector = kind === "slideshow"
-    ? ".slideshow-top, .slideshow-controls, .slideshow-hidden-actions"
-    : ".modal-header, .modal-actions, .modal-hidden-actions";
+    ? ".slideshow-top, .slideshow-controls, .slideshow-hidden-actions, .slideshow-nav"
+    : ".modal-header, .modal-actions, .modal-hidden-actions, .modal-nav";
   const timerKey = kind === "slideshow" ? "slideshowToolbarTimer" : "modalToolbarTimer";
   const inHotspot = kind === "modal" ? isInModalControlHotspot(event, root) : isInTopRightHotspot(event, root);
   if (inHotspot || event.target.closest(toolbarSelector)) {
@@ -2894,13 +2899,34 @@ function handleAutoControls(kind, event) {
   scheduleAutoHideControls(kind);
 }
 
+function mediaNavIsHovered(container) {
+  return !!container?.querySelector(".modal-nav:hover, .slideshow-nav:hover");
+}
+
 function pulseMediaNav(container, delay = 1000) {
   if (!container || container.classList.contains("controls-hidden")) return;
   container.classList.add("nav-active");
   clearTimeout(state.mediaNavTimer);
   state.mediaNavTimer = setTimeout(() => {
+    state.mediaNavTimer = null;
+    if (mediaNavIsHovered(container)) return;
     container.classList.remove("nav-active");
   }, delay);
+}
+
+function holdMediaNav(kind, container) {
+  if (!container) return;
+  const timerKey = kind === "slideshow" ? "slideshowToolbarTimer" : "modalToolbarTimer";
+  clearTimeout(state.mediaNavTimer);
+  state.mediaNavTimer = null;
+  clearTimeout(state[timerKey]);
+  state[timerKey] = null;
+  container.classList.add("nav-active");
+}
+
+function releaseMediaNav(kind, container) {
+  pulseMediaNav(container);
+  scheduleAutoHideControls(kind);
 }
 
 function toggleModalFullscreen() {
@@ -4898,6 +4924,10 @@ modalNext.addEventListener("click", () => {
   if (state.currentModalItem?.type === "video") showModalVideo(1);
   pulseMediaNav(modalContent, 1400);
 });
+[modalPrev, modalNext].forEach(button => {
+  button.addEventListener("pointerenter", () => holdMediaNav("modal", modalContent));
+  button.addEventListener("pointerleave", () => releaseMediaNav("modal", modalContent));
+});
 modalVideoModeSeg.addEventListener("click", e => {
   const btn = e.target.closest("button[data-video-mode]");
   if (!btn) return;
@@ -4971,6 +5001,10 @@ slideshowNext.addEventListener("click", () => showNextSlide(1));
 slideshowMoveTrash.addEventListener("click", () => runFileAction("move_trash", state.slideshowItems[state.slideshowIndex], "slideshow"));
 slideshowSidePrev.addEventListener("click", () => showNextSlide(-1));
 slideshowSideNext.addEventListener("click", () => showNextSlide(1));
+[slideshowSidePrev, slideshowSideNext].forEach(button => {
+  button.addEventListener("pointerenter", () => holdMediaNav("slideshow", slideshow));
+  button.addEventListener("pointerleave", () => releaseMediaNav("slideshow", slideshow));
+});
 slideshowPlay.addEventListener("click", toggleSlideshowPlay);
 slideshowFullscreen.addEventListener("click", toggleSlideshowFullscreen);
 slideshowUiToggle.addEventListener("click", () => setSlideshowControlsHidden(true));
